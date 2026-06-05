@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Smart-EMAP</string>
+    <string name="login_title">Smart-EMAP 登录</string>
+    <string name="server_url_hint">服务器地址（如 http://192.168.1.10:8005）</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 开发环境允许 HTTP；生产请改用 HTTPS 并收紧 cleartext -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
