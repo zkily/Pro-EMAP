@@ -18,9 +18,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,6 +48,7 @@ fun SidebarMenu(
     activePath: String,
     onNavigate: (String) -> Unit,
     onToggleCollapse: () -> Unit,
+    showCollapseControl: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
@@ -69,57 +73,147 @@ fun SidebarMenu(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             AppMenuConfig.rootMenus.forEach { node ->
-                when (node) {
-                    is AppMenuNode.Leaf -> SidebarLeafItem(
-                        label = node.label,
-                        icon = node.icon,
-                        isHome = node.isHome,
-                        isCollapsed = isCollapsed,
-                        isActive = activePath == node.path,
-                        onClick = { onNavigate(node.path) },
-                    )
-                    is AppMenuNode.Group -> {
-                        val expanded = expandedGroups[node.code] == true
-                        SidebarGroupItem(
-                            label = node.label,
-                            icon = node.icon,
-                            isCollapsed = isCollapsed,
-                            expanded = expanded,
-                            onToggle = {
-                                if (isCollapsed) {
-                                    onToggleCollapse()
-                                    expandedGroups[node.code] = true
-                                } else {
-                                    expandedGroups[node.code] = !expanded
-                                }
-                            },
+                SidebarNode(
+                    node = node,
+                    depth = 0,
+                    isCollapsed = isCollapsed,
+                    activePath = activePath,
+                    expandedGroups = expandedGroups,
+                    onNavigate = onNavigate,
+                    onToggleCollapse = onToggleCollapse,
+                )
+            }
+        }
+
+        if (showCollapseControl) {
+            HorizontalDivider(
+                color = Color.White.copy(alpha = 0.08f),
+                thickness = 1.dp,
+            )
+            SidebarCollapseFooter(
+                isCollapsed = isCollapsed,
+                onToggleCollapse = onToggleCollapse,
+            )
+        }
+    }
+}
+
+/** Web SidebarMenu.vue `.collapse-btn`：底部折りたたむ / 展開 */
+@Composable
+private fun SidebarCollapseFooter(
+    isCollapsed: Boolean,
+    onToggleCollapse: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        LoginColors.Primary.copy(alpha = 0.1f),
+                        LoginColors.PrimaryDark.copy(alpha = 0.08f),
+                    ),
+                ),
+            )
+            .clickable(onClick = onToggleCollapse)
+            .padding(horizontal = if (isCollapsed) 0.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (isCollapsed) Arrangement.Center else Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = if (isCollapsed) {
+                Icons.AutoMirrored.Filled.KeyboardArrowRight
+            } else {
+                Icons.AutoMirrored.Filled.KeyboardArrowLeft
+            },
+            contentDescription = if (isCollapsed) "展開" else "折りたたむ",
+            tint = LayoutColors.SidebarText,
+            modifier = Modifier.size(18.dp),
+        )
+        if (!isCollapsed) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "折りたたむ",
+                color = LayoutColors.SidebarText,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SidebarNode(
+    node: AppMenuNode,
+    depth: Int,
+    isCollapsed: Boolean,
+    activePath: String,
+    expandedGroups: MutableMap<String, Boolean>,
+    onNavigate: (String) -> Unit,
+    onToggleCollapse: () -> Unit,
+) {
+    when (node) {
+        is AppMenuNode.Leaf -> SidebarLeafItem(
+            label = node.label,
+            icon = node.icon,
+            isHome = node.isHome,
+            isCollapsed = isCollapsed,
+            isActive = activePath == node.path,
+            depth = depth,
+            onClick = { onNavigate(node.path) },
+        )
+
+        is AppMenuNode.Group -> {
+            val activeInSubtree = isActiveInSubtree(node, activePath)
+            // 当激活路由位于子树中时自动展开，避免用户看不到当前页对应的菜单层级。
+            val expanded = expandedGroups[node.code] == true || activeInSubtree
+            SidebarGroupItem(
+                label = node.label,
+                icon = node.icon,
+                isCollapsed = isCollapsed,
+                expanded = expanded,
+                isActiveInSubtree = activeInSubtree,
+                depth = depth,
+                onToggle = {
+                    if (isCollapsed) {
+                        onToggleCollapse()
+                        expandedGroups[node.code] = true
+                    } else {
+                        expandedGroups[node.code] = !expanded
+                    }
+                },
+            )
+
+            if (!isCollapsed && expanded) {
+                Column(
+                    modifier = Modifier
+                        .padding(start = 6.dp)
+                        .animateContentSize(),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    node.children.forEach { child ->
+                        SidebarNode(
+                            node = child,
+                            depth = depth + 1,
+                            isCollapsed = false,
+                            activePath = activePath,
+                            expandedGroups = expandedGroups,
+                            onNavigate = onNavigate,
+                            onToggleCollapse = onToggleCollapse,
                         )
-                        if (!isCollapsed && expanded) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(start = 8.dp)
-                                    .animateContentSize(),
-                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                            ) {
-                                node.children.forEach { child ->
-                                    if (child is AppMenuNode.Leaf) {
-                                        SidebarLeafItem(
-                                            label = child.label,
-                                            icon = child.icon,
-                                            isHome = child.isHome,
-                                            isCollapsed = false,
-                                            isActive = activePath == child.path,
-                                            isNested = true,
-                                            onClick = { onNavigate(child.path) },
-                                        )
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
         }
+    }
+}
+
+private fun isActiveInSubtree(node: AppMenuNode, activePath: String): Boolean {
+    return when (node) {
+        is AppMenuNode.Leaf -> node.path == activePath
+        is AppMenuNode.Group -> node.children.any { child -> isActiveInSubtree(child, activePath) }
     }
 }
 
@@ -171,23 +265,30 @@ private fun SidebarGroupItem(
     icon: ImageVector,
     isCollapsed: Boolean,
     expanded: Boolean,
+    isActiveInSubtree: Boolean,
+    depth: Int,
     onToggle: () -> Unit,
 ) {
+    val tint = if (isActiveInSubtree) LayoutColors.SidebarTextActive else LayoutColors.SidebarText
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onToggle)
-            .padding(horizontal = if (isCollapsed) 0.dp else 10.dp, vertical = 10.dp),
+            .padding(
+                horizontal = if (isCollapsed) 0.dp else (10 + depth * 8).dp,
+                vertical = 10.dp,
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (isCollapsed) Arrangement.Center else Arrangement.Start,
     ) {
-        Icon(icon, contentDescription = null, tint = LayoutColors.SidebarTextActive, modifier = Modifier.size(18.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
         if (!isCollapsed) {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
-                color = LayoutColors.SidebarTextActive,
+                color = tint,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -211,7 +312,7 @@ private fun SidebarLeafItem(
     isHome: Boolean,
     isCollapsed: Boolean,
     isActive: Boolean,
-    isNested: Boolean = false,
+    depth: Int = 0,
     onClick: () -> Unit,
 ) {
     val textColor = when {
@@ -234,8 +335,8 @@ private fun SidebarLeafItem(
             )
             .clickable(onClick = onClick)
             .padding(
-                horizontal = if (isCollapsed) 0.dp else if (isNested) 8.dp else 10.dp,
-                vertical = if (isNested) 8.dp else 10.dp,
+                horizontal = if (isCollapsed) 0.dp else (10 + depth * 8).dp,
+                vertical = if (depth > 0) 8.dp else 10.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (isCollapsed) Arrangement.Center else Arrangement.Start,
@@ -246,7 +347,7 @@ private fun SidebarLeafItem(
             Text(
                 text = label,
                 color = textColor,
-                fontSize = if (isNested) 13.sp else 14.sp,
+                fontSize = if (depth > 0) 13.sp else 14.sp,
                 fontWeight = if (isHome) FontWeight.Bold else FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -25,6 +25,8 @@ import com.example.smart_emap.SmartEmapAppContainer
 import com.example.smart_emap.data.model.UserDto
 import com.example.smart_emap.ui.dashboard.DashboardScreen
 import com.example.smart_emap.ui.dashboard.DashboardViewModel
+import com.example.smart_emap.ui.mes.inspection.InspectionActualScreen
+import com.example.smart_emap.ui.mes.inspection.InspectionActualViewModel
 
 /** Web MainLayout.vue と同構造：サイドバー + ヘッダー + タブ + コンテンツ */
 @Composable
@@ -37,6 +39,13 @@ fun MainShellScreen(
         factory = DashboardViewModel.Factory(
             dashboardRepository = appContainer.dashboardRepository,
             username = user.fullName ?: user.username,
+        ),
+    )
+    val inspectionViewModel: InspectionActualViewModel = viewModel(
+        factory = InspectionActualViewModel.Factory(
+            repository = appContainer.inspectionRepository,
+            userId = user.id,
+            inspectorLabel = user.fullName?.trim().orEmpty().ifEmpty { user.username },
         ),
     )
 
@@ -83,6 +92,7 @@ fun MainShellScreen(
                 SidebarMenu(
                     isCollapsed = !isMobile && isSidebarCollapsed,
                     activePath = activePath,
+                    showCollapseControl = !isMobile,
                     onNavigate = { path ->
                         navigateTo(path)
                         if (isMobile) isSidebarCollapsed = true
@@ -125,8 +135,9 @@ fun MainShellScreen(
                         }
                     },
                     onRefresh = {
-                        if (activePath == "/dashboard") {
-                            dashboardViewModel.loadDashboard()
+                        when (activePath) {
+                            "/dashboard" -> dashboardViewModel.loadDashboard()
+                            "/mes/actualDataCollection/inspection" -> inspectionViewModel.refresh()
                         }
                     },
                     onCloseOthers = {
@@ -140,6 +151,7 @@ fun MainShellScreen(
                 ) {
                     when (activePath) {
                         "/dashboard" -> DashboardScreen(viewModel = dashboardViewModel)
+                        "/mes/actualDataCollection/inspection" -> InspectionActualScreen(viewModel = inspectionViewModel)
                         else -> PlaceholderScreen(path = activePath)
                     }
                 }

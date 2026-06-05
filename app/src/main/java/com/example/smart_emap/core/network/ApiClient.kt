@@ -4,6 +4,9 @@ import com.example.smart_emap.BuildConfig
 import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.data.api.AuthApiService
 import com.example.smart_emap.data.api.DashboardApiService
+import com.example.smart_emap.data.api.ErpOptionsApiService
+import com.example.smart_emap.data.api.InspectionApiService
+import com.example.smart_emap.data.api.ProcessDefectApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
@@ -40,6 +43,12 @@ class ApiClient(
     suspend fun authApi(): AuthApiService = retrofit().create(AuthApiService::class.java)
 
     suspend fun dashboardApi(): DashboardApiService = retrofit().create(DashboardApiService::class.java)
+
+    suspend fun inspectionApi(): InspectionApiService = retrofit().create(InspectionApiService::class.java)
+
+    suspend fun erpOptionsApi(): ErpOptionsApiService = retrofit().create(ErpOptionsApiService::class.java)
+
+    suspend fun processDefectApi(): ProcessDefectApiService = retrofit().create(ProcessDefectApiService::class.java)
 
     fun invalidate() {
         cachedBaseUrl = null
