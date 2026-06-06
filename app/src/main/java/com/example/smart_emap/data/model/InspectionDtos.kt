@@ -26,6 +26,9 @@ data class InspectionManagementRowDto(
     @Json(name = "mes_production_is_paused") val mesProductionIsPaused: Int? = null,
     @Json(name = "mes_inspector_user_id") val mesInspectorUserId: Int? = null,
     @Json(name = "mes_client_instance_id") val mesClientInstanceId: String? = null,
+    val remarks: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
 )
 
 data class CreateInspectionBody(
@@ -33,6 +36,7 @@ data class CreateInspectionBody(
     @Json(name = "product_cd") val productCd: String,
     @Json(name = "product_name") val productName: String,
     @Json(name = "mes_inspector_user_id") val mesInspectorUserId: Int? = null,
+    val remarks: String? = null,
 )
 
 data class CreateInspectionResponse(
@@ -47,6 +51,7 @@ data class CreateInspectionData(
 
 data class PatchInspectionBody(
     @Json(name = "production_day") val productionDay: String? = null,
+    @Json(name = "production_sequence") val productionSequence: Int? = null,
     @Json(name = "actual_production_quantity") val actualProductionQuantity: Int? = null,
     @Json(name = "production_completed_check") val productionCompletedCheck: Boolean? = null,
     @Json(name = "defect_qty") val defectQty: Int? = null,
@@ -59,6 +64,8 @@ data class PatchInspectionBody(
     @Json(name = "mes_defect_by_item") val mesDefectByItem: Map<String, Int>? = null,
     @Json(name = "mes_client_instance_id") val mesClientInstanceId: String? = null,
     @Json(name = "mes_claim_client_lock") val mesClaimClientLock: Boolean? = null,
+    @Json(name = "mes_force_release") val mesForceRelease: Boolean? = null,
+    val remarks: String? = null,
 )
 
 data class ApiMessageResponse(
@@ -69,9 +76,19 @@ data class ApiMessageResponse(
 
 data class ErpProductDto(
     val id: Int? = null,
-    @Json(name = "product_code") val productCode: String,
-    @Json(name = "product_name") val productName: String,
+    @Json(name = "product_code") val productCode: String = "",
+    @Json(name = "product_cd") val productCd: String? = null,
+    @Json(name = "product_name") val productName: String = "",
     @Json(name = "is_active") val isActive: Boolean? = true,
+) {
+    fun normalizedCode(): String = productCode.trim().ifEmpty { productCd?.trim().orEmpty() }
+
+    fun normalizedName(): String = productName.trim()
+}
+
+data class ErpProductsEnvelope(
+    val success: Boolean? = null,
+    val data: List<ErpProductDto>? = null,
 )
 
 data class ProcessDefectItemDto(

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,6 +45,8 @@ fun MainShellScreen(
     val inspectionViewModel: InspectionActualViewModel = viewModel(
         factory = InspectionActualViewModel.Factory(
             repository = appContainer.inspectionRepository,
+            offlineStore = appContainer.inspectionOfflineStore,
+            networkMonitor = appContainer.networkMonitor,
             userId = user.id,
             inspectorLabel = user.fullName?.trim().orEmpty().ifEmpty { user.username },
         ),
@@ -58,11 +61,12 @@ fun MainShellScreen(
     }
 
     fun navigateTo(path: String) {
-        val title = AppMenuConfig.titleForPath(path)
-        if (tabs.none { it.path == path }) {
-            tabs = tabs + ShellTab(path = path, title = title)
+        val normalizedPath = path.trim().ifEmpty { "/dashboard" }
+        val title = AppMenuConfig.titleForPath(normalizedPath)
+        if (tabs.none { it.path == normalizedPath }) {
+            tabs = tabs + ShellTab(path = normalizedPath, title = title)
         }
-        activePath = path
+        activePath = normalizedPath
     }
 
     BoxWithConstraints(
@@ -137,7 +141,7 @@ fun MainShellScreen(
                     onRefresh = {
                         when (activePath) {
                             "/dashboard" -> dashboardViewModel.loadDashboard()
-                            "/mes/actualDataCollection/inspection" -> inspectionViewModel.refresh()
+                            "/mes/actualDataCollection/inspection" -> inspectionViewModel.refreshAll()
                         }
                     },
                     onCloseOthers = {
@@ -149,13 +153,28 @@ fun MainShellScreen(
                         .weight(1f)
                         .fillMaxWidth(),
                 ) {
-                    when (activePath) {
-                        "/dashboard" -> DashboardScreen(viewModel = dashboardViewModel)
-                        "/mes/actualDataCollection/inspection" -> InspectionActualScreen(viewModel = inspectionViewModel)
-                        else -> PlaceholderScreen(path = activePath)
+                    key(activePath) {
+                        ShellRouteContent(
+                            path = activePath,
+                            dashboardViewModel = dashboardViewModel,
+                            inspectionViewModel = inspectionViewModel,
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ShellRouteContent(
+    path: String,
+    dashboardViewModel: DashboardViewModel,
+    inspectionViewModel: InspectionActualViewModel,
+) {
+    when (path) {
+        "/dashboard" -> DashboardScreen(viewModel = dashboardViewModel)
+        "/mes/actualDataCollection/inspection" -> InspectionActualScreen(viewModel = inspectionViewModel)
+        else -> PlaceholderScreen(path = path)
     }
 }

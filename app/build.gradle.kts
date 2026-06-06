@@ -20,8 +20,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 开发模式默认：与 Smart-EMAPs 后端同网段（HTTPS）
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://192.168.1.62:5010/\"")
+        // 开发模式默认：直连 Smart-EMAPs 后端 API（startsub.py 默认 8010）
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:8010/\"")
     }
 
     buildTypes {
@@ -30,7 +30,7 @@ android {
             buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://your-server.example.com\"")
         }
         debug {
-            buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://192.168.1.62:5010/\"")
+            buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:8010/\"")
         }
     }
 

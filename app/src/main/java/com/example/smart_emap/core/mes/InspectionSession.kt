@@ -68,8 +68,8 @@ object InspectionSessionLogic {
     }
 
     fun hydrateFromRow(sess: PlanSession, row: InspectionRowSnapshot) {
-        val started = row.mesProductionStartedAt?.let { parseIsoToMillis(it) }
-        val ended = row.mesProductionEndedAt?.let { parseIsoToMillis(it) }
+        val started = MesDateTime.parseToMillis(row.mesProductionStartedAt)
+        val ended = MesDateTime.parseToMillis(row.mesProductionEndedAt)
         sess.wallStart = started
         sess.wallEnd = ended
         sess.activeAccumMs = ((row.mesNetProductionSec ?: 0) * 1000L).coerceAtLeast(0)
@@ -91,11 +91,6 @@ object InspectionSessionLogic {
         }
     }
 
-    private fun parseIsoToMillis(iso: String): Long? {
-        return runCatching {
-            java.time.Instant.parse(iso.trim()).toEpochMilli()
-        }.getOrNull()
-    }
 }
 
 enum class TimerPhase {

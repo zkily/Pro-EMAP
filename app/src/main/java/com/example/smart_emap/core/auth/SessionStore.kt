@@ -51,7 +51,15 @@ class SessionStore(private val context: Context) {
     }
 
     suspend fun getApiBaseUrl(defaultUrl: String): String {
-        return context.dataStore.data.first()[apiBaseUrlKey] ?: defaultUrl
+        val raw = context.dataStore.data.first()[apiBaseUrlKey]
+        val resolved = ApiDefaults.resolveApiBaseUrl(raw ?: defaultUrl)
+        if (!raw.isNullOrBlank()) {
+            val normalizedRaw = ApiDefaults.ensureTrailingSlash(raw.trim())
+            if (resolved != normalizedRaw) {
+                saveApiBaseUrl(resolved)
+            }
+        }
+        return resolved
     }
 
     suspend fun getRememberedCredentials(): RememberedCredentials {

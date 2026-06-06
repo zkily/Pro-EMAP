@@ -25,7 +25,9 @@ fun PlaceholderScreen(
     path: String,
     modifier: Modifier = Modifier,
 ) {
-    val title = AppMenuConfig.titleForPath(path)
+    val menuLeaf = AppMenuConfig.findLeaf(path)
+    val title = menuLeaf?.label ?: AppMenuConfig.titleForPath(path)
+    val isKnownRoute = menuLeaf != null
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -45,7 +47,11 @@ fun PlaceholderScreen(
                 Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = LoginColors.TitleDark)
                 Text(text = path, fontSize = 12.sp, color = LoginColors.TextMuted)
                 Text(
-                    text = "この画面は Web 版と同じルートです。次フェーズで各モジュール画面を実装します。",
+                    text = if (isKnownRoute) {
+                        "メニューからこのページを開きました。モバイル画面は順次実装予定です。"
+                    } else {
+                        "このルートはメニューに登録されていません。"
+                    },
                     fontSize = 13.sp,
                     color = LoginColors.TextMuted,
                 )

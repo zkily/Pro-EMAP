@@ -4,10 +4,12 @@ import com.example.smart_emap.core.mes.MesClientIdStore
 import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.ErpProductDto
+import com.example.smart_emap.data.model.ErpProductsEnvelope
 import com.example.smart_emap.data.model.InspectionManagementRowDto
 import com.example.smart_emap.data.model.PatchInspectionBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.HttpException
 
@@ -19,23 +21,49 @@ class InspectionRepository(
     private val apiClient: ApiClient,
     private val mesClientIdStore: MesClientIdStore,
 ) {
-    private val errorAdapter = Moshi.Builder()
+    private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
         .build()
-        .adapter(com.example.smart_emap.data.model.ApiMessageResponse::class.java)
+
+    private val errorAdapter = moshi.adapter(com.example.smart_emap.data.model.ApiMessageResponse::class.java)
+
+    private val productsListAdapter = moshi.adapter<List<ErpProductDto>>(
+        Types.newParameterizedType(List::class.java, ErpProductDto::class.java),
+    )
+
+    private val productsEnvelopeAdapter = moshi.adapter(ErpProductsEnvelope::class.java)
+
     suspend fun getClientInstanceId(): String = mesClientIdStore.getClientInstanceId()
 
     suspend fun loadProducts(): List<ErpProductDto> {
-        val list = apiClient.erpOptionsApi().getProducts()
+        val body = apiClient.erpOptionsApi().getProductsRaw().string()
+        val list = parseProductsJson(body)
         return list
+            .map { p ->
+                ErpProductDto(
+                    id = p.id,
+                    productCode = p.normalizedCode(),
+                    productName = p.normalizedName(),
+                    isActive = p.isActive,
+                )
+            }
             .filter { p ->
                 if (p.isActive == false) return@filter false
-                val code = p.productCode.trim()
+                val code = p.productCode
                 if (code.isEmpty() || !code.endsWith("1")) return@filter false
-                val name = p.productName
-                INSPECTION_PRODUCT_NAME_EXCLUDES.none { name.contains(it) }
+                INSPECTION_PRODUCT_NAME_EXCLUDES.none { p.productName.contains(it) }
             }
             .sortedBy { it.productName }
+    }
+
+    /** Web getProducts と同様：配列または { data: [...] } の両方に対応 */
+    private fun parseProductsJson(body: String): List<ErpProductDto> {
+        val trimmed = body.trim()
+        if (trimmed.isEmpty() || trimmed == "null") return emptyList()
+        if (trimmed.startsWith("[")) {
+            return productsListAdapter.fromJson(trimmed).orEmpty()
+        }
+        return productsEnvelopeAdapter.fromJson(trimmed)?.data.orEmpty()
     }
 
     suspend fun loadDefectItems(): List<ProcessDefectItemDto> {

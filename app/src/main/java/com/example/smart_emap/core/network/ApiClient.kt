@@ -9,7 +9,9 @@ import com.example.smart_emap.data.api.InspectionApiService
 import com.example.smart_emap.data.api.ProcessDefectApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import okhttp3.ConnectionSpec
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
@@ -69,10 +71,14 @@ class ApiClient(
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
 
         // 仅开发环境放开证书校验，避免自签名/私有 CA 造成的 SSLHandshakeException
         // 生产环境请改用正确受信任证书，或通过 network_security_config 配置 trust-anchors。
         if (BuildConfig.DEBUG) {
+            // HTTP/1.1：避免经 Vite/自签名 HTTPS 代理时出现 BAD_DECRYPT
+            clientBuilder.protocols(listOf(Protocol.HTTP_1_1))
             val trustManager = trustAllX509TrustManager()
             val sslSocketFactory = createSslSocketFactory(trustManager)
             clientBuilder.sslSocketFactory(sslSocketFactory, trustManager)
@@ -98,7 +104,7 @@ class ApiClient(
     }
 
     private fun createSslSocketFactory(trustManager: X509TrustManager) = run {
-        val sslContext = SSLContext.getInstance("TLS")
+        val sslContext = SSLContext.getInstance("TLSv1.2")
         sslContext.init(null, arrayOf<TrustManager>(trustManager), SecureRandom())
         sslContext.socketFactory
     }

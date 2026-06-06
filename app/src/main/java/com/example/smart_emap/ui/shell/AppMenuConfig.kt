@@ -313,15 +313,21 @@ object AppMenuConfig {
     )
 
     fun titleForPath(path: String): String {
-        fun walk(nodes: List<AppMenuNode>): String? {
+        return findLeaf(path)?.label ?: path
+    }
+
+    fun findLeaf(path: String): AppMenuNode.Leaf? {
+        fun walk(nodes: List<AppMenuNode>): AppMenuNode.Leaf? {
             for (node in nodes) {
                 when (node) {
-                    is AppMenuNode.Leaf -> if (node.path == path) return node.label
+                    is AppMenuNode.Leaf -> if (node.path == path) return node
                     is AppMenuNode.Group -> walk(node.children)?.let { return it }
                 }
             }
             return null
         }
-        return walk(rootMenus) ?: path
+        return walk(rootMenus)
     }
+
+    fun isKnownPath(path: String): Boolean = findLeaf(path) != null
 }
