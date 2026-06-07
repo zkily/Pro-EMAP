@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -55,12 +56,20 @@ fun HeaderBar(
     modifier: Modifier = Modifier,
 ) {
     var currentTime by remember { mutableStateOf(formatHeaderTime()) }
+    var weatherInfo by remember { mutableStateOf(HeaderWeatherInfo(temperature = "--", emoji = "🌤️")) }
     var userMenuExpanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
             currentTime = formatHeaderTime()
             delay(60_000)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            weatherInfo = HeaderWeatherFetcher.fetch()
+            delay(HeaderWeatherFetcher.REFRESH_MS)
         }
     }
 
@@ -106,7 +115,13 @@ fun HeaderBar(
                 ) {
                     Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color(0xFFC7D2FE), modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = currentTime, color = Color(0xFFF8FAFC), fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = currentTime,
+                        color = Color(0xFFF8FAFC),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    HeaderWeatherInline(weatherInfo = weatherInfo)
                 }
             }
 
@@ -147,6 +162,48 @@ fun HeaderBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HeaderWeatherInline(
+    weatherInfo: HeaderWeatherInfo,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(start = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(15.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.32f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(
+            text = weatherInfo.emoji,
+            fontSize = 13.sp,
+            lineHeight = 13.sp,
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = weatherInfo.temperature,
+            color = Color(0xFFC7D2FE),
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            modifier = Modifier.widthIn(min = 36.dp),
+        )
     }
 }
 

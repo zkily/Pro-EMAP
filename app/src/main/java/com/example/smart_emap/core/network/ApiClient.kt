@@ -3,10 +3,24 @@ package com.example.smart_emap.core.network
 import com.example.smart_emap.BuildConfig
 import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.data.api.AuthApiService
+import com.example.smart_emap.data.api.ApsApiService
+import com.example.smart_emap.data.api.ChamferingApiService
+import com.example.smart_emap.data.api.CuttingApiService
+import com.example.smart_emap.data.api.CuttingInstructionApiService
+import com.example.smart_emap.data.api.DatabaseApiService
+import com.example.smart_emap.data.api.CuttingPlanningApiService
 import com.example.smart_emap.data.api.DashboardApiService
 import com.example.smart_emap.data.api.ErpOptionsApiService
 import com.example.smart_emap.data.api.InspectionApiService
+import com.example.smart_emap.data.api.MaterialApiService
+import com.example.smart_emap.data.api.MasterApiService
+import com.example.smart_emap.data.api.PartApiService
+import com.example.smart_emap.data.api.OrderBatchApiService
+import com.example.smart_emap.data.api.OrderDailyApiService
+import com.example.smart_emap.data.api.OrderMonthlyApiService
 import com.example.smart_emap.data.api.ProcessDefectApiService
+import com.example.smart_emap.data.api.SystemUsersApiService
+import com.example.smart_emap.data.api.WeldingApiService
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.ConnectionSpec
@@ -48,9 +62,79 @@ class ApiClient(
 
     suspend fun inspectionApi(): InspectionApiService = retrofit().create(InspectionApiService::class.java)
 
+    suspend fun cuttingApi(): CuttingApiService = retrofit().create(CuttingApiService::class.java)
+
+    suspend fun chamferingApi(): ChamferingApiService = retrofit().create(ChamferingApiService::class.java)
+
+    suspend fun cuttingInstructionApi(): CuttingInstructionApiService =
+        retrofit().create(CuttingInstructionApiService::class.java)
+
+    suspend fun databaseApi(): DatabaseApiService =
+        retrofit().create(DatabaseApiService::class.java)
+
+    suspend fun cuttingPlanningApi(): CuttingPlanningApiService =
+        retrofit().create(CuttingPlanningApiService::class.java)
+
+    suspend fun systemUsersApi(): SystemUsersApiService = retrofit().create(SystemUsersApiService::class.java)
+
+    suspend fun weldingApi(): WeldingApiService = retrofit().create(WeldingApiService::class.java)
+
+    suspend fun masterApi(): MasterApiService = retrofit().create(MasterApiService::class.java)
+
+    suspend fun apsApi(): ApsApiService = retrofit().create(ApsApiService::class.java)
+
     suspend fun erpOptionsApi(): ErpOptionsApiService = retrofit().create(ErpOptionsApiService::class.java)
 
     suspend fun processDefectApi(): ProcessDefectApiService = retrofit().create(ProcessDefectApiService::class.java)
+
+    suspend fun orderMonthlyApi(): OrderMonthlyApiService = retrofit().create(OrderMonthlyApiService::class.java)
+
+    suspend fun orderBatchApi(): OrderBatchApiService = retrofitWithLongTimeout().create(OrderBatchApiService::class.java)
+
+    suspend fun orderDailyApi(): OrderDailyApiService = retrofit().create(OrderDailyApiService::class.java)
+
+    suspend fun materialApi(): MaterialApiService = retrofit().create(MaterialApiService::class.java)
+
+    suspend fun materialApiLong(): MaterialApiService =
+        retrofitWithLongTimeout().create(MaterialApiService::class.java)
+
+    suspend fun partApi(): PartApiService = retrofit().create(PartApiService::class.java)
+
+    suspend fun partApiLong(): PartApiService = retrofitWithLongTimeout().create(PartApiService::class.java)
+
+    private suspend fun retrofitWithLongTimeout(): Retrofit {
+        val baseUrl = sessionStore.getApiBaseUrl(ApiDefaults.displayBaseUrl)
+        val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        val logging = HttpLoggingInterceptor().apply {
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+        }
+        val clientBuilder = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
+        if (BuildConfig.DEBUG) {
+            clientBuilder.protocols(listOf(Protocol.HTTP_1_1))
+            val trustManager = trustAllX509TrustManager()
+            val sslSocketFactory = createSslSocketFactory(trustManager)
+            clientBuilder.sslSocketFactory(sslSocketFactory, trustManager)
+            clientBuilder.hostnameVerifier { _, _ -> true }
+        }
+        val client = clientBuilder
+            .addInterceptor(AuthInterceptor(sessionStore))
+            .addInterceptor(logging)
+            .build()
+        return Retrofit.Builder()
+            .baseUrl(normalized)
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+    }
 
     fun invalidate() {
         cachedBaseUrl = null

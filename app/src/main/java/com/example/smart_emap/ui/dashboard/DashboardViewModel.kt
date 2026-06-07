@@ -165,4 +165,8 @@ private fun defaultQuickAccess(): List<QuickAccessUi> = listOf(
     QuickAccessUi("/mes/productionInstruction/cutting", "切断・面取指示", "切断・面取の作業指示", Color(0xFFF59E0B), Color(0xFFD97706)),
     QuickAccessUi("/mes/productionInstruction/forming", "成型指示", "成型の作業指示", Color(0xFF06B6D4), Color(0xFF0891B2)),
     QuickAccessUi("/mes/productionInstruction/welding", "溶接指示", "溶接の作業指示", Color(0xFF6366F1), Color(0xFF4F46E5)),
+    QuickAccessUi("/mes/actualDataCollection/cutting", "切断実績収集", "切断実績の登録・照会", Color(0xFFEA580C), Color(0xFFC2410C)),
+    QuickAccessUi("/mes/actualDataCollection/chamfering", "面取実績収集", "面取実績の登録・照会", Color(0xFF14B8A6), Color(0xFF0D9488)),
+    QuickAccessUi("/mes/actualDataCollection/welding", "溶接実績収集", "溶接実績の登録・照会", Color(0xFF4F46E5), Color(0xFF4338CA)),
+    QuickAccessUi("/mes/actualDataCollection/inspection", "検査実績収集", "検査実績の登録・照会", Color(0xFFEC4899), Color(0xFFDB2777)),
 )

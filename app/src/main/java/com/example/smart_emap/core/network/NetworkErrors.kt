@@ -1,6 +1,9 @@
 package com.example.smart_emap.core.network
 
+import com.example.smart_emap.data.repository.ChamferingPatchException
+import com.example.smart_emap.data.repository.CuttingPatchException
 import com.example.smart_emap.data.repository.InspectionPatchException
+import com.example.smart_emap.data.repository.WeldingPatchException
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -18,12 +21,14 @@ data class NetworkErrorHints(
 object NetworkErrors {
     /** 是否因网络/服务器不可用而适合进入离线队列 */
     fun isNetworkFailure(throwable: Throwable): Boolean {
-        if (throwable is InspectionPatchException) {
-            return throwable.statusCode >= 500 || throwable.statusCode == 408
+        when (throwable) {
+            is InspectionPatchException -> return isRetryableHttpStatus(throwable.statusCode)
+            is CuttingPatchException -> return isRetryableHttpStatus(throwable.statusCode)
+            is ChamferingPatchException -> return isRetryableHttpStatus(throwable.statusCode)
+            is WeldingPatchException -> return isRetryableHttpStatus(throwable.statusCode)
         }
         if (throwable is HttpException) {
-            val code = throwable.code()
-            return code >= 500 || code == 408
+            return isRetryableHttpStatus(throwable.code())
         }
         if (throwable is SocketTimeoutException || throwable is UnknownHostException) return true
         if (throwable is IOException) return true
@@ -33,6 +38,9 @@ object NetworkErrors {
             detail.contains("Unable to resolve host", ignoreCase = true) ||
             detail.contains("Connection refused", ignoreCase = true)
     }
+
+    private fun isRetryableHttpStatus(statusCode: Int): Boolean =
+        statusCode >= 500 || statusCode == 408
 
     fun formatError(throwable: Throwable, fallback: String, hints: NetworkErrorHints): String {
         if (throwable is HttpException) {

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
@@ -76,6 +77,27 @@ object AppMenuConfig {
                     label = "購買・外注管理",
                     icon = Icons.Default.ShoppingCart,
                     children = listOf(
+                        AppMenuNode.Group(
+                            code = "ERP_PURCHASE_MATERIAL",
+                            label = "材料管理",
+                            icon = Icons.Default.Inventory2,
+                            children = listOf(
+                                AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_HOME", "材料管理ホーム", Icons.Default.Home, "/erp/purchase/material", isHome = true),
+                                AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_ORDER", "材料在庫管理", Icons.Default.ShoppingCart, "/erp/purchase/material/order"),
+                                AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_RECEIVING", "受入履歴", Icons.Default.List, "/erp/purchase/material/receiving-history"),
+                                AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_INSPECTION", "受入検品", Icons.Default.CheckCircle, "/erp/purchase/material/receiving-inspection"),
+                                AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_FORECAST", "内示管理", Icons.Default.TrendingUp, "/erp/purchase/material/forecast"),
+                            ),
+                        ),
+                        AppMenuNode.Group(
+                            code = "ERP_PURCHASE_PART",
+                            label = "部品管理",
+                            icon = Icons.Default.GridView,
+                            children = listOf(
+                                AppMenuNode.Leaf("ERP_PURCHASE_PART_HOME", "部品管理ホーム", Icons.Default.Home, "/erp/purchase/part", isHome = true),
+                                AppMenuNode.Leaf("ERP_PURCHASE_PART_ORDER", "部品在庫管理", Icons.Default.ShoppingCart, "/erp/purchase/part/order"),
+                            ),
+                        ),
                         AppMenuNode.Group(
                             code = "ERP_PURCHASE_OUTSOURCING",
                             label = "外注管理",
