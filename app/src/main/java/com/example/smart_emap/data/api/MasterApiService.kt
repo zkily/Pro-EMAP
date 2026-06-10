@@ -41,7 +41,11 @@ import com.example.smart_emap.data.model.ProductProcessBomRowDto
 import com.example.smart_emap.data.model.UpdateProductProcessBomBody
 import com.example.smart_emap.data.model.ProductCsvExportItemDto
 import com.example.smart_emap.data.model.ProductCsvExportResultDto
+import com.example.smart_emap.data.model.MasterProcessOptionDto
 import com.example.smart_emap.data.model.MasterProductRouteInfoDto
+import com.example.smart_emap.data.model.MasterProductRouteMachineBodyDto
+import com.example.smart_emap.data.model.MasterProductRouteMachineCreateResponseDto
+import com.example.smart_emap.data.model.MasterProductRouteStepBulkItemDto
 import com.example.smart_emap.data.model.MasterProductRouteStepDto
 import com.example.smart_emap.data.model.MasterRollerBodyDto
 import com.example.smart_emap.data.model.MasterRollerDto
@@ -55,6 +59,7 @@ import com.example.smart_emap.data.model.ApiEnvelope
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -274,6 +279,28 @@ interface MasterApiService {
         @Path("routeCd") routeCd: String,
     ): List<MasterProductRouteStepDto>
 
+    @GET("/api/master/product/process/routes")
+    suspend fun listProcessesForProductRoute(): List<MasterProcessOptionDto>
+
+    @POST("/api/master/product/process/routes/bulk")
+    suspend fun saveProductRouteStepsBulk(
+        @Body body: List<MasterProductRouteStepBulkItemDto>,
+    ): Map<String, String>
+
+    @POST("/api/master/product/process/routes/machines")
+    suspend fun createProductRouteMachine(
+        @Body body: MasterProductRouteMachineBodyDto,
+    ): MasterProductRouteMachineCreateResponseDto
+
+    @PUT("/api/master/product/process/routes/machines/{id}")
+    suspend fun updateProductRouteMachine(
+        @Path("id") id: Int,
+        @Body body: MasterProductRouteMachineBodyDto,
+    ): Map<String, String>
+
+    @DELETE("/api/master/product/process/routes/machines/{id}")
+    suspend fun deleteProductRouteMachine(@Path("id") id: Int): Map<String, String>
+
     // --- processing fees ---
     @GET("/api/master/process-processing-fees")
     suspend fun listProcessingFees(
@@ -301,6 +328,7 @@ interface MasterApiService {
     suspend fun listCustomers(
         @Query("keyword") keyword: String? = null,
         @Query("status") status: Int? = null,
+        @Query("customer_type") customerType: String? = null,
         @Query("page") page: Int = 1,
         @Query("pageSize") pageSize: Int = 5000,
     ): MasterListEnvelope<MasterCustomerDto>
@@ -310,6 +338,12 @@ interface MasterApiService {
 
     @PUT("/api/master/customers/{id}")
     suspend fun updateCustomer(@Path("id") id: Int, @Body body: MasterCustomerBodyDto): MasterCustomerDto
+
+    @PATCH("/api/master/customers/{id}/status")
+    suspend fun updateCustomerStatus(
+        @Path("id") id: Int,
+        @Query("status") status: Int,
+    ): MasterCustomerDto
 
     @DELETE("/api/master/customers/{id}")
     suspend fun deleteCustomer(@Path("id") id: Int): Map<String, String>
@@ -328,6 +362,12 @@ interface MasterApiService {
 
     @PUT("/api/master/carriers/{id}")
     suspend fun updateCarrier(@Path("id") id: Int, @Body body: MasterCarrierBodyDto): MasterCarrierDto
+
+    @PATCH("/api/master/carriers/{id}/status")
+    suspend fun updateCarrierStatus(
+        @Path("id") id: Int,
+        @Query("status") status: Int,
+    ): MasterCarrierDto
 
     @DELETE("/api/master/carriers/{id}")
     suspend fun deleteCarrier(@Path("id") id: Int): Map<String, String>

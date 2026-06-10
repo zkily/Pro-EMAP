@@ -9,6 +9,7 @@ import com.example.smart_emap.data.model.DestinationOptionDto
 import com.example.smart_emap.data.model.MasterBatchDeleteBodyDto
 import com.example.smart_emap.data.model.MasterCarrierBodyDto
 import com.example.smart_emap.data.model.MasterCustomerBodyDto
+import com.example.smart_emap.data.model.MasterCustomerDto
 import com.example.smart_emap.data.model.MasterDestinationBodyDto
 import com.example.smart_emap.data.model.MasterDestinationHolidayDto
 import com.example.smart_emap.data.model.MasterDestinationWorkdayDto
@@ -32,8 +33,13 @@ import com.example.smart_emap.data.model.MasterProductDto
 import com.example.smart_emap.data.model.ProductCsvExportItemDto
 import com.example.smart_emap.data.model.ProductCsvExportResultDto
 import com.example.smart_emap.data.model.ProductMasterStatsDto
+import com.example.smart_emap.data.model.MasterProcessOptionDto
 import com.example.smart_emap.data.model.MasterProductRouteInfoDto
+import com.example.smart_emap.data.model.MasterProductRouteMachineBodyDto
+import com.example.smart_emap.data.model.MasterProductRouteStepBulkItemDto
+import com.example.smart_emap.data.model.MasterProductRouteStepBulkMachineDto
 import com.example.smart_emap.data.model.MasterProductRouteStepDto
+import com.example.smart_emap.data.model.MasterMachineFullDto
 import com.example.smart_emap.data.model.MasterRollerBodyDto
 import com.example.smart_emap.data.model.MasterProcessRouteDto
 import com.example.smart_emap.data.model.MasterRouteStepBodyDto
@@ -287,11 +293,18 @@ class MasterRepository(
             }
         }.getOrElse { emptyList<MasterTableRow>() to 0 }
 
-    suspend fun loadProductsForRoute(keyword: String): List<Pair<String, String>> = runCatching {
-        apiClient.masterApi().listProducts(keyword = keyword.takeIf { it.isNotBlank() }, pageSize = 500)
-            .items()
-            .map { (it.productCd.orEmpty()) to (it.productName.orEmpty()) }
-    }.getOrElse { emptyList() }
+    suspend fun loadProductsForRoute(
+        keyword: String,
+        page: Int = 1,
+        pageSize: Int = 20,
+    ): Pair<List<Pair<String, String>>, Int> = runCatching {
+        val resp = apiClient.masterApi().listProducts(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            page = page,
+            pageSize = pageSize,
+        )
+        resp.items().map { (it.productCd.orEmpty()) to (it.productName.orEmpty()) } to resp.totalCount()
+    }.getOrElse { emptyList<Pair<String, String>>() to 0 }
 
     suspend fun loadProductRouteInfo(productCd: String): MasterProductRouteInfoDto? = runCatching {
         apiClient.masterApi().getProductRouteInfo(productCd)
@@ -300,6 +313,30 @@ class MasterRepository(
     suspend fun loadProductRouteSteps(productCd: String, routeCd: String): List<MasterProductRouteStepDto> = runCatching {
         apiClient.masterApi().getProductRouteSteps(productCd, routeCd)
     }.getOrElse { emptyList() }
+
+    suspend fun loadProcessesForProductRoute(): List<MasterProcessOptionDto> = runCatching {
+        apiClient.masterApi().listProcessesForProductRoute()
+    }.getOrElse { emptyList() }
+
+    suspend fun loadAllMachinesForRoute(): List<MasterMachineFullDto> = runCatching {
+        apiClient.masterApi().listMachines(pageSize = 5000).items()
+    }.getOrElse { emptyList() }
+
+    suspend fun saveProductRouteStepsBulk(steps: List<MasterProductRouteStepBulkItemDto>) {
+        apiClient.masterApi().saveProductRouteStepsBulk(steps)
+    }
+
+    suspend fun createProductRouteMachine(body: MasterProductRouteMachineBodyDto): Int? = runCatching {
+        apiClient.masterApi().createProductRouteMachine(body).id
+    }.getOrNull()
+
+    suspend fun updateProductRouteMachine(id: Int, body: MasterProductRouteMachineBodyDto) {
+        apiClient.masterApi().updateProductRouteMachine(id, body)
+    }
+
+    suspend fun deleteProductRouteMachine(id: Int) {
+        apiClient.masterApi().deleteProductRouteMachine(id)
+    }
 
     suspend fun loadRouteSteps(routeCd: String) = runCatching {
         apiClient.masterApi().listRouteSteps(routeCd)
@@ -888,6 +925,81 @@ class MasterRepository(
 
     suspend fun deleteSupplierMaster(id: Int) {
         apiClient.masterApi().deleteSupplier(id)
+    }
+
+    suspend fun loadCustomers(
+        keyword: String,
+        status: Int? = null,
+        customerType: String? = null,
+    ): Pair<List<MasterCustomerDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listCustomers(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            status = status,
+            customerType = customerType?.takeIf { it.isNotBlank() },
+            page = 1,
+            pageSize = 5000,
+        )
+        resp.items() to resp.totalCount()
+    }.getOrElse { emptyList<MasterCustomerDto>() to 0 }
+
+    suspend fun saveCustomerMaster(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        fun blankToNull(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }
+        val body = MasterCustomerBodyDto(
+            customerCd = fields["customer_cd"].orEmpty().trim(),
+            customerName = fields["customer_name"].orEmpty().trim(),
+            phone = blankToNull(fields["phone"]),
+            address = blankToNull(fields["address"]),
+            customerType = blankToNull(fields["customer_type"]),
+            status = fields["status"]?.toIntOrNull() ?: 1,
+        )
+        if (id == null) apiClient.masterApi().createCustomer(body) else apiClient.masterApi().updateCustomer(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun updateCustomerStatus(id: Int, status: Int) {
+        apiClient.masterApi().updateCustomerStatus(id, status)
+    }
+
+    suspend fun deleteCustomerMaster(id: Int) {
+        apiClient.masterApi().deleteCustomer(id)
+    }
+
+    suspend fun loadCarriers(
+        keyword: String,
+        status: Int? = null,
+    ): Pair<List<com.example.smart_emap.data.model.MasterCarrierDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listCarriers(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            status = status,
+            page = 1,
+            pageSize = 5000,
+        )
+        resp.items() to resp.totalCount()
+    }.getOrElse { emptyList<com.example.smart_emap.data.model.MasterCarrierDto>() to 0 }
+
+    suspend fun saveCarrierMaster(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        fun blankToNull(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }
+        val body = MasterCarrierBodyDto(
+            carrierCd = fields["carrier_cd"].orEmpty().trim(),
+            carrierName = fields["carrier_name"].orEmpty().trim(),
+            contactPerson = blankToNull(fields["contact_person"]),
+            phone = blankToNull(fields["phone"]),
+            address = blankToNull(fields["address"]),
+            shippingTime = blankToNull(fields["shipping_time"]),
+            reportNo = blankToNull(fields["report_no"]),
+            note = blankToNull(fields["note"]),
+            status = fields["status"]?.toIntOrNull() ?: 1,
+        )
+        if (id == null) apiClient.masterApi().createCarrier(body) else apiClient.masterApi().updateCarrier(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun updateCarrierStatus(id: Int, status: Int) {
+        apiClient.masterApi().updateCarrierStatus(id, status)
+    }
+
+    suspend fun deleteCarrierMaster(id: Int) {
+        apiClient.masterApi().deleteCarrier(id)
     }
 
     suspend fun loadProcesses(keyword: String = ""): Pair<List<com.example.smart_emap.data.model.MasterProcessDto>, Int> = runCatching {

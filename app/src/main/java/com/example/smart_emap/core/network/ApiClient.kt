@@ -1,6 +1,7 @@
 package com.example.smart_emap.core.network
 
 import com.example.smart_emap.BuildConfig
+import com.example.smart_emap.core.auth.SessionEvents
 import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.data.api.AuthApiService
 import com.example.smart_emap.data.api.ApsApiService
@@ -44,6 +45,7 @@ import java.util.concurrent.TimeUnit
 
 class ApiClient(
     private val sessionStore: SessionStore,
+    private val sessionEvents: SessionEvents,
 ) {
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -63,6 +65,12 @@ class ApiClient(
     }
 
     suspend fun authApi(): AuthApiService = retrofit().create(AuthApiService::class.java)
+
+    /** 登录时使用文本框传入的地址，避免与已缓存 Retrofit 或本地旧地址不一致。 */
+    fun authApiForBaseUrl(baseUrl: String): AuthApiService {
+        val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        return createRetrofit(normalized).create(AuthApiService::class.java)
+    }
 
     suspend fun dashboardApi(): DashboardApiService = retrofit().create(DashboardApiService::class.java)
 
@@ -158,6 +166,7 @@ class ApiClient(
         }
         val client = clientBuilder
             .addInterceptor(AuthInterceptor(sessionStore))
+            .addInterceptor(UnauthorizedInterceptor(sessionEvents))
             .addInterceptor(logging)
             .build()
         return Retrofit.Builder()
@@ -202,6 +211,7 @@ class ApiClient(
 
         val client = clientBuilder
             .addInterceptor(AuthInterceptor(sessionStore))
+            .addInterceptor(UnauthorizedInterceptor(sessionEvents))
             .addInterceptor(logging)
             .build()
 

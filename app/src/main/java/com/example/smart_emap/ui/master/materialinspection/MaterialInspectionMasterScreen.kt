@@ -45,29 +45,17 @@ fun MaterialInspectionMasterScreen(viewModel: MaterialInspectionMasterViewModel)
                     .padding(padding)
                     .padding(horizontal = 6.dp, vertical = 6.dp)
                     .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MaterialInspectionHeroBar(total = uiState.total, displayed = uiState.items.size)
-                MaterialInspectionActionSection(
-                    displayedCount = uiState.items.size,
-                    hasActiveFilters = viewModel.hasActiveFilters(),
-                    keyword = uiState.keyword,
-                    selectedCount = uiState.selectedIds.size,
+                MaterialInspectionToolbar(
+                    total = uiState.total,
                     actionLoading = uiState.actionLoading,
-                    onClear = viewModel::clearFilters,
                     onAdd = viewModel::openCreate,
-                    onBatchDelete = viewModel::requestBatchDelete,
-                )
-                MaterialInspectionFilterField(
-                    keyword = uiState.keyword,
-                    onKeywordChange = viewModel::setKeyword,
                 )
                 MaterialInspectionTable(
                     items = uiState.items,
-                    selectedIds = uiState.selectedIds,
                     loading = uiState.isLoading,
-                    onToggleSelectAll = viewModel::toggleSelectAll,
-                    onToggleSelect = viewModel::toggleSelection,
                     onRowClick = viewModel::openDetail,
                     onEdit = viewModel::openEdit,
                     onDelete = viewModel::requestDelete,
@@ -101,11 +89,10 @@ fun MaterialInspectionMasterScreen(viewModel: MaterialInspectionMasterViewModel)
     }
 
     uiState.pendingDeleteIds?.let { ids ->
-        val message = if (ids.size == 1) "この検品CDを削除しますか？" else "選択した ${ids.size} 件の検品CDを削除しますか？"
         AlertDialog(
             onDismissRequest = viewModel::cancelDelete,
-            title = { Text(if (ids.size == 1) "削除確認" else "一括削除確認") },
-            text = { Text(message) },
+            title = { Text("削除確認") },
+            text = { Text("この検品CDを削除しますか？") },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmDelete) { Text("はい") }
             },

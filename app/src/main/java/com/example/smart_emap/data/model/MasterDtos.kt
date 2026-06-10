@@ -324,16 +324,24 @@ data class MasterCarrierDto(
     val id: Int? = null,
     @Json(name = "carrier_cd") val carrierCd: String? = null,
     @Json(name = "carrier_name") val carrierName: String? = null,
+    @Json(name = "contact_person") val contactPerson: String? = null,
     val phone: String? = null,
     val address: String? = null,
+    @Json(name = "shipping_time") val shippingTime: String? = null,
+    @Json(name = "report_no") val reportNo: String? = null,
+    val note: String? = null,
     val status: Int? = null,
 )
 
 data class MasterCarrierBodyDto(
     @Json(name = "carrier_cd") val carrierCd: String,
     @Json(name = "carrier_name") val carrierName: String,
+    @Json(name = "contact_person") val contactPerson: String? = null,
     val phone: String? = null,
     val address: String? = null,
+    @Json(name = "shipping_time") val shippingTime: String? = null,
+    @Json(name = "report_no") val reportNo: String? = null,
+    val note: String? = null,
     val status: Int? = null,
 )
 
@@ -452,6 +460,43 @@ data class MasterProductRouteMachineDto(
     @Json(name = "machine_name") val machineName: String? = null,
     @Json(name = "process_time_sec") val processTimeSec: Double? = null,
     @Json(name = "setup_time") val setupTime: Int? = null,
+)
+
+data class MasterProcessOptionDto(
+    @Json(name = "process_cd") val processCd: String? = null,
+    @Json(name = "process_name") val processName: String? = null,
+)
+
+data class MasterProductRouteMachineBodyDto(
+    @Json(name = "product_cd") val productCd: String,
+    @Json(name = "route_cd") val routeCd: String,
+    @Json(name = "step_no") val stepNo: Int,
+    @Json(name = "machine_cd") val machineCd: String,
+    @Json(name = "machine_name") val machineName: String? = null,
+    @Json(name = "process_time_sec") val processTimeSec: Double = 0.0,
+    @Json(name = "setup_time") val setupTime: Double = 0.0,
+)
+
+data class MasterProductRouteMachineCreateResponseDto(
+    val id: Int? = null,
+    val message: String? = null,
+)
+
+data class MasterProductRouteStepBulkItemDto(
+    val id: Int? = null,
+    @Json(name = "product_cd") val productCd: String,
+    @Json(name = "route_cd") val routeCd: String,
+    @Json(name = "step_no") val stepNo: Int,
+    @Json(name = "process_cd") val processCd: String,
+    @Json(name = "process_name") val processName: String? = null,
+    val machines: List<MasterProductRouteStepBulkMachineDto>? = null,
+)
+
+data class MasterProductRouteStepBulkMachineDto(
+    @Json(name = "machine_cd") val machineCd: String,
+    @Json(name = "machine_name") val machineName: String? = null,
+    @Json(name = "process_time_sec") val processTimeSec: Double = 0.0,
+    @Json(name = "setup_time") val setupTime: Double = 0.0,
 )
 
 data class MasterDestinationHolidayDto(

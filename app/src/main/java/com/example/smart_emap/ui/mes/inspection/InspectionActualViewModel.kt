@@ -142,7 +142,13 @@ class InspectionActualViewModel(
     private val _uiState = MutableStateFlow(InspectionUiState(inspectorLabel = inspectorLabel))
     val uiState: StateFlow<InspectionUiState> = _uiState.asStateFlow()
 
-    init {
+    private var started = false
+    private var networkJob: Job? = null
+
+    /** 进入検査画面后再拉取计划与轮询，避免主界面挂载时触发 /api/plan/inspection-management/list。 */
+    fun ensureStarted() {
+        if (started) return
+        started = true
         viewModelScope.launch {
             clientInstanceId = repository.getClientInstanceId()
             hydrateFromOfflineCache()
@@ -154,7 +160,7 @@ class InspectionActualViewModel(
                 flushOfflineQueue()
             }
         }
-        viewModelScope.launch {
+        networkJob = viewModelScope.launch {
             networkMonitor.isOnline.collect { online ->
                 _uiState.update { it.copy(isNetworkOnline = online, isOfflineMode = !online || it.pendingSyncCount > 0) }
                 if (online) {
@@ -168,6 +174,7 @@ class InspectionActualViewModel(
     override fun onCleared() {
         tickJob?.cancel()
         syncJob?.cancel()
+        networkJob?.cancel()
         super.onCleared()
     }
 
@@ -225,6 +232,7 @@ class InspectionActualViewModel(
     }
 
     fun refreshAll() {
+        ensureStarted()
         viewModelScope.launch { loadInitial() }
     }
 

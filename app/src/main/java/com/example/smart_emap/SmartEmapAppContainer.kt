@@ -1,6 +1,7 @@
 package com.example.smart_emap
 
 import android.content.Context
+import com.example.smart_emap.core.auth.SessionEvents
 import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.core.mes.MesClientIdStore
 import com.example.smart_emap.core.mes.ChamferingOfflineStore
@@ -31,8 +32,9 @@ import com.example.smart_emap.data.repository.WeldingRepository
 
 class SmartEmapAppContainer(context: Context) {
     val sessionStore = SessionStore(context.applicationContext)
+    val sessionEvents = SessionEvents()
     val mesClientIdStore = MesClientIdStore(context.applicationContext)
-    val apiClient = ApiClient(sessionStore)
+    val apiClient = ApiClient(sessionStore, sessionEvents)
     val authRepository = AuthRepository(sessionStore, apiClient)
     val dashboardRepository = DashboardRepository(apiClient)
     val inspectionRepository = InspectionRepository(apiClient, mesClientIdStore)

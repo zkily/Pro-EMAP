@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+/** 登录页默认 API 地址（可在登录画面手动修改） */
+val DEFAULT_API_HOST = "192.168.0.12"
+val DEFAULT_API_PORT = 3005
+
+val defaultDevApiBaseUrl = "http://$DEFAULT_API_HOST:$DEFAULT_API_PORT/"
+println("SmartEMAP DEFAULT_API_BASE_URL = $defaultDevApiBaseUrl")
+
 android {
     namespace = "com.example.smart_emap"
     compileSdk {
@@ -20,8 +27,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 开发模式默认：Smart-EMAPs 前端 HTTP 代理（startsub.py 默认 3010）
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:3010/\"")
+        // 开发默认 API 地址（登录页可编辑）
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$defaultDevApiBaseUrl\"")
     }
 
     buildTypes {
@@ -30,7 +37,7 @@ android {
             buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://your-server.example.com\"")
         }
         debug {
-            buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:3010/\"")
+            buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$defaultDevApiBaseUrl\"")
         }
     }
 

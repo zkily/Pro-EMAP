@@ -5,8 +5,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.smart_emap.data.model.MasterInspectionDto
 import com.example.smart_emap.data.repository.MasterRepository
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,12 +14,10 @@ import kotlinx.coroutines.launch
 data class MaterialInspectionUiState(
     val isLoading: Boolean = false,
     val actionLoading: Boolean = false,
-    val keyword: String = "",
     val page: Int = 1,
     val pageSize: Int = 20,
     val items: List<MasterInspectionDto> = emptyList(),
     val total: Int = 0,
-    val selectedIds: Set<Int> = emptySet(),
     val showForm: Boolean = false,
     val editingItem: MasterInspectionDto? = null,
     val inspectionCd: String = "",
@@ -37,7 +33,6 @@ class MaterialInspectionMasterViewModel(
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(MaterialInspectionUiState())
     val uiState: StateFlow<MaterialInspectionUiState> = _uiState.asStateFlow()
-    private var searchJob: Job? = null
 
     init {
         refreshAll()
@@ -55,32 +50,15 @@ class MaterialInspectionMasterViewModel(
 
     private suspend fun loadPage() {
         val state = _uiState.value
-        val (items, total) = repository.loadInspectionMasters(state.keyword, state.page, state.pageSize)
+        val (items, total) = repository.loadInspectionMasters("", state.page, state.pageSize)
         _uiState.update {
             it.copy(
                 isLoading = false,
                 items = items,
                 total = total,
-                selectedIds = it.selectedIds.filter { id -> items.any { row -> row.id == id } }.toSet(),
             )
         }
     }
-
-    fun setKeyword(value: String) {
-        _uiState.update { it.copy(keyword = value, page = 1) }
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            delay(300)
-            refreshAll()
-        }
-    }
-
-    fun clearFilters() {
-        _uiState.update { it.copy(keyword = "", page = 1) }
-        refreshAll()
-    }
-
-    fun hasActiveFilters(): Boolean = _uiState.value.keyword.isNotBlank()
 
     fun setPage(page: Int) {
         _uiState.update { it.copy(page = page) }
@@ -90,26 +68,6 @@ class MaterialInspectionMasterViewModel(
     fun setPageSize(size: Int) {
         _uiState.update { it.copy(pageSize = size, page = 1) }
         refreshAll()
-    }
-
-    fun toggleSelection(id: Int) {
-        _uiState.update { state ->
-            val next = state.selectedIds.toMutableSet()
-            if (id in next) next.remove(id) else next.add(id)
-            state.copy(selectedIds = next)
-        }
-    }
-
-    fun toggleSelectAll(checked: Boolean) {
-        _uiState.update { state ->
-            state.copy(
-                selectedIds = if (checked) {
-                    state.items.mapNotNull { it.id }.toSet()
-                } else {
-                    emptySet()
-                },
-            )
-        }
     }
 
     fun openCreate() {
@@ -146,15 +104,6 @@ class MaterialInspectionMasterViewModel(
 
     fun requestDelete(id: Int) = _uiState.update { it.copy(pendingDeleteIds = listOf(id)) }
 
-    fun requestBatchDelete() {
-        val ids = _uiState.value.selectedIds.toList()
-        if (ids.isEmpty()) {
-            _uiState.update { it.copy(snackbarMessage = "削除するレコードを選択してください") }
-            return
-        }
-        _uiState.update { it.copy(pendingDeleteIds = ids) }
-    }
-
     fun cancelDelete() = _uiState.update { it.copy(pendingDeleteIds = null) }
 
     fun confirmDelete() {
@@ -162,16 +111,11 @@ class MaterialInspectionMasterViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(actionLoading = true, pendingDeleteIds = null) }
             runCatching {
-                if (ids.size == 1) {
-                    repository.deleteInspectionMaster(ids.first())
-                } else {
-                    repository.batchDeleteInspection(ids)
-                }
+                repository.deleteInspectionMaster(ids.first())
                 _uiState.update {
                     it.copy(
                         actionLoading = false,
-                        selectedIds = emptySet(),
-                        snackbarMessage = if (ids.size == 1) "削除しました" else "${ids.size} 件のレコードを削除しました",
+                        snackbarMessage = "削除しました",
                     )
                 }
                 refreshAll()

@@ -14,13 +14,14 @@ import kotlinx.coroutines.launch
 data class LoginUiState(
     val username: String = "",
     val password: String = "",
-    val apiBaseUrl: String = ApiDefaults.displayBaseUrl,
+    val apiBaseUrl: String = "",
     val rememberMe: Boolean = false,
     val passwordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val usernameError: String? = null,
     val passwordError: String? = null,
+    val apiBaseUrlError: String? = null,
 )
 
 class LoginViewModel(
@@ -32,14 +33,10 @@ class LoginViewModel(
     init {
         viewModelScope.launch {
             val savedUrl = authRepository.getApiBaseUrl(ApiDefaults.displayBaseUrl)
-            val apiBaseUrl = ApiDefaults.resolveApiBaseUrl(savedUrl)
-            if (apiBaseUrl != savedUrl) {
-                authRepository.saveApiBaseUrl(apiBaseUrl)
-            }
             val remembered = authRepository.getRememberedCredentials()
             _uiState.update {
                 it.copy(
-                    apiBaseUrl = apiBaseUrl,
+                    apiBaseUrl = savedUrl.trim().trimEnd('/'),
                     rememberMe = remembered.rememberMe,
                     username = remembered.username,
                     password = remembered.password,
@@ -54,6 +51,10 @@ class LoginViewModel(
 
     fun onPasswordChange(value: String) {
         _uiState.update { it.copy(password = value, passwordError = null, errorMessage = null) }
+    }
+
+    fun onApiBaseUrlChange(value: String) {
+        _uiState.update { it.copy(apiBaseUrl = value, apiBaseUrlError = null, errorMessage = null) }
     }
 
     fun onRememberMeChange(checked: Boolean) {
@@ -85,20 +86,27 @@ class LoginViewModel(
             state.password.length < 6 -> "パスワードは6文字以上である必要があります"
             else -> null
         }
-        if (usernameError != null || passwordError != null) {
+        val apiBaseUrlError = when {
+            state.apiBaseUrl.isBlank() -> "API サーバーアドレスを入力してください"
+            !state.apiBaseUrl.trim().matches(Regex("^https?://\\S+$", RegexOption.IGNORE_CASE)) ->
+                "http:// または https:// で始まる URL を入力してください"
+            else -> null
+        }
+        if (usernameError != null || passwordError != null || apiBaseUrlError != null) {
             valid = false
             _uiState.update {
-                it.copy(usernameError = usernameError, passwordError = passwordError)
+                it.copy(
+                    usernameError = usernameError,
+                    passwordError = passwordError,
+                    apiBaseUrlError = apiBaseUrlError,
+                )
             }
         }
         if (!valid) return
 
-        val apiBaseUrl = ApiDefaults.resolveApiBaseUrl(
-            state.apiBaseUrl.takeIf { it.isNotBlank() } ?: ApiDefaults.displayBaseUrl,
-        )
-
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val apiBaseUrl = ApiDefaults.ensureTrailingSlash(state.apiBaseUrl.trim())
             val result = authRepository.login(
                 username = state.username,
                 password = state.password,

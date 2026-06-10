@@ -34,6 +34,19 @@ fun AppNavHost(appContainer: SmartEmapAppContainer) {
         }
     }
 
+    LaunchedEffect(Unit) {
+        appContainer.sessionEvents.unauthorized.collect {
+            scope.launch {
+                appContainer.authRepository.clearLocalSession()
+                appNavViewModel.onLogout()
+                appContainer.sessionEvents.reset()
+                navController.navigate(Routes.LOGIN) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Routes.LOGIN,
@@ -45,6 +58,7 @@ fun AppNavHost(appContainer: SmartEmapAppContainer) {
             LoginScreen(
                 viewModel = loginViewModel,
                 onLoginSuccess = {
+                    appContainer.sessionEvents.reset()
                     appNavViewModel.onLoginSuccess()
                     navController.navigate(Routes.DASHBOARD) {
                         popUpTo(Routes.LOGIN) { inclusive = true }

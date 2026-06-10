@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -25,6 +27,7 @@ import com.example.smart_emap.ui.shell.LayoutColors
 fun SupplierMasterScreen(viewModel: SupplierMasterViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scroll = rememberScrollState()
     val emailCount = uiState.suppliers.count { !it.email.isNullOrBlank() }
 
     LaunchedEffect(uiState.snackbarMessage) {
@@ -43,7 +46,8 @@ fun SupplierMasterScreen(viewModel: SupplierMasterViewModel) {
                     .fillMaxSize()
                     .padding(padding)
                     .background(supplierPageBackground)
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                    .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 SupplierMasterHeroBar(
@@ -52,7 +56,8 @@ fun SupplierMasterScreen(viewModel: SupplierMasterViewModel) {
                 )
                 SupplierMasterFilterCard(
                     keyword = uiState.keyword,
-                    hasActiveFilters = viewModel.hasActiveFilters(),
+                    displayedCount = uiState.suppliers.size,
+                    total = uiState.total,
                     actionLoading = uiState.actionLoading || uiState.isLoading,
                     onKeywordChange = viewModel::setKeyword,
                     onSearch = viewModel::search,
@@ -62,17 +67,13 @@ fun SupplierMasterScreen(viewModel: SupplierMasterViewModel) {
                 SupplierMasterTable(
                     suppliers = uiState.suppliers,
                     loading = uiState.isLoading,
-                    total = uiState.total,
-                    modifier = Modifier.weight(1f),
-                    onEdit = viewModel::openEdit,
-                    onDelete = viewModel::requestDelete,
-                )
-                SupplierMasterPaginationBar(
                     page = uiState.page,
                     pageSize = uiState.pageSize,
                     total = uiState.total,
                     onPageChange = viewModel::setPage,
                     onPageSizeChange = viewModel::setPageSize,
+                    onEdit = viewModel::openEdit,
+                    onDelete = viewModel::requestDelete,
                 )
             }
         }

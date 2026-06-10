@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-private val supplierFormPrimary = Color(0xFF409EFF)
+private val supplierFormPrimary = Color(0xFFDB2777)
 private val supplierFormControlHeight = 32.dp
 private val supplierFormFieldGap = 6.dp
 
@@ -68,7 +68,7 @@ fun SupplierMasterFormDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Brush.horizontalGradient(listOf(Color(0xFFE6F7FF), Color.White))),
+                        .background(Brush.horizontalGradient(listOf(Color(0xFFFDF2F8), Color.White))),
                 ) {
                     Row(
                         modifier = Modifier

@@ -2,12 +2,14 @@ package com.example.smart_emap.data.repository
 
 import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.core.network.ApiClient
+import com.example.smart_emap.core.network.ApiDefaults
 import com.example.smart_emap.data.model.ApiErrorBody
 import com.example.smart_emap.data.model.LoginRequest
 import com.example.smart_emap.data.model.UserDto
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.HttpException
+import java.io.IOException
 
 class AuthRepository(
     private val sessionStore: SessionStore,
@@ -68,9 +70,10 @@ class AuthRepository(
             val identifier = username.trim().let {
                 if (it.contains('@')) it.lowercase() else it
             }
-            sessionStore.saveApiBaseUrl(apiBaseUrl)
+            val normalizedUrl = ApiDefaults.ensureTrailingSlash(apiBaseUrl.trim())
+            sessionStore.saveApiBaseUrl(normalizedUrl)
             apiClient.invalidate()
-            val response = apiClient.authApi().login(
+            val response = apiClient.authApiForBaseUrl(normalizedUrl).login(
                 LoginRequest(username = identifier, password = password),
             )
             sessionStore.saveSession(response.accessToken, response.user)
@@ -119,6 +122,19 @@ class AuthRepository(
                 )
             }
             return Exception("请求失败 (${throwable.code()})")
+        }
+        if (throwable is IOException) {
+            val detail = throwable.message.orEmpty()
+            return when {
+                detail.contains("unexpected end of stream", ignoreCase = true) ||
+                    detail.contains("Connection reset", ignoreCase = true) ||
+                    detail.contains("Failed to connect", ignoreCase = true) ->
+                    Exception(
+                        "サーバーに接続できません。API サーバー欄のアドレス・ポートが正しいか、バックエンドが起動しているか確認してください。",
+                    )
+                detail.isNotBlank() -> Exception(detail)
+                else -> Exception("ネットワークエラー。サーバーアドレスを確認してください。")
+            }
         }
         return Exception(throwable.message ?: "ネットワークエラー。サーバーアドレスを確認してください。")
     }

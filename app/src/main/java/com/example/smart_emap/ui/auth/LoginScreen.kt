@@ -49,6 +49,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Monitor
@@ -201,6 +202,7 @@ fun LoginScreen(
     val formCallbacks = LoginFormCallbacks(
         onUsernameChange = viewModel::onUsernameChange,
         onPasswordChange = viewModel::onPasswordChange,
+        onApiBaseUrlChange = viewModel::onApiBaseUrlChange,
         onRememberMeChange = viewModel::onRememberMeChange,
         onTogglePasswordVisible = viewModel::togglePasswordVisible,
         onForgotPassword = { showForgotDialog = true },
@@ -429,6 +431,7 @@ private fun BrandLogoMark(
 private data class LoginFormCallbacks(
     val onUsernameChange: (String) -> Unit,
     val onPasswordChange: (String) -> Unit,
+    val onApiBaseUrlChange: (String) -> Unit,
     val onRememberMeChange: (Boolean) -> Unit,
     val onTogglePasswordVisible: () -> Unit,
     val onForgotPassword: () -> Unit,
@@ -796,6 +799,7 @@ private fun LoginFormContent(
 ) {
     val usernameBringIntoView = remember { BringIntoViewRequester() }
     val passwordBringIntoView = remember { BringIntoViewRequester() }
+    val apiBringIntoView = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
 
     val formAlpha = remember { Animatable(if (animate) 0f else 1f) }
@@ -904,14 +908,43 @@ private fun LoginFormContent(
                         )
                     }
                 },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { callbacks.onLogin() }),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 modifier = Modifier
                     .fillMaxWidth()
                     .bringIntoViewRequester(passwordBringIntoView)
                     .onFocusEvent { event ->
                         if (event.isFocused) {
                             scope.launch { passwordBringIntoView.bringIntoView() }
+                        }
+                    },
+                shape = RoundedCornerShape(14.dp),
+                colors = loginFieldColors(),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+            )
+
+            Spacer(modifier = Modifier.height(dims.fieldGap))
+            FormLabel("API サーバー")
+            OutlinedTextField(
+                value = uiState.apiBaseUrl,
+                onValueChange = callbacks.onApiBaseUrlChange,
+                placeholder = { Text("http://192.168.1.62:3010", fontSize = 13.sp) },
+                singleLine = true,
+                isError = uiState.apiBaseUrlError != null,
+                supportingText = uiState.apiBaseUrlError?.let { { Text(it, fontSize = 11.sp) } },
+                leadingIcon = {
+                    Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp))
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { callbacks.onLogin() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewRequester(apiBringIntoView)
+                    .onFocusEvent { event ->
+                        if (event.isFocused) {
+                            scope.launch { apiBringIntoView.bringIntoView() }
                         }
                     },
                 shape = RoundedCornerShape(14.dp),

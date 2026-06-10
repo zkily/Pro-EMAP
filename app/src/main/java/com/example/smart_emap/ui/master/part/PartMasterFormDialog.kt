@@ -85,7 +85,7 @@ fun PartMasterFormDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(0.92f),
+            modifier = Modifier.fillMaxWidth(0.644f),
             shape = RoundedCornerShape(14.dp),
             color = Color.White,
             shadowElevation = 8.dp,

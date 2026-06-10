@@ -50,16 +50,14 @@ class SessionStore(private val context: Context) {
         return runCatching { userAdapter.fromJson(json) }.getOrNull()
     }
 
+    /** 返回用户保存的 API 地址（不做端口迁移），登录页与 ApiClient 均以此为准。 */
     suspend fun getApiBaseUrl(defaultUrl: String): String {
-        val raw = context.dataStore.data.first()[apiBaseUrlKey]
-        val resolved = ApiDefaults.resolveApiBaseUrl(raw ?: defaultUrl)
-        if (!raw.isNullOrBlank()) {
-            val normalizedRaw = ApiDefaults.ensureTrailingSlash(raw.trim())
-            if (resolved != normalizedRaw) {
-                saveApiBaseUrl(resolved)
-            }
+        val raw = context.dataStore.data.first()[apiBaseUrlKey]?.trim().orEmpty()
+        return if (raw.isBlank()) {
+            ApiDefaults.ensureTrailingSlash(defaultUrl)
+        } else {
+            ApiDefaults.ensureTrailingSlash(raw)
         }
-        return resolved
     }
 
     suspend fun getRememberedCredentials(): RememberedCredentials {

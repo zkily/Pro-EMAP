@@ -103,7 +103,7 @@ class MasterViewModel(
 
     private suspend fun loadProductRouteScreen() {
         val state = _uiState.value
-        val products = repository.loadProductsForRoute(state.productKeyword)
+        val (products, _) = repository.loadProductsForRoute(state.productKeyword)
         val info = state.selectedProductCd.takeIf { it.isNotBlank() }?.let { repository.loadProductRouteInfo(it) }
         val steps = if (info != null && !info.routeCd.isNullOrBlank()) {
             repository.loadProductRouteSteps(state.selectedProductCd, info.routeCd.orEmpty())

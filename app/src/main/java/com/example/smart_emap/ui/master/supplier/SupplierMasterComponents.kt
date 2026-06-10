@@ -9,11 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,10 +19,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -65,13 +65,12 @@ import com.example.smart_emap.data.model.MasterSupplierDto
 import kotlin.math.max
 import kotlin.math.min
 
-val supplierPageBackground = Brush.linearGradient(listOf(Color(0xFFF0F4F8), Color(0xFFE2E8F0)))
-private val supplierPurpleGradient = Brush.linearGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2)))
-private const val SUPPLIER_SUBTITLE = "仕入先情報の登録・編集・管理を行います"
-
-private val supplierFilterControlHeight = 34.dp
-private val supplierTableRowHeight = 38.dp
-private val supplierTableHeaderHeight = 40.dp
+val supplierPageBackground = Brush.linearGradient(listOf(Color(0xFFF8F5FF), Color(0xFFEDE9FE)))
+private val supplierGradient = Brush.linearGradient(listOf(Color(0xFFF093FB), Color(0xFFF5576C)))
+private val supplierAccent = Color(0xFFDB2777)
+private val supplierControlHeight = 32.dp
+private val supplierTableRowHeight = 40.dp
+private val supplierTableHeaderHeight = 38.dp
 
 private data class SupplierTableColumn(
     val key: String,
@@ -81,12 +80,12 @@ private data class SupplierTableColumn(
 )
 
 private val supplierTableColumns = listOf(
-    SupplierTableColumn("supplier_cd", "仕入先CD", 108, TextAlign.Center),
-    SupplierTableColumn("supplier_name", "仕入先名", 160),
-    SupplierTableColumn("contact_person", "担当者", 96),
-    SupplierTableColumn("phone", "電話", 120),
-    SupplierTableColumn("email", "メール", 168),
-    SupplierTableColumn("actions", "操作", 88, TextAlign.Center),
+    SupplierTableColumn("supplier_cd", "仕入先CD", 96, TextAlign.Center),
+    SupplierTableColumn("supplier_name", "仕入先名", 132),
+    SupplierTableColumn("contact_person", "担当者", 88),
+    SupplierTableColumn("phone", "電話", 104),
+    SupplierTableColumn("email", "メール", 148),
+    SupplierTableColumn("actions", "操作", 76, TextAlign.Center),
 )
 
 private val supplierTableWidth = (supplierTableColumns.sumOf { it.widthDp } + 16).dp
@@ -97,27 +96,32 @@ fun SupplierMasterHeroBar(total: Int, emailRegistered: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(8.dp, shape, spotColor = Color(0x40667EEA))
+            .shadow(6.dp, shape, spotColor = Color(0x40F093FB))
             .clip(shape)
-            .background(supplierPurpleGradient)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .background(supplierGradient)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
             modifier = Modifier.weight(1f).padding(end = 8.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(Icons.Default.Business, contentDescription = null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(22.dp))
+            Icon(
+                Icons.Default.Business,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier.size(22.dp),
+            )
             Column {
-                Text("仕入先マスタ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text(SUPPLIER_SUBTITLE, color = Color.White.copy(alpha = 0.8f), fontSize = 10.sp, lineHeight = 14.sp)
+                Text("仕入先マスタ", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Text("仕入先情報の登録・編集", color = Color.White.copy(alpha = 0.82f), fontSize = 10.sp)
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SupplierStatChip(total.toString(), "総仕入先数")
-            SupplierStatChip(emailRegistered.toString(), "メール登録")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SupplierStatChip(total.toString(), "総件数")
+            SupplierStatChip(emailRegistered.toString(), "メール")
         }
     }
 }
@@ -126,15 +130,15 @@ fun SupplierMasterHeroBar(total: Int, emailRegistered: Int) {
 private fun SupplierStatChip(value: String, label: String) {
     Surface(
         shape = RoundedCornerShape(10.dp),
-        color = Color.White.copy(alpha = 0.18f),
+        color = Color.White.copy(alpha = 0.16f),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 20.sp)
-            Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 10.sp, maxLines = 1)
+            Text(value, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text(label, color = Color.White.copy(alpha = 0.9f), fontSize = 9.sp)
         }
     }
 }
@@ -142,112 +146,108 @@ private fun SupplierStatChip(value: String, label: String) {
 @Composable
 fun SupplierMasterFilterCard(
     keyword: String,
-    hasActiveFilters: Boolean,
+    displayedCount: Int,
+    total: Int,
     actionLoading: Boolean,
     onKeywordChange: (String) -> Unit,
     onSearch: () -> Unit,
     onClear: () -> Unit,
     onAdd: () -> Unit,
 ) {
-    val buttonScroll = rememberScrollState()
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        elevation = CardDefaults.cardElevation(2.dp),
+        elevation = CardDefaults.cardElevation(1.dp),
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.linearGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9))))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .background(Brush.linearGradient(listOf(Color(0xFFFDF4FF), Color(0xFFFCE7F3))))
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
-                    Icon(Icons.Default.FilterList, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(16.dp))
-                    Text("検索・絞り込み", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color(0xFF334155))
+                    Icon(Icons.Default.FilterList, contentDescription = null, tint = supplierAccent, modifier = Modifier.size(15.dp))
+                    Text("検索・絞り込み", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = Color(0xFF334155))
+                    Text(
+                        "表示 $displayedCount / $total",
+                        fontSize = 10.sp,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
                 }
-                Row(
-                    modifier = Modifier.horizontalScroll(buttonScroll),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     TextButton(
                         onClick = onClear,
                         enabled = !actionLoading,
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF64748B))
-                        Text("クリア", fontSize = 11.sp, color = Color(0xFF64748B))
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(13.dp), tint = Color(0xFF64748B))
+                        Text("クリア", fontSize = 10.sp, color = Color(0xFF64748B))
                     }
-                    SupplierGradientButton("仕入先を追加", supplierPurpleGradient, Icons.Default.Add, enabled = !actionLoading, onClick = onAdd)
+                    SupplierGradientButton("仕入先追加", supplierGradient, Icons.Default.Add, enabled = !actionLoading, onClick = onAdd)
                 }
             }
             HorizontalDivider(color = Color(0xFFE2E8F0))
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.Bottom,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("🔍 キーワード検索", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569), modifier = Modifier.padding(bottom = 4.dp))
+                    Text("キーワード", fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
                     BasicTextField(
                         value = keyword,
                         onValueChange = onKeywordChange,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(supplierFilterControlHeight)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFFAFBFC))
+                            .padding(top = 4.dp)
+                            .height(supplierControlHeight)
                             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp),
+                            .padding(horizontal = 8.dp),
                         singleLine = true,
                         textStyle = TextStyle(fontSize = 12.sp, color = Color(0xFF334155)),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                         decorationBox = { inner ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+                                Box(modifier = Modifier.weight(1f).padding(start = 6.dp)) {
                                     if (keyword.isEmpty()) {
-                                        Text("仕入先CD・名称", fontSize = 11.sp, color = Color(0xFF94A3B8), maxLines = 1)
+                                        Text("仕入先CD・名称・担当者", color = Color(0xFF94A3B8), fontSize = 11.sp)
                                     }
                                     inner()
                                 }
-                                if (keyword.isNotBlank()) {
-                                    Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(16.dp))
+                                if (keyword.isNotEmpty()) {
+                                    Icon(
+                                        Icons.Default.Clear,
+                                        contentDescription = null,
+                                        tint = Color(0xFF94A3B8),
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { onKeywordChange("") },
+                                    )
                                 }
                             }
                         },
                     )
                 }
-                SupplierGradientButton("検索", Brush.linearGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2))), Icons.Default.Search, enabled = !actionLoading, onClick = onSearch)
-            }
-            if (hasActiveFilters) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Surface(shape = RoundedCornerShape(4.dp), color = Color(0xFFEEF2FF)) {
-                        Text(
-                            "キーワード: $keyword",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                            fontSize = 11.sp,
-                            color = Color(0xFF667EEA),
-                        )
-                    }
-                }
+                SupplierGradientButton(
+                    "検索",
+                    Brush.linearGradient(listOf(Color(0xFFEC4899), Color(0xFFDB2777))),
+                    Icons.Default.Search,
+                    enabled = !actionLoading,
+                    onClick = onSearch,
+                )
             }
         }
     }
@@ -261,21 +261,20 @@ private fun SupplierGradientButton(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(8.dp)
-    Row(
-        modifier = Modifier
-            .height(34.dp)
-            .clip(shape)
-            .then(
-                if (enabled) Modifier.background(brush, shape).clickable(onClick = onClick)
-                else Modifier.background(Color(0xFFE2E8F0), shape),
-            )
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(8.dp),
+        color = Color.Transparent,
+        modifier = Modifier.background(brush, RoundedCornerShape(8.dp)),
     ) {
-        Icon(icon, contentDescription = null, tint = if (enabled) Color.White else Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-        androidx.compose.foundation.layout.Spacer(Modifier.width(4.dp))
-        Text(label, color = if (enabled) Color.White else Color(0xFF94A3B8), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+            Text(label, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 4.dp))
+        }
     }
 }
 
@@ -283,78 +282,67 @@ private fun SupplierGradientButton(
 fun SupplierMasterTable(
     suppliers: List<MasterSupplierDto>,
     loading: Boolean,
+    page: Int,
+    pageSize: Int,
     total: Int,
-    modifier: Modifier = Modifier,
+    onPageChange: (Int) -> Unit,
+    onPageSizeChange: (Int) -> Unit,
     onEdit: (MasterSupplierDto) -> Unit,
     onDelete: (Int) -> Unit,
 ) {
     val hScroll = rememberScrollState()
-    val vScroll = rememberScrollState()
     Card(
-        modifier = modifier.fillMaxWidth().fillMaxHeight(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         elevation = CardDefaults.cardElevation(1.dp),
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(modifier = Modifier.horizontalScroll(hScroll)) {
-                Row(
-                    modifier = Modifier
-                        .width(supplierTableWidth)
-                        .height(supplierTableHeaderHeight)
-                        .background(Brush.linearGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9))))
-                        .padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    supplierTableColumns.forEach { col ->
-                        Text(
-                            col.label,
-                            modifier = Modifier.width(col.widthDp.dp).padding(horizontal = 4.dp),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF334155),
-                            textAlign = col.align,
-                            maxLines = 1,
-                        )
-                    }
-                }
+        if (loading && suppliers.isEmpty()) {
+            Box(modifier = Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = supplierAccent, strokeWidth = 2.dp)
             }
-            HorizontalDivider(color = Color(0xFFE2E8F0))
-            Box(modifier = Modifier.weight(1f).fillMaxWidth().heightIn(min = 140.dp)) {
-                when {
-                    loading && suppliers.isEmpty() -> {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = Color(0xFF667EEA), modifier = Modifier.size(28.dp))
-                        }
-                    }
-                    suppliers.isEmpty() -> {
-                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("データがありません", color = Color(0xFF94A3B8), fontSize = 13.sp)
-                        }
-                    }
-                    else -> {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .verticalScroll(vScroll)
-                                .horizontalScroll(hScroll),
-                        ) {
-                            suppliers.forEachIndexed { index, supplier ->
-                                SupplierMasterTableRow(supplier, index, onEdit, onDelete)
-                            }
-                        }
-                    }
-                }
-            }
-            HorizontalDivider(color = Color(0xFFE2E8F0))
-            Text(
-                "表示件数: ${suppliers.size} / $total",
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                fontSize = 11.sp,
-                color = Color(0xFF64748B),
-            )
+            return@Card
         }
+        Column(modifier = Modifier.horizontalScroll(hScroll)) {
+            Row(
+                modifier = Modifier
+                    .width(supplierTableWidth)
+                    .height(supplierTableHeaderHeight)
+                    .background(Brush.linearGradient(listOf(Color(0xFFFDF4FF), Color(0xFFFCE7F3))))
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                supplierTableColumns.forEach { col ->
+                    Text(
+                        col.label,
+                        modifier = Modifier.width(col.widthDp.dp),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF334155),
+                        textAlign = col.align,
+                    )
+                }
+            }
+            HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+            if (suppliers.isEmpty()) {
+                Box(modifier = Modifier.width(supplierTableWidth).height(100.dp), contentAlignment = Alignment.Center) {
+                    Text("データがありません", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                }
+            } else {
+                suppliers.forEachIndexed { index, supplier ->
+                    SupplierMasterTableRow(supplier, index, onEdit, onDelete)
+                }
+            }
+        }
+        HorizontalDivider(color = Color(0xFFE2E8F0))
+        SupplierMasterCompactPagination(
+            page = page,
+            pageSize = pageSize,
+            total = total,
+            onPageChange = onPageChange,
+            onPageSizeChange = onPageSizeChange,
+        )
     }
 }
 
@@ -375,67 +363,74 @@ private fun SupplierMasterTableRow(
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.width(108.dp).padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Icon(Icons.Default.Business, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(14.dp))
-            androidx.compose.foundation.layout.Spacer(Modifier.width(4.dp))
+        Surface(shape = RoundedCornerShape(6.dp), color = Color(0xFFFDF2F8), modifier = Modifier.width(96.dp)) {
             Text(
                 supplier.supplierCd.orEmpty(),
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF667EEA),
+                color = supplierAccent,
                 fontFamily = FontFamily.Monospace,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        SupplierTableTextCell(supplier.supplierName.orEmpty(), 160)
-        SupplierTableTextCell(supplier.contactPerson.orEmpty().ifBlank { "—" }, 96)
-        SupplierTableTextCell(supplier.phone.orEmpty().ifBlank { "—" }, 120)
-        SupplierTableTextCell(supplier.email.orEmpty().ifBlank { "—" }, 168)
-        Row(
+        Text(
+            supplier.supplierName.orEmpty(),
+            modifier = Modifier.width(132.dp).padding(horizontal = 4.dp),
+            fontSize = 11.sp,
+            color = Color(0xFF1E293B),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            supplier.contactPerson.orEmpty().ifBlank { "—" },
             modifier = Modifier.width(88.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                "編集",
-                color = Color(0xFF667EEA),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable { onEdit(supplier) }.padding(horizontal = 4.dp, vertical = 4.dp),
-            )
-            Text(
-                "削除",
-                color = Color(0xFFEF4444),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.clickable { onDelete(id) }.padding(horizontal = 4.dp, vertical = 4.dp),
-            )
+            fontSize = 10.sp,
+            color = Color(0xFF64748B),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            supplier.phone.orEmpty().ifBlank { "—" },
+            modifier = Modifier.width(104.dp),
+            fontSize = 10.sp,
+            color = Color(0xFF64748B),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        SupplierEmailCell(supplier.email, Modifier.width(148.dp))
+        Row(modifier = Modifier.width(76.dp), horizontalArrangement = Arrangement.Center) {
+            TextButton(onClick = { onEdit(supplier) }, contentPadding = PaddingValues(0.dp)) {
+                Icon(Icons.Default.Edit, contentDescription = "編集", modifier = Modifier.size(15.dp), tint = supplierAccent)
+            }
+            TextButton(onClick = { onDelete(id) }, contentPadding = PaddingValues(0.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "削除", modifier = Modifier.size(15.dp), tint = Color(0xFFEF4444))
+            }
         }
     }
-    HorizontalDivider(color = Color(0xFFF1F5F9), thickness = 0.5.dp)
+    HorizontalDivider(color = Color(0xFFF1F5F9))
 }
 
 @Composable
-private fun SupplierTableTextCell(text: String, widthDp: Int) {
-    Text(
-        text,
-        modifier = Modifier.width(widthDp.dp).padding(horizontal = 4.dp),
-        fontSize = 10.sp,
-        color = Color(0xFF334155),
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        lineHeight = 13.sp,
-    )
+private fun SupplierEmailCell(email: String?, modifier: Modifier = Modifier) {
+    val value = email.orEmpty().trim()
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
+        if (value.isBlank()) {
+            Text("—", fontSize = 10.sp, color = Color(0xFF94A3B8))
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Icon(Icons.Default.Email, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+                Text(value, fontSize = 10.sp, color = Color(0xFF475569), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SupplierMasterPaginationBar(
+private fun SupplierMasterCompactPagination(
     page: Int,
     pageSize: Int,
     total: Int,
@@ -449,73 +444,62 @@ fun SupplierMasterPaginationBar(
     var pageSizeExpanded by remember { mutableStateOf(false) }
     val pageSizeOptions = listOf(10, 20, 50, 100)
 
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFFAFBFC))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text("全 $total 件", fontSize = 11.sp, color = Color(0xFF64748B))
-                ExposedDropdownMenuBox(expanded = pageSizeExpanded, onExpandedChange = { pageSizeExpanded = it }) {
-                    Surface(
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFF8FAFC),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        onClick = { pageSizeExpanded = true },
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("$pageSize 件/頁", fontSize = 11.sp, color = Color(0xFF64748B))
-                            ExposedDropdownMenuDefaults.TrailingIcon(pageSizeExpanded)
-                        }
-                    }
-                    ExposedDropdownMenu(expanded = pageSizeExpanded, onDismissRequest = { pageSizeExpanded = false }) {
-                        pageSizeOptions.forEach { size ->
-                            DropdownMenuItem(
-                                text = { Text("$size 件/頁", fontSize = 12.sp) },
-                                onClick = { onPageSizeChange(size); pageSizeExpanded = false },
-                            )
-                        }
-                    }
+        Text("全 $total 件", fontSize = 10.sp, color = Color(0xFF64748B))
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+            SupplierPageNavButton("‹", enabled = page > 1) { onPageChange(page - 1) }
+            for (p in start..end) {
+                val active = p == page
+                Surface(
+                    onClick = { onPageChange(p) },
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (active) Color.Transparent else Color(0xFFF1F5F9),
+                    modifier = if (active) Modifier.background(supplierGradient, RoundedCornerShape(6.dp)) else Modifier,
+                ) {
+                    Text(
+                        "$p",
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        fontSize = 11.sp,
+                        color = if (active) Color.White else Color(0xFF64748B),
+                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    )
                 }
             }
-            Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                SupplierPageNavButton("‹", enabled = page > 1) { onPageChange(page - 1) }
-                for (p in start..end) {
-                    val active = p == page
-                    Surface(
-                        onClick = { onPageChange(p) },
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (active) Color.Transparent else Color(0xFFF1F5F9),
-                        modifier = if (active) {
-                            Modifier.padding(horizontal = 2.dp).background(supplierPurpleGradient, RoundedCornerShape(6.dp))
-                        } else {
-                            Modifier.padding(horizontal = 2.dp)
-                        },
-                    ) {
-                        Text(
-                            "$p",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            fontSize = 12.sp,
-                            color = if (active) Color.White else Color(0xFF64748B),
-                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                        )
-                    }
+            SupplierPageNavButton("›", enabled = page < maxPage) { onPageChange(page + 1) }
+        }
+        ExposedDropdownMenuBox(expanded = pageSizeExpanded, onExpandedChange = { pageSizeExpanded = it }) {
+            Surface(
+                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                shape = RoundedCornerShape(6.dp),
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                onClick = { pageSizeExpanded = true },
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("$pageSize/頁", fontSize = 10.sp, color = Color(0xFF64748B))
+                    ExposedDropdownMenuDefaults.TrailingIcon(pageSizeExpanded)
                 }
-                SupplierPageNavButton("›", enabled = page < maxPage) { onPageChange(page + 1) }
+            }
+            ExposedDropdownMenu(expanded = pageSizeExpanded, onDismissRequest = { pageSizeExpanded = false }) {
+                pageSizeOptions.forEach { size ->
+                    DropdownMenuItem(
+                        text = { Text("$size 件/頁", fontSize = 12.sp) },
+                        onClick = {
+                            onPageSizeChange(size)
+                            pageSizeExpanded = false
+                        },
+                    )
+                }
             }
         }
     }
@@ -528,12 +512,11 @@ private fun SupplierPageNavButton(label: String, enabled: Boolean, onClick: () -
         enabled = enabled,
         shape = RoundedCornerShape(6.dp),
         color = Color(0xFFF1F5F9),
-        modifier = Modifier.padding(horizontal = 2.dp),
     ) {
         Text(
             label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
-            fontSize = 14.sp,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            fontSize = 12.sp,
             color = if (enabled) Color(0xFF64748B) else Color(0xFFCBD5E1),
         )
     }

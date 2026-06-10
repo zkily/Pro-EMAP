@@ -3,7 +3,7 @@ package com.example.smart_emap.core.network
 import com.example.smart_emap.BuildConfig
 
 object ApiDefaults {
-    /** 登录页 API サーバー 文本框默认显示（与 BuildConfig 一致） */
+    /** 默认 API 地址（BuildConfig.DEFAULT_API_BASE_URL，登录页可编辑覆盖） */
     val displayBaseUrl: String
         get() = ensureTrailingSlash(BuildConfig.DEFAULT_API_BASE_URL)
 
@@ -31,6 +31,10 @@ object ApiDefaults {
      */
     fun migrateDevApiUrl(url: String): String {
         val trimmed = url.trim().trimEnd('/')
+        val frontendProd = Regex("^(https?)://([^/:]+):(3005|5005)$", RegexOption.IGNORE_CASE).find(trimmed)
+        if (frontendProd != null) {
+            return ensureTrailingSlash("http://${frontendProd.groupValues[2]}:8005")
+        }
         val match = Regex("^(https?)://([^/:]+):(5010|5000)$", RegexOption.IGNORE_CASE).find(trimmed)
             ?: return ensureTrailingSlash(url)
         val host = match.groupValues[2]
@@ -41,8 +45,8 @@ object ApiDefaults {
     fun isLegacyDevUrl(url: String): Boolean {
         val key = url.trim().trimEnd('/')
         if (legacyDevUrls.contains(key)) return true
-        // 任意 IP 的前端 dev 端口
-        return Regex("^https?://[^/:]+:(5010|5000)$", RegexOption.IGNORE_CASE).matches(key)
+        // 任意 IP 的前端端口（Vite dev / start.py 本番静态服务）
+        return Regex("^https?://[^/:]+:(3005|5005|5010|5000)$", RegexOption.IGNORE_CASE).matches(key)
     }
 
     fun ensureTrailingSlash(url: String): String {

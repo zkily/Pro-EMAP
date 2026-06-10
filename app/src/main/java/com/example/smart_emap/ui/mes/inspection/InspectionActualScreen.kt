@@ -121,6 +121,10 @@ fun InspectionActualScreen(
     val s = inspStringsFor(uiState.locale)
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(Unit) {
+        viewModel.ensureStarted()
+    }
+
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
