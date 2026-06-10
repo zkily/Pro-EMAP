@@ -41,8 +41,6 @@ class MaterialForecastViewModel(
     val uiState: StateFlow<MaterialForecastUiState> = _uiState.asStateFlow()
     private var keywordSearchJob: Job? = null
 
-    init { refreshAll() }
-
     fun refreshAll() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }

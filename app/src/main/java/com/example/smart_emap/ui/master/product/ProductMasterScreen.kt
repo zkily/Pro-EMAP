@@ -1,6 +1,5 @@
 package com.example.smart_emap.ui.master.product
 
-import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.ui.master.MasterPageScaffold
 import com.example.smart_emap.ui.shell.LayoutColors
 
@@ -37,13 +37,11 @@ fun ProductMasterScreen(viewModel: ProductMasterViewModel) {
     LaunchedEffect(uiState.pendingPrintHtml) {
         val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
         val subject = uiState.pendingPrintSubject ?: "製品マスタ印刷"
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/html"
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            putExtra(Intent.EXTRA_TEXT, html)
-        }
-        context.startActivity(Intent.createChooser(intent, "印刷 / 共有"))
+        val opened = HtmlPrintHelper.printHtml(context, html, subject, uiState.pendingPrintLayout)
         viewModel.clearPendingPrintHtml()
+        if (!opened) {
+            snackbarHostState.showSnackbar("印刷画面を開けませんでした")
+        }
     }
 
     Scaffold(

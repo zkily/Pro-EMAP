@@ -44,7 +44,7 @@ class ChamferingRepository(
     }
 
     suspend fun loadOperators(): List<UserListItemDto> {
-        val res = apiClient.systemUsersApi().listUsers(page = 1, pageSize = 500, status = "active")
+        val res = apiClient.systemUsersApi().getUsers(page = 1, pageSize = 500, status = "active")
         return res.items.orEmpty().filter { it.id != null }
     }
 

@@ -4,6 +4,8 @@ import com.example.smart_emap.data.model.ApiMessageResponse
 import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.CreateInspectionResponse
 import com.example.smart_emap.data.model.InspectionListResponse
+import com.example.smart_emap.data.model.InspectionProductivityAnalysisResponse
+import com.example.smart_emap.data.model.InspectionUtilizationAnalysisResponse
 import com.example.smart_emap.data.model.PatchInspectionBody
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -28,4 +30,26 @@ interface InspectionApiService {
         @Path("id") id: Int,
         @Body body: PatchInspectionBody,
     ): ApiMessageResponse
+
+    @GET("/api/plan/inspection-management/productivity-analysis")
+    suspend fun productivityAnalysis(
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("mes_inspector_user_id") mesInspectorUserId: Int? = null,
+        @Query("product_cd") productCd: String? = null,
+        @Query("include_incomplete") includeIncomplete: Boolean? = null,
+        @Query("limit") limit: Int? = null,
+    ): InspectionProductivityAnalysisResponse
+
+    @GET("/api/plan/inspection-management/utilization-analysis")
+    suspend fun utilizationAnalysis(
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("mes_inspector_user_id") mesInspectorUserId: Int? = null,
+        @Query("include_incomplete") includeIncomplete: Boolean? = null,
+        @Query("extra_workdays") extraWorkdays: String? = null,
+        @Query("extra_holidays") extraHolidays: String? = null,
+        @Query("use_company_calendar") useCompanyCalendar: Boolean? = true,
+        @Query("limit") limit: Int? = null,
+    ): InspectionUtilizationAnalysisResponse
 }

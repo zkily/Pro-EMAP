@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
+import com.example.smart_emap.data.model.UserDto
 import com.example.smart_emap.ui.theme.LoginColors
 import kotlinx.coroutines.delay
 
@@ -166,6 +167,7 @@ private fun computeFlyoutPanelLayout(
 
 @Composable
 fun SidebarMenu(
+    user: UserDto,
     isCollapsed: Boolean,
     activePath: String,
     onNavigate: (String) -> Unit,
@@ -173,6 +175,9 @@ fun SidebarMenu(
     showCollapseControl: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
+    val visibleMenus = remember(user.id, user.role, user.permissions, user.menuCodes) {
+        AppMenuConfig.menusForUser(user)
+    }
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
     var flyoutState by remember { mutableStateOf<CollapsedFlyoutState?>(null) }
     var flyoutVisible by remember { mutableStateOf(false) }
@@ -238,7 +243,7 @@ fun SidebarMenu(
                     .padding(horizontal = if (isCollapsed) 4.dp else 8.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                AppMenuConfig.rootMenus.forEach { node ->
+                visibleMenus.forEach { node ->
                     SidebarNode(
                         node = node,
                         depth = 0,

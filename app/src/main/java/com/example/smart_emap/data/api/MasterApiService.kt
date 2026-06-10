@@ -1,5 +1,9 @@
 package com.example.smart_emap.data.api
 
+import com.example.smart_emap.data.model.CompanyWorkCalendarBatchBodyDto
+import com.example.smart_emap.data.model.CompanyWorkCalendarBatchResponse
+import com.example.smart_emap.data.model.CompanyWorkCalendarDayTypeDto
+import com.example.smart_emap.data.model.CompanyWorkCalendarListResponse
 import com.example.smart_emap.data.model.DestinationOptionDto
 import com.example.smart_emap.data.model.MasterBatchDeleteBodyDto
 import com.example.smart_emap.data.model.MasterCarrierBodyDto
@@ -31,6 +35,10 @@ import com.example.smart_emap.data.model.MasterProductDto
 import com.example.smart_emap.data.model.EquipmentEfficiencyListResponse
 import com.example.smart_emap.data.model.ProductByProcessDto
 import com.example.smart_emap.data.model.ProductMachineConfigRowDto
+import com.example.smart_emap.data.model.ProductMachineConfigUpdateBody
+import com.example.smart_emap.data.model.ProductProcessBomListResponse
+import com.example.smart_emap.data.model.ProductProcessBomRowDto
+import com.example.smart_emap.data.model.UpdateProductProcessBomBody
 import com.example.smart_emap.data.model.ProductCsvExportItemDto
 import com.example.smart_emap.data.model.ProductCsvExportResultDto
 import com.example.smart_emap.data.model.MasterProductRouteInfoDto
@@ -39,6 +47,8 @@ import com.example.smart_emap.data.model.MasterRollerBodyDto
 import com.example.smart_emap.data.model.MasterRollerDto
 import com.example.smart_emap.data.model.MasterRouteStepBodyDto
 import com.example.smart_emap.data.model.MasterRouteStepDto
+import com.example.smart_emap.data.model.MasterRouteStepOrderItemDto
+import com.example.smart_emap.data.model.MasterRouteStepUpdateDto
 import com.example.smart_emap.data.model.MasterSupplierBodyDto
 import com.example.smart_emap.data.model.MasterSupplierDto
 import com.example.smart_emap.data.model.ApiEnvelope
@@ -68,11 +78,13 @@ interface MasterApiService {
         @Query("pageSize") pageSize: Int = 9999,
         @Query("destination_cd") destinationCd: String? = null,
         @Query("keyword") keyword: String? = null,
+        @Query("product_cd") productCd: String? = null,
         @Query("category") category: String? = null,
         @Query("kind") kind: String? = null,
         @Query("status") status: String? = null,
-        @Query("material_cd") materialCd: String? = null,
-        @Query("page") page: Int = 1,
+    @Query("material_cd") materialCd: String? = null,
+    @Query("product_type") productType: String? = null,
+    @Query("page") page: Int = 1,
     ): MasterListEnvelope<MasterProductDto>
 
     @GET("/api/master/products/max-cd")
@@ -98,9 +110,19 @@ interface MasterApiService {
     suspend fun listMaterials(
         @Query("keyword") keyword: String? = null,
         @Query("status") status: Int? = null,
+        @Query("material_type") materialType: String? = null,
+        @Query("supply_classification") supplyClassification: String? = null,
+        @Query("usegae") usegae: String? = null,
+        @Query("storage_location") storageLocation: String? = null,
         @Query("page") page: Int = 1,
         @Query("pageSize") pageSize: Int = 5000,
     ): MasterListEnvelope<MasterMaterialDto>
+
+    @GET("/api/master/materials/{id}")
+    suspend fun getMaterial(@Path("id") id: Int): MasterMaterialDto
+
+    @GET("/api/master/materials/max-cd")
+    suspend fun getMaxMaterialCd(): Map<String, Int>
 
     @POST("/api/master/materials")
     suspend fun createMaterial(@Body body: MasterMaterialBodyDto): MasterMaterialDto
@@ -110,6 +132,9 @@ interface MasterApiService {
 
     @DELETE("/api/master/materials/{id}")
     suspend fun deleteMaterial(@Path("id") id: Int): Map<String, String>
+
+    @POST("/api/master/materials/export-csv")
+    suspend fun exportMaterialsCsv(@Body body: List<com.example.smart_emap.data.model.MaterialCsvExportItemDto>): okhttp3.ResponseBody
 
     // --- material inspection ---
     @GET("/api/material/inspection-master")
@@ -151,6 +176,12 @@ interface MasterApiService {
 
     @DELETE("/api/master/parts/{id}")
     suspend fun deletePart(@Path("id") id: Int): ApiEnvelope<Any>
+
+    @GET("/api/master/parts/{id}")
+    suspend fun getPart(@Path("id") id: Int): ApiEnvelope<MasterPartDto>
+
+    @POST("/api/master/parts/export-csv")
+    suspend fun exportPartsCsv(@Body body: List<com.example.smart_emap.data.model.PartCsvExportItemDto>): okhttp3.ResponseBody
 
     // --- suppliers ---
     @GET("/api/master/suppliers")
@@ -203,6 +234,9 @@ interface MasterApiService {
     @DELETE("/api/master/process-routes/{id}")
     suspend fun deleteProcessRoute(@Path("id") id: Int): Map<String, String>
 
+    @GET("/api/master/process-routes/by-cd/{routeCd}")
+    suspend fun getProcessRouteByCd(@Path("routeCd") routeCd: String): MasterProcessRouteDto
+
     @GET("/api/master/process-routes/by-cd/{routeCd}/steps")
     suspend fun listRouteSteps(@Path("routeCd") routeCd: String): List<MasterRouteStepDto>
 
@@ -211,6 +245,18 @@ interface MasterApiService {
         @Path("routeCd") routeCd: String,
         @Body body: MasterRouteStepBodyDto,
     ): MasterRouteStepDto
+
+    @PUT("/api/master/process-routes/steps/{stepId}")
+    suspend fun updateRouteStep(
+        @Path("stepId") stepId: Int,
+        @Body body: MasterRouteStepUpdateDto,
+    ): MasterRouteStepDto
+
+    @PUT("/api/master/process-routes/by-cd/{routeCd}/steps/order")
+    suspend fun updateRouteStepOrder(
+        @Path("routeCd") routeCd: String,
+        @Body body: List<MasterRouteStepOrderItemDto>,
+    ): Map<String, String>
 
     @DELETE("/api/master/process-routes/by-cd/{routeCd}/steps/{stepId}")
     suspend fun deleteRouteStep(
@@ -362,6 +408,21 @@ interface MasterApiService {
     @DELETE("/api/master/destinations/workdays/{id}")
     suspend fun deleteDestinationWorkday(@Path("id") id: Int): Map<String, String>
 
+    @GET("/api/master/company-work-calendar/day-types")
+    suspend fun listCompanyWorkCalendarDayTypes(): List<CompanyWorkCalendarDayTypeDto>
+
+    @GET("/api/master/company-work-calendar")
+    suspend fun listCompanyWorkCalendar(
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+    ): CompanyWorkCalendarListResponse
+
+    @POST("/api/master/company-work-calendar/batch")
+    suspend fun batchCreateCompanyWorkCalendar(@Body body: CompanyWorkCalendarBatchBodyDto): CompanyWorkCalendarBatchResponse
+
+    @DELETE("/api/master/company-work-calendar/{id}")
+    suspend fun deleteCompanyWorkCalendarEntry(@Path("id") id: Int): Map<String, String>
+
     @GET("/api/master/carriers/options")
     suspend fun carrierOptions(): List<MasterOptionDto>
 
@@ -377,6 +438,26 @@ interface MasterApiService {
     suspend fun listProductMachineConfig(
         @Query("limit") limit: Int = 99999,
     ): MasterListEnvelope<ProductMachineConfigRowDto>
+
+    @PUT("/api/master/product-machine-config/{id}")
+    suspend fun updateProductMachineConfig(
+        @Path("id") id: Int,
+        @Body body: ProductMachineConfigUpdateBody,
+    ): ProductMachineConfigRowDto
+
+    @GET("/api/master/product-process-bom")
+    suspend fun listProductProcessBom(
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 100,
+        @Query("sort_by") sortBy: String? = "product_name",
+        @Query("sort_order") sortOrder: String? = "asc",
+    ): ProductProcessBomListResponse
+
+    @PUT("/api/master/product-process-bom/{productCd}")
+    suspend fun updateProductProcessBom(
+        @Path("productCd") productCd: Int,
+        @Body body: UpdateProductProcessBomBody,
+    ): ProductProcessBomRowDto
 
     @GET("/api/master/equipment-efficiency")
     suspend fun listEquipmentEfficiencyMaster(

@@ -3,6 +3,7 @@ package com.example.smart_emap.ui.master.product
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.data.model.MasterProductDto
 import com.example.smart_emap.data.model.ProductMasterStatsDto
 import com.example.smart_emap.data.repository.MasterRepository
@@ -119,6 +120,7 @@ data class ProductMasterUiState(
     val showScrapConfirm: Boolean = false,
     val pendingPrintHtml: String? = null,
     val pendingPrintSubject: String? = null,
+    val pendingPrintLayout: PrintPageLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
 )
 
 class ProductMasterViewModel(
@@ -401,6 +403,7 @@ class ProductMasterViewModel(
                         actionLoading = false,
                         pendingPrintHtml = html,
                         pendingPrintSubject = "製品QRコード印刷",
+                        pendingPrintLayout = PrintPageLayout.A3_LANDSCAPE_SINGLE,
                         snackbarMessage = "${qrItems.size}件のQRコードを生成しました",
                     )
                 }
@@ -440,7 +443,8 @@ class ProductMasterViewModel(
                         actionLoading = false,
                         pendingPrintHtml = html,
                         pendingPrintSubject = "切断長印刷",
-                        snackbarMessage = "印刷プレビューを共有します",
+                        pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                        snackbarMessage = "印刷プレビューを開きます",
                     )
                 }
             }.onFailure { e ->
@@ -455,7 +459,13 @@ class ProductMasterViewModel(
     }
 
     fun clearPendingPrintHtml() {
-        _uiState.update { it.copy(pendingPrintHtml = null, pendingPrintSubject = null) }
+        _uiState.update {
+            it.copy(
+                pendingPrintHtml = null,
+                pendingPrintSubject = null,
+                pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+            )
+        }
     }
 
     fun exportCsv() {

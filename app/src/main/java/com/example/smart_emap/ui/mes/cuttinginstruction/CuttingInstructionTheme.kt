@@ -35,7 +35,14 @@ object CuttingInstructionTheme {
     const val CuttingTableMaxHeightDp = 448
     const val CuttingMgmtRowHeightDp = 32
     const val CuttingTodayVisibleRows = 6
+    const val ChamferTodayVisibleRows = 12
     const val CuttingCompletedSwitchScale = 0.7f
+    const val UsageSummaryVisibleRows = 5
+    const val UsageSummaryRowHeightDp = 22
+    const val UsageSummaryHeaderHeightDp = 20
+    const val UsageSummaryStockSwitchScale = 0.7f
+    val UsageSummaryStockSwitchTrackChecked = Color(0xFFCBD5E1)
+    val UsageSummaryStockSwitchTrackUnchecked = Color(0xFFE2E8F0)
     val ChamferingAccent = Color(0xFF059669)
     val ChamferingTitle = Color(0xFF047857)
     val KanbanAccent = Color(0xFFD97706)
@@ -82,12 +89,28 @@ object CuttingInstructionTheme {
     val ChamferHeaderBtnNewBg = Color(0xFFF8FAFC)
     val ChamferHeaderBtnNewBorder = Color(0xFFCBD5E1)
     val ChamferHeaderBtnNewText = Color(0xFF047857)
+    const val SectionCardTitleHeightDp = 20
+    val ChamferPlanGlassBtnTop = Color(0xF5FFFFFF)
+    val ChamferPlanGlassBtnMid = Color(0xD9ECFDF5)
+    val ChamferPlanGlassBtnBottom = Color(0xCC10B981)
+    val ChamferPlanGlassBtnBorder = Color(0x99FFFFFF)
+    val ChamferPlanGlassBtnEdge = Color(0x66059669)
+    val ChamferPlanGlassBtnShadow = Color(0x45059669)
+    val ChamferPlanGlassBtnText = Color(0xFF065F46)
     val ChamferHeaderBtnPlanStart = Color(0xFFFBBF24)
     val ChamferHeaderBtnPlanEnd = Color(0xFFE49604)
     val ChamferHeaderBtnIssue = Color(0xFF409EFF)
     val ChamferHeaderBtnIssueEnd = Color(0xFF2563EB)
     val ChamferHeaderBtnConfirmStart = Color(0xFF67C23A)
     val ChamferHeaderBtnConfirmEnd = Color(0xFF16A34A)
+    const val ChamferMgmtHeaderBtnHeightDp = 28
+    val ChamferMgmtBtnDefaultBg = Color(0xFFFFFFFF)
+    val ChamferMgmtBtnDefaultBorder = Color(0xFFC0C4CC)
+    val ChamferMgmtBtnDefaultText = Color(0xFF606266)
+    val ChamferMgmtBtnSuccessBg = Color(0xFF67C23A)
+    val ChamferMgmtBtnSuccessBorder = Color(0xFF67C23A)
+    val ChamferMgmtBtnPrimaryBg = Color(0xFF409EFF)
+    val ChamferMgmtBtnPrimaryBorder = Color(0xFF409EFF)
 
     val ChamferMgmtTableBorder = Color(0xFF6EE7B7)
     val ChamferMgmtTableHeaderStart = Color(0xFFECFDF5)
@@ -134,6 +157,12 @@ object CuttingInstructionTheme {
 
     const val PlanBatchVisibleRows = 7
     const val PlanBatchRowHeightDp = 34
+    const val ChamferPlanVisibleRows = 8
+    const val KanbanVisibleRows = 8
+    const val KanbanRowHeightDp = 32
+    const val PlanBatchMaterialSwitchScale = 0.72f
+    val PlanBatchMaterialSwitchTrackChecked = Color(0xFF93C5FD)
+    val PlanBatchMaterialSwitchTrackUnchecked = Color(0xFFE2E8F0)
     const val ChamferPlanMinWidthDp = 796
 
     val ChamferPlanTableBorder = Color(0xFFA7F3D0)
@@ -163,4 +192,25 @@ object CuttingInstructionTheme {
     val PlanEditFooterBg = Color(0xFFF8FAFC)
     val PlanEditSaveStart = Color(0xFF2563EB)
     val PlanEditSaveEnd = Color(0xFF1D4ED8)
+
+    val NotesDialogBorder = Color(0xFFDDD6FE)
+    val NotesDialogHeaderStart = Color(0xFFF5F3FF)
+    val NotesDialogHeaderMid = Color(0xFFEEF2FF)
+    val NotesDialogHeaderEnd = Color(0xFFECFEFF)
+    val NotesDialogTitle = Color(0xFF4C1D95)
+    val NotesDialogBodyTop = Color(0xFFFAFAFF)
+    val NotesDialogBodyBottom = Color(0xFFF8FAFC)
+    val NotesDialogFooterBg = Color(0xFFFCFCFF)
+    val NotesDialogAddBorder = Color(0xFFE9D5FF)
+    val NotesDialogAddBgStart = Color(0xFFFFFFFF)
+    val NotesDialogAddBgEnd = Color(0xFFF8F5FF)
+    val NotesDialogInputBorder = Color(0xFFDDD6FE)
+    val NotesDialogInputFocusBorder = Color(0xFFA78BFA)
+    val NotesDialogCharCount = Color(0xFF7C3AED)
+    val NotesDialogAddBtnStart = Color(0xFF8B5CF6)
+    val NotesDialogAddBtnEnd = Color(0xFF6366F1)
+    val NotesDialogRowBorder = Color(0xFFEDE9FE)
+    val NotesDialogCheckbox = Color(0xFF8B5CF6)
+    val NotesDialogDelete = Color(0xFF94A3B8)
+    val NotesBadgeText = Color(0xFFEF4444)
 }

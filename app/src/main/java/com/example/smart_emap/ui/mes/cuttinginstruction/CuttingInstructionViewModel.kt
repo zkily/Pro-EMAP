@@ -26,11 +26,17 @@ import com.example.smart_emap.data.model.SplitChamferingToNextDayBody
 import com.example.smart_emap.data.model.SplitCuttingToNextDayBody
 import com.example.smart_emap.data.model.UpdateChamferingPlanContentBody
 import com.example.smart_emap.data.model.CuttingInstructionNoteDto
+import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.data.repository.CuttingInstructionRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
@@ -83,7 +89,11 @@ sealed class CuttingInstructionDialog {
     data object ChamferingDoneList : CuttingInstructionDialog()
     data object DataManagement : CuttingInstructionDialog()
     data object Notes : CuttingInstructionDialog()
-    data class NewPlan(val isTrial: Boolean, val initial: PlanFormState) : CuttingInstructionDialog()
+    data class NewPlan(
+        val isTrial: Boolean,
+        val initial: PlanFormState,
+        val productOptions: List<Pair<String, String>> = emptyList(),
+    ) : CuttingInstructionDialog()
     data class EditPlan(val planId: Int, val initial: PlanFormState) : CuttingInstructionDialog()
     data class EditUsageCount(val rowId: Int, val isCutting: Boolean, val current: Double) : CuttingInstructionDialog()
     data object SpecifiedDateMaterial : CuttingInstructionDialog()
@@ -97,8 +107,6 @@ sealed class CuttingInstructionDialog {
     data class EditChamferingPlan(val planId: Int, val initial: ChamferingPlanFormState) : CuttingInstructionDialog()
     data class MoveChamferingPlan(val plan: InstructionChamferingPlanRowDto) : CuttingInstructionDialog()
     data class EditKanban(val row: KanbanIssuanceRowDto) : CuttingInstructionDialog()
-    data object ConfirmCuttingActual : CuttingInstructionDialog()
-    data object ConfirmChamferingActual : CuttingInstructionDialog()
     data object ConfirmUsageReflection : CuttingInstructionDialog()
     data class ConfirmActualResult(val inserted: Int, val totalQty: Int) : CuttingInstructionDialog()
     data class ConfirmDelete(val message: String, val onConfirm: () -> Unit) : CuttingInstructionDialog()
@@ -107,14 +115,19 @@ data class UsageSummaryCounts(val total: Int = 0, val reflected: Int = 0, val no
 data class CuttingInstructionUiState(
     val isLoading: Boolean = false,
     val actionLoading: Boolean = false,
+    val confirmCuttingActualLoading: Boolean = false,
+    val confirmChamferingActualLoading: Boolean = false,
+    val splitToNextDaySubmitting: Boolean = false,
     val snackbarMessage: String? = null,
     val pendingPrintHtml: String? = null,
     val pendingPrintSubject: String? = null,
+    val pendingPrintLayout: PrintPageLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
     val activeDialog: CuttingInstructionDialog = CuttingInstructionDialog.None,
     val equipmentFilter: String = "",
     val productNameFilter: String = "",
     val materialNameFilter: String = "",
     val machineOptions: List<Pair<String, String>> = emptyList(),
+    val cuttingMachineOptions: List<Pair<String, String>> = emptyList(),
     val chamferingMachineOptions: List<Pair<String, String>> = emptyList(),
     val allPlans: List<InstructionPlanRowDto> = emptyList(),
     val planPage: Int = 1,
@@ -150,15 +163,22 @@ data class CuttingInstructionUiState(
     val chamferingTomorrow: List<InstructionChamferingRowDto> = emptyList(),
     val chamferingLoading: Boolean = false,
     val kanbanDate: String = instructionToday(),
-    val kanbanStatus: String = "",
+    val kanbanStatus: String = "pending",
     val kanbanProductName: String = "",
     val kanbanProductOptions: List<String> = emptyList(),
     val kanbanRows: List<KanbanIssuanceRowDto> = emptyList(),
+    val kanbanPage: Int = 1,
+    val kanbanPageSize: Int = 30,
     val selectedKanbanIds: Set<Int> = emptySet(),
     val kanbanLoading: Boolean = false,
+    val kanbanBatchIssueLoading: Boolean = false,
+    val kanbanSyncLoading: Boolean = false,
+    val kanbanIssuePendingLoading: Int? = null,
+    val kanbanReissueLoading: Int? = null,
     val notes: List<CuttingInstructionNoteDto> = emptyList(),
     val notesCount: Int = 0,
     val notesLoading: Boolean = false,
+    val notesSaving: Boolean = false,
     val moldingPreInventoryDate: String = instructionToday(),
     val moldingPreInventoryGroups: List<MoldingPreInventoryGroup> = emptyList(),
     val moldingPreInventoryLoading: Boolean = false,
@@ -176,6 +196,8 @@ data class CuttingInstructionUiState(
     val doneListPage: Int = 1,
     val doneListPageSize: Int = 50,
     val chamferingProductOptions: List<Pair<String, String>> = emptyList(),
+    val chamferingNewSubmitting: Boolean = false,
+    val chamferingPlanFormSubmitting: Boolean = false,
     val chamferingMaterialOptions: List<String> = emptyList(),
     val materialMasterOptions: List<Pair<String, String>> = emptyList(),
     val doneListLoading: Boolean = false,
@@ -189,8 +211,18 @@ data class CuttingInstructionUiState(
 class CuttingInstructionViewModel(
     private val repository: CuttingInstructionRepository,
 ) : ViewModel() {
+    companion object {
+        private const val BACKGROUND_SYNC_INTERVAL_MS = 15_000L
+    }
+
     private val _uiState = MutableStateFlow(CuttingInstructionUiState())
     val uiState: StateFlow<CuttingInstructionUiState> = _uiState.asStateFlow()
+    private var backgroundSyncJob: Job? = null
+    @Volatile
+    private var syncInFlight = false
+    @Volatile
+    private var pageActive = false
+    private var hasBeenActive = false
     val filteredPlans: List<InstructionPlanRowDto>
         get() {
             val state = _uiState.value
@@ -220,6 +252,17 @@ class CuttingInstructionViewModel(
         get() = computeUsageCounts(_uiState.value.usageSummaryToday, _uiState.value.reflectedCodesToday)
     val usageSummaryTomorrowCounts: UsageSummaryCounts
         get() = computeUsageCounts(_uiState.value.usageSummaryTomorrow, emptySet())
+    val kanbanPagedRows: List<KanbanIssuanceRowDto>
+        get() {
+            val state = _uiState.value
+            val start = (state.kanbanPage - 1) * state.kanbanPageSize
+            return state.kanbanRows.drop(start).take(state.kanbanPageSize)
+        }
+    val kanbanTotalPages: Int
+        get() {
+            val size = _uiState.value.kanbanRows.size
+            return max(1, ceil(size.toDouble() / _uiState.value.kanbanPageSize).toInt())
+        }
     val cuttingDoneFiltered: List<InstructionCuttingRowDto>
         get() = filterCuttingDoneList(
             _uiState.value.cuttingDoneRaw,
@@ -260,44 +303,145 @@ class CuttingInstructionViewModel(
     val dataManagementMonthOptions: List<String>
         get() = _uiState.value.allPlans.mapNotNull { it.productionMonth?.take(7)?.takeIf { m -> m.isNotBlank() } }.distinct().sortedDescending()
     val cuttingMachineChipOptions: List<Pair<String, String>>
-        get() = _uiState.value.machineOptions.filter { (name, _) -> name != OUTSOURCED_CUTTING_MACHINE }
-    init { refreshAll() }
+        get() = _uiState.value.cuttingMachineOptions.filter { (name, _) -> name != OUTSOURCED_CUTTING_MACHINE }
+    init {
+        refreshAll()
+        startBackgroundSyncLoop()
+    }
+
+    override fun onCleared() {
+        backgroundSyncJob?.cancel()
+        super.onCleared()
+    }
+
+    /** 画面表示中のみバックグラウンド同期を行う */
+    fun setPageActive(active: Boolean) {
+        pageActive = active
+        if (active) {
+            if (hasBeenActive) {
+                refreshAllSilent(force = true)
+            } else {
+                hasBeenActive = true
+            }
+        }
+    }
+
+    private fun startBackgroundSyncLoop() {
+        backgroundSyncJob = viewModelScope.launch {
+            while (isActive) {
+                delay(BACKGROUND_SYNC_INTERVAL_MS)
+                refreshAllSilent()
+            }
+        }
+    }
+
     fun dismissDialog() = _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None) }
     fun openDialog(dialog: CuttingInstructionDialog) = _uiState.update { it.copy(activeDialog = dialog) }
     fun refreshAll() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            runCatching {
-                val machines = repository.loadCuttingMachines()
-                val chamferMachines = repository.loadChamferingMachines()
-                val plans = repository.loadBatchPlans(_uiState.value.equipmentFilter)
-                val notes = repository.loadNotes()
-                val kanbanProducts = repository.loadKanbanProductNames()
-                val materialMasterOptions = repository.loadMaterialMasterOptions()
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        machineOptions = machines,
+            if (syncInFlight) return@launch
+            syncInFlight = true
+            try {
+                fetchAllFromServer(showLoading = true, showErrors = true)
+            } finally {
+                syncInFlight = false
+            }
+        }
+    }
+
+    private fun refreshAllSilent(force: Boolean = false) {
+        if (!pageActive && !force) return
+        val state = _uiState.value
+        if (!force && (syncInFlight || state.actionLoading || state.activeDialog != CuttingInstructionDialog.None)) {
+            return
+        }
+        viewModelScope.launch {
+            if (!force && syncInFlight) return@launch
+            syncInFlight = true
+            try {
+                fetchAllFromServer(showLoading = false, showErrors = false)
+            } finally {
+                syncInFlight = false
+            }
+        }
+    }
+
+    private suspend fun fetchAllFromServer(showLoading: Boolean, showErrors: Boolean) {
+        if (showLoading) _uiState.update { it.copy(isLoading = true) }
+        val snapshot = _uiState.value
+        runCatching {
+            coroutineScope {
+                val formingMachinesAsync = async { repository.loadFormingMachines() }
+                val cuttingMachinesAsync = async { repository.loadCuttingMachines() }
+                val chamferMachinesAsync = async { repository.loadChamferingMachines() }
+                val plansAsync = async { repository.loadBatchPlans(snapshot.equipmentFilter) }
+                val notesAsync = async { repository.loadNotes() }
+                val kanbanProductsAsync = async { repository.loadKanbanProductNames() }
+                val materialMasterAsync = async { repository.loadMaterialMasterOptions() }
+
+                val formingMachines = formingMachinesAsync.await()
+                val cuttingMachines = cuttingMachinesAsync.await()
+                val chamferMachines = chamferMachinesAsync.await()
+                val plans = plansAsync.await()
+                val notes = notesAsync.await()
+                val kanbanProducts = kanbanProductsAsync.await()
+                val materialMasterOptions = materialMasterAsync.await()
+
+                _uiState.update { state ->
+                    val selectedStillExists = state.selectedPlanId?.let { id ->
+                        plans.any { it.id == id }
+                    } ?: true
+                    state.copy(
+                        isLoading = if (showLoading) false else state.isLoading,
+                        machineOptions = formingMachines,
+                        cuttingMachineOptions = cuttingMachines,
                         chamferingMachineOptions = chamferMachines,
                         allPlans = plans,
                         notes = notes,
-                        notesCount = notes.count { n -> n.isDone != true },
+                        notesCount = notes.size,
                         kanbanProductOptions = kanbanProducts,
                         materialMasterOptions = materialMasterOptions,
                         chamferingMaterialOptions = materialMasterOptions.map { pair -> pair.first },
-                        cuttingMachineFilter = resolveCuttingMachineFilter(it.cuttingMachineFilter, machines),
-                        chamferingMachineFilter = it.chamferingMachineFilter,
-                        dataManagementMonth = it.dataManagementMonth.ifBlank { plans.firstOrNull()?.productionMonth?.take(7).orEmpty() },
+                        cuttingMachineFilter = resolveCuttingMachineFilter(state.cuttingMachineFilter, cuttingMachines),
+                        dataManagementMonth = state.dataManagementMonth.ifBlank {
+                            plans.firstOrNull()?.productionMonth?.take(7).orEmpty()
+                        },
+                        selectedPlanId = if (selectedStillExists) state.selectedPlanId else null,
+                        selectedProductCd = if (selectedStillExists) state.selectedProductCd else null,
+                        productDetail = if (selectedStillExists) state.productDetail else null,
+                        equipmentEfficiency = if (selectedStillExists) state.equipmentEfficiency else emptyList(),
                     )
                 }
-                loadCuttingLists()
-                loadUsageSummary()
-                loadChamferingLists()
-                loadKanbanList()
-                loadChamferingPlans()
-            }.onFailure { e ->
-                _uiState.update { it.copy(isLoading = false, snackbarMessage = e.message ?: "読込失敗") }
             }
+            coroutineScope {
+                val cuttingAsync = async { loadCuttingListsSync(showLoading, showErrors) }
+                val usageAsync = async { loadUsageSummarySync(showLoading, showErrors) }
+                val chamferingAsync = async { loadChamferingListsSync(showLoading, showErrors) }
+                val chamferingPlansAsync = async { loadChamferingPlansSync(showLoading, showErrors) }
+                val kanbanAsync = async {
+                    loadKanbanListSync(showLoading, showErrors, preserveSelection = !showLoading)
+                }
+                cuttingAsync.await()
+                usageAsync.await()
+                chamferingAsync.await()
+                chamferingPlansAsync.await()
+                kanbanAsync.await()
+            }
+            refreshSelectedProductDetailSilently()
+        }.onFailure { e ->
+            if (showLoading) _uiState.update { it.copy(isLoading = false) }
+            if (showErrors) _uiState.update { it.copy(snackbarMessage = e.message ?: "読込失敗") }
+        }
+    }
+
+    private suspend fun refreshSelectedProductDetailSilently() {
+        val cd = _uiState.value.selectedProductCd?.trim().orEmpty()
+        if (cd.isBlank()) return
+        val detail = repository.loadProductDetail(cd)
+        val efficiency = repository.loadEquipmentEfficiency(cd)
+            .filter { e -> e.productCd == cd && e.machinesName.orEmpty().contains("切断") }
+        _uiState.update {
+            it.copy(productDetail = detail, equipmentEfficiency = efficiency, productDetailLoading = false)
         }
     }
     private fun computeUsageCounts(rows: List<InstructionCuttingRowDto>, reflectedCodes: Set<String>): UsageSummaryCounts {
@@ -388,7 +532,8 @@ class CuttingInstructionViewModel(
         if (cd.isBlank()) return
         viewModelScope.launch {
             val detail = repository.loadProductDetail(cd)
-            val efficiency = repository.loadEquipmentEfficiency(cd).filter { e -> e.machinesName.orEmpty().contains("切断") }
+            val efficiency = repository.loadEquipmentEfficiency(cd)
+                .filter { e -> e.productCd == cd && e.machinesName.orEmpty().contains("切断") }
             _uiState.update { it.copy(productDetail = detail, equipmentEfficiency = efficiency, productDetailLoading = false) }
         }
     }
@@ -435,9 +580,21 @@ class CuttingInstructionViewModel(
     }
     fun openNewPlan(isTrial: Boolean) {
         loadMaterialMasterOptionsIfNeeded()
-        val month = LocalDate.now(JST).toString().take(7)
-        openDialog(CuttingInstructionDialog.NewPlan(isTrial, PlanFormState(productionMonth = month, productionLine = _uiState.value.equipmentFilter)))
+        viewModelScope.launch {
+            val month = LocalDate.now(JST).toString().take(7)
+            val options = runCatching { repository.loadPlanProductOptions(isTrial) }.getOrElse { emptyList() }
+            openDialog(
+                CuttingInstructionDialog.NewPlan(
+                    isTrial = isTrial,
+                    initial = PlanFormState(productionMonth = month, productionLine = _uiState.value.equipmentFilter),
+                    productOptions = options,
+                ),
+            )
+        }
     }
+
+    suspend fun loadPlanProductBatchDetail(productCd: String): ProductBatchDetailDto? =
+        repository.loadPlanProductBatchDetail(productCd)
     private fun loadMaterialMasterOptionsIfNeeded() {
         if (_uiState.value.materialMasterOptions.isNotEmpty()) return
         viewModelScope.launch {
@@ -465,6 +622,16 @@ class CuttingInstructionViewModel(
         }
     }
     fun saveNewPlan(isTrial: Boolean, form: PlanFormState) {
+        val productCd = form.productCd.trim()
+        val productName = form.productName.trim()
+        if (form.productionMonth.trim().isBlank()) {
+            _uiState.update { it.copy(snackbarMessage = "生産月を選択してください") }
+            return
+        }
+        if (productCd.isBlank() || productName.isBlank()) {
+            _uiState.update { it.copy(snackbarMessage = "製品名で製品を選択してください") }
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(actionLoading = true) }
             runCatching {
@@ -542,31 +709,44 @@ class CuttingInstructionViewModel(
         loadCuttingLists()
     }
     private fun loadCuttingLists() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            _uiState.update { it.copy(cuttingLoading = true) }
-            runCatching {
-                val machine = state.cuttingMachineFilter.ifBlank { null }
-                val today = repository.loadCuttingManagement(state.cuttingDateToday, machine)
-                val tomorrow = repository.loadCuttingManagement(state.cuttingDateTomorrow, machine)
-                _uiState.update { it.copy(cuttingToday = today, cuttingTomorrow = tomorrow, cuttingLoading = false) }
-            }.onFailure { e ->
-                _uiState.update { it.copy(cuttingLoading = false, snackbarMessage = e.message ?: "切断指示取得失敗") }
-            }
+        viewModelScope.launch { loadCuttingListsSync(showLoading = true, showErrors = true) }
+    }
+
+    private suspend fun loadCuttingListsSync(showLoading: Boolean, showErrors: Boolean) {
+        val state = _uiState.value
+        if (showLoading) _uiState.update { it.copy(cuttingLoading = true) }
+        runCatching {
+            val machine = state.cuttingMachineFilter.ifBlank { null }
+            val today = repository.loadCuttingManagement(state.cuttingDateToday, machine)
+            val tomorrow = repository.loadCuttingManagement(state.cuttingDateTomorrow, machine)
+            _uiState.update { it.copy(cuttingToday = today, cuttingTomorrow = tomorrow, cuttingLoading = false) }
+        }.onFailure { e ->
+            _uiState.update { it.copy(cuttingLoading = false) }
+            if (showErrors) _uiState.update { it.copy(snackbarMessage = e.message ?: "切断指示取得失敗") }
         }
     }
     fun loadUsageSummary() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            _uiState.update { it.copy(usageSummaryLoading = true) }
-            runCatching {
-                val today = repository.loadCuttingManagement(state.usageSummaryDateToday, null)
-                val tomorrow = repository.loadCuttingManagement(state.usageSummaryDateTomorrow, null)
-                val codes = repository.loadReflectedManagementCodes(state.usageSummaryDateToday)
-                _uiState.update { it.copy(usageSummaryToday = today, usageSummaryTomorrow = tomorrow, reflectedCodesToday = codes, usageSummaryLoading = false) }
-            }.onFailure { e ->
-                _uiState.update { it.copy(usageSummaryLoading = false, snackbarMessage = e.message ?: "使用数取得失敗") }
+        viewModelScope.launch { loadUsageSummarySync(showLoading = true, showErrors = true) }
+    }
+
+    private suspend fun loadUsageSummarySync(showLoading: Boolean, showErrors: Boolean) {
+        val state = _uiState.value
+        if (showLoading) _uiState.update { it.copy(usageSummaryLoading = true) }
+        runCatching {
+            val today = repository.loadCuttingManagement(state.usageSummaryDateToday, null)
+            val tomorrow = repository.loadCuttingManagement(state.usageSummaryDateTomorrow, null)
+            val codes = repository.loadReflectedManagementCodes(state.usageSummaryDateToday)
+            _uiState.update {
+                it.copy(
+                    usageSummaryToday = today,
+                    usageSummaryTomorrow = tomorrow,
+                    reflectedCodesToday = codes,
+                    usageSummaryLoading = false,
+                )
             }
+        }.onFailure { e ->
+            _uiState.update { it.copy(usageSummaryLoading = false) }
+            if (showErrors) _uiState.update { it.copy(snackbarMessage = e.message ?: "使用数取得失敗") }
         }
     }
     fun shiftUsageSummaryDateToday(days: Long) {
@@ -612,49 +792,113 @@ class CuttingInstructionViewModel(
         }
     }
     fun openEditCutting(row: InstructionCuttingRowDto) = openDialog(CuttingInstructionDialog.EditCutting(row))
-    fun saveCuttingEdit(row: InstructionCuttingRowDto, day: String, machine: String, qty: Int?, defect: Int?, remarks: String?) {
+    fun saveCuttingEdit(row: InstructionCuttingRowDto, form: CuttingEditFormState) {
         val id = row.id ?: return
+        val qtyNum = form.actualProductionQuantity.trim().toIntOrNull() ?: 0
+        val defectNum = form.defectQty.trim().toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val sequenceNum = form.productionSequence.trim().toIntOrNull()?.coerceIn(1, 9999) ?: 1
+        val usageCount = form.usageCount.trim().toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0
         viewModelScope.launch {
             runCatching {
-                repository.patchCutting(id, PatchInstructionCuttingBody(
-                    productionDay = day.ifBlank { null },
-                    cuttingMachine = machine.ifBlank { null },
-                    actualProductionQuantity = qty,
-                    defectQty = defect,
-                    remarks = remarks,
-                ))
+                repository.patchCutting(
+                    id,
+                    PatchInstructionCuttingBody(
+                        cuttingMachine = form.cuttingMachine.trim().ifBlank { null },
+                        productionSequence = sequenceNum,
+                        actualProductionQuantity = qtyNum,
+                        defectQty = defectNum,
+                        productionLotSize = form.productionLotSize.trim().toIntOrNull(),
+                        lotNumber = form.lotNumber.trim().ifBlank { null },
+                        remarks = form.remarks.trim().ifBlank { null },
+                        useMaterialStockSub = if (form.useMaterialStockSub) 1 else 0,
+                        usageCount = usageCount,
+                    ),
+                )
                 _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "保存しました") }
                 loadCuttingLists()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "保存失敗") } }
+            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "保存に失敗しました") } }
         }
     }
-    fun splitCutting(row: InstructionCuttingRowDto, todayQty: Int) {
+    fun splitCutting(row: InstructionCuttingRowDto, todayQty: Int, nextDay: String?) {
         val id = row.id ?: return
+        val total = row.actualProductionQuantity ?: 0
+        if (todayQty < 0 || todayQty >= total) {
+            _uiState.update {
+                it.copy(snackbarMessage = "当日完成数は 0 以上、かつ現在の生産数より少なく入力してください")
+            }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(splitToNextDaySubmitting = true) }
+            runCatching {
+                val nextDayValue = nextDay?.trim()?.take(10)?.ifBlank { null }
+                repository.splitCuttingToNextDay(
+                    id,
+                    SplitCuttingToNextDayBody(todayQuantity = todayQty, nextDay = nextDayValue),
+                )
+                runCatching {
+                    repository.patchCutting(id, PatchInstructionCuttingBody(productionCompletedCheck = true))
+                }
+                _uiState.update {
+                    it.copy(
+                        activeDialog = CuttingInstructionDialog.None,
+                        splitToNextDaySubmitting = false,
+                        snackbarMessage = "順延しました（元の行を完了にしました）",
+                    )
+                }
+                loadCuttingListsSync(showLoading = false, showErrors = true)
+                loadChamferingPlansSync(showLoading = false, showErrors = false)
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        splitToNextDaySubmitting = false,
+                        snackbarMessage = e.message ?: "順延に失敗しました",
+                    )
+                }
+            }
+        }
+    }
+    fun commitCuttingTodayReorder(orderedIds: List<Int>, cuttingMachine: String) {
+        val cm = cuttingMachine.trim()
+        if (cm.isBlank() || orderedIds.isEmpty()) {
+            _uiState.update {
+                it.copy(snackbarMessage = "切断機でフィルタを指定するか、同一切断機内で並び替えてください")
+            }
+            return
+        }
         viewModelScope.launch {
             runCatching {
-                repository.splitCuttingToNextDay(id, SplitCuttingToNextDayBody(todayQuantity = todayQty, nextDay = _uiState.value.cuttingDateTomorrow))
-                _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "分割しました") }
-                loadCuttingLists()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "分割失敗") } }
+                repository.reorderCutting(ReorderCuttingBody(cuttingMachine = cm, orderedIds = orderedIds))
+                loadCuttingListsSync(showLoading = false, showErrors = true)
+                _uiState.update { it.copy(snackbarMessage = "生産順を更新しました") }
+            }.onFailure { e ->
+                loadCuttingListsSync(showLoading = false, showErrors = true)
+                _uiState.update { it.copy(snackbarMessage = e.message ?: "並び替えに失敗しました") }
+            }
         }
     }
+
     fun reorderCuttingRow(row: InstructionCuttingRowDto, direction: Int) {
-        val list = if (row.productionDay?.take(10) == _uiState.value.cuttingDateTomorrow) _uiState.value.cuttingTomorrow else _uiState.value.cuttingToday
-        val idx = list.indexOfFirst { it.id == row.id }
+        val list = if (row.productionDay?.take(10) == _uiState.value.cuttingDateTomorrow) {
+            _uiState.value.cuttingTomorrow
+        } else {
+            _uiState.value.cuttingToday
+        }
+        val cm = _uiState.value.cuttingMachineFilter.trim().ifBlank { row.cuttingMachine.orEmpty().trim() }
+        if (cm.isBlank()) {
+            _uiState.update {
+                it.copy(snackbarMessage = "切断機でフィルタを指定するか、同一切断機内で並び替えてください")
+            }
+            return
+        }
+        val sameMachine = list.filter { it.cuttingMachine.orEmpty().trim() == cm }
+        val idx = sameMachine.indexOfFirst { it.id == row.id }
         if (idx < 0) return
         val newIdx = idx + direction
-        if (newIdx !in list.indices) return
-        val reordered = list.toMutableList()
-        val item = reordered.removeAt(idx)
-        reordered.add(newIdx, item)
-        val ids = reordered.mapNotNull { it.id }
-        val machine = _uiState.value.cuttingMachineFilter.ifBlank { row.cuttingMachine.orEmpty() }
-        viewModelScope.launch {
-            runCatching {
-                repository.reorderCutting(ReorderCuttingBody(cuttingMachine = machine, orderedIds = ids))
-                loadCuttingLists()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "並べ替え失敗") } }
-        }
+        if (newIdx !in sameMachine.indices) return
+        val reordered = sameMachine.toMutableList()
+        reordered.add(newIdx, reordered.removeAt(idx))
+        commitCuttingTodayReorder(reordered.mapNotNull { it.id }, cm)
     }
     fun moveCuttingBackToBatch(row: InstructionCuttingRowDto) {
         val id = row.id ?: return
@@ -700,45 +944,93 @@ class CuttingInstructionViewModel(
             }
         })
     }
-    fun openConfirmCuttingActual() = openDialog(CuttingInstructionDialog.ConfirmCuttingActual)
-    fun confirmCuttingActualAction() {
+    fun confirmCuttingActual() {
+        val day = _uiState.value.cuttingDateToday.trim().take(10)
+        if (day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "生産日を選択してください") }
+            return
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(actionLoading = true) }
+            _uiState.update { it.copy(confirmCuttingActualLoading = true) }
             runCatching {
-                val res = repository.confirmCuttingActual(_uiState.value.cuttingDateToday, _uiState.value.cuttingMachineFilter)
+                val res = repository.confirmCuttingActual(day, null)
                 _uiState.update {
                     it.copy(
-                        actionLoading = false,
+                        confirmCuttingActualLoading = false,
                         activeDialog = CuttingInstructionDialog.ConfirmActualResult(res.inserted ?: 0, res.totalQuantity ?: 0),
                     )
                 }
                 loadCuttingLists()
             }.onFailure { e ->
-                _uiState.update { it.copy(actionLoading = false, activeDialog = CuttingInstructionDialog.None, snackbarMessage = e.message ?: "確定失敗") }
+                _uiState.update {
+                    it.copy(confirmCuttingActualLoading = false, snackbarMessage = e.message ?: "実績確定に失敗しました")
+                }
             }
         }
     }
-    fun printCuttingPlan() = printCuttingPlanForDate(_uiState.value.cuttingDateToday, "切断計画")
+    fun printCuttingPlan() = printCuttingPlanForDate(_uiState.value.cuttingDateToday)
     fun printCuttingInstructionSheet() = printCuttingSheetForDate(_uiState.value.cuttingDateToday)
-    private fun printCuttingPlanForDate(date: String, subject: String) {
+    private fun printCuttingPlanForDate(date: String) {
+        val day = date.trim().take(10)
+        if (day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "生産日を選択してください") }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(actionLoading = true) }
             runCatching {
-                val rows = repository.loadCuttingManagement(date, null)
-                if (rows.isEmpty()) throw IllegalStateException("該当日のデータがありません")
-                val stock = repository.loadMaterialStockForPrint(date)
-                val sub = repository.loadMaterialStockSubForPrint()
-                val html = buildCuttingPlanPrintHtml(date, rows, stock, sub)
-                _uiState.update { it.copy(pendingPrintHtml = html, pendingPrintSubject = subject) }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "印刷失敗") } }
+                coroutineScope {
+                    val rowsDeferred = async { repository.loadCuttingManagement(day, null) }
+                    val stockDeferred = async { repository.loadMaterialStockForPrint(day) }
+                    val subDeferred = async { repository.loadMaterialStockSubForPrint() }
+                    val rows = rowsDeferred.await()
+                    if (rows.isEmpty()) throw IllegalStateException("該当日のデータがありません")
+                    val stock = stockDeferred.await()
+                    val sub = subDeferred.await()
+                    val html = buildCuttingPlanPrintHtml(day, rows, stock, sub)
+                    _uiState.update {
+                        it.copy(
+                            actionLoading = false,
+                            pendingPrintHtml = html,
+                            pendingPrintSubject = "切断計画リスト",
+                            pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                        )
+                    }
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        actionLoading = false,
+                        snackbarMessage = e.message ?: "印刷データの取得に失敗しました",
+                    )
+                }
+            }
         }
     }
     private fun printCuttingSheetForDate(date: String) {
+        val day = date.trim().take(10)
+        if (day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "生産日を選択してください") }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(actionLoading = true) }
             runCatching {
-                val rows = repository.loadCuttingManagement(date, null)
+                val rows = repository.loadCuttingManagement(day, null)
                 if (rows.isEmpty()) throw IllegalStateException("該当日のデータがありません")
-                _uiState.update { it.copy(pendingPrintHtml = buildCuttingInstructionSheetHtml(date, rows), pendingPrintSubject = "切断指示書") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "印刷失敗") } }
+                _uiState.update {
+                    it.copy(
+                        actionLoading = false,
+                        pendingPrintHtml = buildCuttingInstructionSheetHtml(day, rows),
+                        pendingPrintSubject = "切断生産指示書",
+                        pendingPrintLayout = PrintPageLayout.A5_LANDSCAPE_SINGLE,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(actionLoading = false, snackbarMessage = e.message ?: "指示書の取得に失敗しました")
+                }
+            }
         }
     }
     fun setChamferingMachineFilter(machine: String) {
@@ -754,36 +1046,42 @@ class CuttingInstructionViewModel(
         loadChamferingLists()
     }
     private fun loadChamferingPlans() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(chamferingPlansLoading = true) }
-            runCatching {
-                val plans = repository.loadChamferingPlans()
-                val (productionDayMap, startDateMap) = repository.loadCuttingReferenceByMgmtCode()
-                _uiState.update {
-                    it.copy(
-                        chamferingPlans = plans,
-                        cuttingProductionDayByMgmtCode = productionDayMap,
-                        cuttingFormingStartDateByMgmtCode = startDateMap,
-                        chamferingPlansLoading = false,
-                    )
-                }
-            }.onFailure { e ->
-                _uiState.update { it.copy(chamferingPlansLoading = false, snackbarMessage = e.message ?: "面取ロット取得失敗") }
+        viewModelScope.launch { loadChamferingPlansSync(showLoading = true, showErrors = true) }
+    }
+
+    private suspend fun loadChamferingPlansSync(showLoading: Boolean, showErrors: Boolean) {
+        if (showLoading) _uiState.update { it.copy(chamferingPlansLoading = true) }
+        runCatching {
+            val plans = repository.loadChamferingPlans()
+            val (productionDayMap, startDateMap) = repository.loadCuttingReferenceByMgmtCode()
+            _uiState.update {
+                it.copy(
+                    chamferingPlans = plans,
+                    cuttingProductionDayByMgmtCode = productionDayMap,
+                    cuttingFormingStartDateByMgmtCode = startDateMap,
+                    chamferingPlansLoading = false,
+                )
             }
+        }.onFailure { e ->
+            _uiState.update { it.copy(chamferingPlansLoading = false) }
+            if (showErrors) _uiState.update { it.copy(snackbarMessage = e.message ?: "面取ロット取得失敗") }
         }
     }
     private fun loadChamferingLists() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            _uiState.update { it.copy(chamferingLoading = true) }
-            runCatching {
-                val machine = state.chamferingMachineFilter.ifBlank { null }
-                val today = repository.loadChamferingManagement(state.chamferingDateToday, machine)
-                val tomorrow = repository.loadChamferingManagement(state.chamferingDateTomorrow, machine)
-                _uiState.update { it.copy(chamferingToday = today, chamferingTomorrow = tomorrow, chamferingLoading = false) }
-            }.onFailure { e ->
-                _uiState.update { it.copy(chamferingLoading = false, snackbarMessage = e.message ?: "面取指示取得失敗") }
-            }
+        viewModelScope.launch { loadChamferingListsSync(showLoading = true, showErrors = true) }
+    }
+
+    private suspend fun loadChamferingListsSync(showLoading: Boolean, showErrors: Boolean) {
+        val state = _uiState.value
+        if (showLoading) _uiState.update { it.copy(chamferingLoading = true) }
+        runCatching {
+            val machine = state.chamferingMachineFilter.ifBlank { null }
+            val today = repository.loadChamferingManagement(state.chamferingDateToday, machine)
+            val tomorrow = repository.loadChamferingManagement(state.chamferingDateTomorrow, machine)
+            _uiState.update { it.copy(chamferingToday = today, chamferingTomorrow = tomorrow, chamferingLoading = false) }
+        }.onFailure { e ->
+            _uiState.update { it.copy(chamferingLoading = false) }
+            if (showErrors) _uiState.update { it.copy(snackbarMessage = e.message ?: "面取指示取得失敗") }
         }
     }
     fun toggleChamferingPlanSw(row: InstructionChamferingPlanRowDto, enabled: Boolean) {
@@ -823,26 +1121,64 @@ class CuttingInstructionViewModel(
             productionDay = instructionToday(),
             productionLine = _uiState.value.chamferingMachineFilter,
         )))
+        viewModelScope.launch {
+            runCatching {
+                val products = repository.loadChamferingProductOptions()
+                _uiState.update { it.copy(chamferingProductOptions = products) }
+            }
+        }
     }
     fun openEditChamferingPlan(row: InstructionChamferingPlanRowDto) {
         openDialog(CuttingInstructionDialog.EditChamferingPlan(row.id ?: return, row.toChamferingPlanFormState()))
+        viewModelScope.launch {
+            runCatching {
+                val products = repository.loadChamferingProductOptions()
+                _uiState.update { it.copy(chamferingProductOptions = products) }
+            }
+        }
     }
     fun saveNewChamferingPlan(form: ChamferingPlanFormState) {
+        validateChamferingPlanForm(form)?.let { message ->
+            _uiState.update { it.copy(snackbarMessage = message) }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(chamferingPlanFormSubmitting = true) }
             runCatching {
                 repository.createChamferingPlan(form.toCreateBody())
                 loadChamferingPlans()
-                _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "登録しました") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "登録失敗") } }
+                _uiState.update {
+                    it.copy(
+                        activeDialog = CuttingInstructionDialog.None,
+                        chamferingPlanFormSubmitting = false,
+                        snackbarMessage = "登録しました",
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(chamferingPlanFormSubmitting = false, snackbarMessage = e.message ?: "登録失敗") }
+            }
         }
     }
     fun saveEditChamferingPlan(planId: Int, form: ChamferingPlanFormState) {
+        validateChamferingPlanForm(form)?.let { message ->
+            _uiState.update { it.copy(snackbarMessage = message) }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(chamferingPlanFormSubmitting = true) }
             runCatching {
                 repository.updateChamferingPlanContent(planId, form.toUpdateBody())
                 loadChamferingPlans()
-                _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "更新しました") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "保存失敗") } }
+                _uiState.update {
+                    it.copy(
+                        activeDialog = CuttingInstructionDialog.None,
+                        chamferingPlanFormSubmitting = false,
+                        snackbarMessage = "更新しました",
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(chamferingPlanFormSubmitting = false, snackbarMessage = e.message ?: "保存失敗") }
+            }
         }
     }
     fun openMoveChamferingPlan(row: InstructionChamferingPlanRowDto) = openDialog(CuttingInstructionDialog.MoveChamferingPlan(row))
@@ -881,9 +1217,15 @@ class CuttingInstructionViewModel(
         openDialog(CuttingInstructionDialog.NewChamferingInstruction(
             ChamferingInstructionFormState(
                 productionDay = state.chamferingDateToday,
+                productionLine = "",
                 chamferingMachine = state.chamferingMachineFilter.ifBlank {
                     state.chamferingMachineOptions.firstOrNull()?.first.orEmpty()
                 },
+                productCd = "",
+                productName = "",
+                actualProductionQuantity = "",
+                productionSequence = "",
+                materialName = "",
             ),
         ))
         viewModelScope.launch {
@@ -917,6 +1259,7 @@ class CuttingInstructionViewModel(
             return
         }
         viewModelScope.launch {
+            _uiState.update { it.copy(chamferingNewSubmitting = true) }
             runCatching {
                 repository.createChamferingManagement(CreateChamferingManagementBody(
                     productionDay = day,
@@ -933,9 +1276,15 @@ class CuttingInstructionViewModel(
                 ))
                 loadChamferingLists()
                 _uiState.update {
-                    it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "面取指示を登録しました")
+                    it.copy(
+                        activeDialog = CuttingInstructionDialog.None,
+                        chamferingNewSubmitting = false,
+                        snackbarMessage = "面取指示を登録しました",
+                    )
                 }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "登録失敗") } }
+            }.onFailure { e ->
+                _uiState.update { it.copy(chamferingNewSubmitting = false, snackbarMessage = e.message ?: "登録失敗") }
+            }
         }
     }
     fun openEditChamfering(row: InstructionChamferingRowDto) = openDialog(CuttingInstructionDialog.EditChamfering(row))
@@ -965,32 +1314,85 @@ class CuttingInstructionViewModel(
             }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "複製失敗") } }
         }
     }
-    fun splitChamfering(row: InstructionChamferingRowDto, todayQty: Int) {
+    fun splitChamfering(row: InstructionChamferingRowDto, todayQty: Int, nextDay: String?) {
         val id = row.id ?: return
+        val total = row.actualProductionQuantity ?: 0
+        if (todayQty < 0 || todayQty >= total) {
+            _uiState.update {
+                it.copy(snackbarMessage = "当日完成数は 0 以上、かつ現在の生産数より少なく入力してください")
+            }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(splitToNextDaySubmitting = true) }
             runCatching {
-                repository.splitChamferingToNextDay(id, SplitChamferingToNextDayBody(todayQuantity = todayQty, nextDay = _uiState.value.chamferingDateTomorrow))
-                _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "分割しました") }
-                loadChamferingLists()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "分割失敗") } }
+                val nextDayValue = nextDay?.trim()?.take(10)?.ifBlank { null }
+                repository.splitChamferingToNextDay(
+                    id,
+                    SplitChamferingToNextDayBody(todayQuantity = todayQty, nextDay = nextDayValue),
+                )
+                _uiState.update {
+                    it.copy(
+                        activeDialog = CuttingInstructionDialog.None,
+                        splitToNextDaySubmitting = false,
+                        snackbarMessage = "順延しました（元の行を完了にしました）",
+                    )
+                }
+                loadChamferingListsSync(showLoading = false, showErrors = true)
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        splitToNextDaySubmitting = false,
+                        snackbarMessage = e.message ?: "順延に失敗しました",
+                    )
+                }
+            }
         }
     }
-    fun reorderChamferingRow(row: InstructionChamferingRowDto, direction: Int) {
-        val list = if (row.productionDay?.take(10) == _uiState.value.chamferingDateTomorrow) _uiState.value.chamferingTomorrow else _uiState.value.chamferingToday
-        val idx = list.indexOfFirst { it.id == row.id }
-        if (idx < 0) return
-        val newIdx = idx + direction
-        if (newIdx !in list.indices) return
-        val reordered = list.toMutableList()
-        reordered.add(newIdx, reordered.removeAt(idx))
-        val machine = _uiState.value.chamferingMachineFilter.ifBlank { row.chamferingMachine.orEmpty() }
-        val day = row.productionDay?.take(10) ?: _uiState.value.chamferingDateToday
+    fun commitChamferingTodayReorder(orderedIds: List<Int>, chamferingMachine: String) {
+        val cm = chamferingMachine.trim()
+        val day = _uiState.value.chamferingDateToday.trim().take(10)
+        if (cm.isBlank() || orderedIds.isEmpty() || day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "同一面取機内で並び替えてください") }
+            return
+        }
         viewModelScope.launch {
             runCatching {
-                repository.reorderChamfering(ReorderChamferingBody(machine, day, reordered.mapNotNull { it.id }))
-                loadChamferingLists()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "並べ替え失敗") } }
+                repository.reorderChamfering(
+                    ReorderChamferingBody(
+                        chamferingMachine = cm,
+                        productionDay = day,
+                        orderedIds = orderedIds,
+                    ),
+                )
+                loadChamferingListsSync(showLoading = false, showErrors = true)
+                _uiState.update { it.copy(snackbarMessage = "生産順を更新しました") }
+            }.onFailure { e ->
+                loadChamferingListsSync(showLoading = false, showErrors = true)
+                _uiState.update { it.copy(snackbarMessage = e.message ?: "並び替えに失敗しました") }
+            }
         }
+    }
+
+    fun reorderChamferingRow(row: InstructionChamferingRowDto, direction: Int) {
+        val list = if (row.productionDay?.take(10) == _uiState.value.chamferingDateTomorrow) {
+            _uiState.value.chamferingTomorrow
+        } else {
+            _uiState.value.chamferingToday
+        }
+        val cm = row.chamferingMachine.orEmpty().trim()
+        if (cm.isBlank()) {
+            _uiState.update { it.copy(snackbarMessage = "同一面取機内で並び替えてください") }
+            return
+        }
+        val sameMachine = list.filter { it.chamferingMachine.orEmpty().trim() == cm }
+        val idx = sameMachine.indexOfFirst { it.id == row.id }
+        if (idx < 0) return
+        val newIdx = idx + direction
+        if (newIdx !in sameMachine.indices) return
+        val reordered = sameMachine.toMutableList()
+        reordered.add(newIdx, reordered.removeAt(idx))
+        commitChamferingTodayReorder(reordered.mapNotNull { it.id }, cm)
     }
     fun deleteChamferingRow(row: InstructionChamferingRowDto) {
         val id = row.id ?: return
@@ -1004,51 +1406,106 @@ class CuttingInstructionViewModel(
             }
         })
     }
-    fun openConfirmChamferingActual() = openDialog(CuttingInstructionDialog.ConfirmChamferingActual)
-    fun confirmChamferingActualAction() {
+    fun confirmChamferingActual() {
+        val day = _uiState.value.chamferingDateToday.trim().take(10)
+        if (day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "生産日を選択してください") }
+            return
+        }
         viewModelScope.launch {
-            _uiState.update { it.copy(actionLoading = true) }
+            _uiState.update { it.copy(confirmChamferingActualLoading = true) }
             runCatching {
-                val res = repository.confirmChamferingActual(_uiState.value.chamferingDateToday, _uiState.value.chamferingMachineFilter)
+                val res = repository.confirmChamferingActual(day, null)
                 _uiState.update {
-                    it.copy(actionLoading = false, activeDialog = CuttingInstructionDialog.ConfirmActualResult(res.inserted ?: 0, res.totalQuantity ?: 0))
+                    it.copy(
+                        confirmChamferingActualLoading = false,
+                        activeDialog = CuttingInstructionDialog.ConfirmActualResult(res.inserted ?: 0, res.totalQuantity ?: 0),
+                    )
                 }
                 loadChamferingLists()
             }.onFailure { e ->
-                _uiState.update { it.copy(actionLoading = false, activeDialog = CuttingInstructionDialog.None, snackbarMessage = e.message ?: "確定失敗") }
+                _uiState.update {
+                    it.copy(confirmChamferingActualLoading = false, snackbarMessage = e.message ?: "実績確定に失敗しました")
+                }
             }
         }
     }
     fun printChamferingPlan() {
+        val day = _uiState.value.chamferingDateToday.trim().take(10)
+        if (day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "生産日を選択してください") }
+            return
+        }
         viewModelScope.launch {
             runCatching {
-                val rows = repository.loadChamferingManagement(_uiState.value.chamferingDateToday, _uiState.value.chamferingMachineFilter.ifBlank { null })
-                if (rows.isEmpty()) throw IllegalStateException("該当日のデータがありません")
-                _uiState.update { it.copy(pendingPrintHtml = buildChamferingPlanPrintHtml(_uiState.value.chamferingDateToday, rows), pendingPrintSubject = "面取計画") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "印刷失敗") } }
+                val state = _uiState.value
+                var machineNames = state.chamferingMachineOptions.map { it.first }.filter { it.isNotBlank() }
+                if (machineNames.isEmpty()) {
+                    machineNames = repository.loadChamferingMachines().map { it.first }.filter { it.isNotBlank() }
+                }
+                val rows = repository.loadChamferingManagement(day, null)
+                val machineNameSet = machineNames.toMutableSet()
+                rows.forEach { row ->
+                    val key = row.chamferingMachine.orEmpty().trim().ifBlank { "（未設定）" }
+                    machineNameSet.add(key)
+                }
+                val allMachineNames = machineNameSet.sorted()
+                if (allMachineNames.isEmpty()) throw IllegalStateException("面取機が登録されていません")
+                _uiState.update {
+                    it.copy(
+                        pendingPrintHtml = buildChamferingPlanPrintHtml(day, rows, allMachineNames),
+                        pendingPrintSubject = "面取計画リスト",
+                        pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                    )
+                }
+            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "印刷データの取得に失敗しました") } }
         }
     }
     fun printChamferingInstructionSheet() {
+        val day = _uiState.value.chamferingDateToday.trim().take(10)
+        if (day.length < 10) {
+            _uiState.update { it.copy(snackbarMessage = "生産日を選択してください") }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(actionLoading = true) }
             runCatching {
-                val rows = repository.loadChamferingManagement(_uiState.value.chamferingDateToday, null)
+                val rowsDeferred = async { repository.loadChamferingManagement(day, null) }
+                val refDeferred = async { repository.loadCuttingReferenceByMgmtCode() }
+                val rows = rowsDeferred.await()
                 if (rows.isEmpty()) throw IllegalStateException("該当日のデータがありません")
-                _uiState.update { it.copy(pendingPrintHtml = buildChamferingInstructionSheetHtml(_uiState.value.chamferingDateToday, rows), pendingPrintSubject = "面取指示書") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "印刷失敗") } }
+                val (_, startDateMap) = refDeferred.await()
+                _uiState.update {
+                    it.copy(
+                        actionLoading = false,
+                        pendingPrintHtml = buildChamferingInstructionSheetHtml(day, rows, startDateMap),
+                        pendingPrintSubject = "面取生産指示書",
+                        pendingPrintLayout = PrintPageLayout.A5_LANDSCAPE_SINGLE,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update {
+                    it.copy(actionLoading = false, snackbarMessage = e.message ?: "指示書の取得に失敗しました")
+                }
+            }
         }
     }
     fun setKanbanDate(date: String) {
-        _uiState.update { it.copy(kanbanDate = date) }
+        _uiState.update { it.copy(kanbanDate = date, kanbanPage = 1) }
         loadKanbanList()
     }
     fun setKanbanToday() = setKanbanDate(instructionToday())
     fun setKanbanStatus(status: String) {
-        _uiState.update { it.copy(kanbanStatus = status) }
+        _uiState.update { it.copy(kanbanStatus = status, kanbanPage = 1) }
         loadKanbanList()
     }
     fun setKanbanProductName(name: String) {
-        _uiState.update { it.copy(kanbanProductName = name) }
+        _uiState.update { it.copy(kanbanProductName = name, kanbanPage = 1) }
         loadKanbanList()
+    }
+    fun setKanbanPage(page: Int) {
+        val total = kanbanTotalPages
+        _uiState.update { it.copy(kanbanPage = page.coerceIn(1, total)) }
     }
     fun toggleKanbanSelection(id: Int, selected: Boolean) {
         _uiState.update { state ->
@@ -1057,53 +1514,137 @@ class CuttingInstructionViewModel(
             state.copy(selectedKanbanIds = next)
         }
     }
+    fun toggleKanbanPageSelection(selectAll: Boolean) {
+        val selectableIds = kanbanPagedRows
+            .filter { it.status == "pending" || it.status == "issued" }
+            .mapNotNull { it.id }
+            .toSet()
+        _uiState.update { state ->
+            val next = state.selectedKanbanIds.toMutableSet()
+            if (selectAll) next.addAll(selectableIds) else next.removeAll(selectableIds)
+            state.copy(selectedKanbanIds = next)
+        }
+    }
     private fun loadKanbanList() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            _uiState.update { it.copy(kanbanLoading = true) }
-            runCatching {
-                val rows = repository.loadKanbanList(state.kanbanDate, state.kanbanStatus, state.kanbanProductName)
-                _uiState.update { it.copy(kanbanRows = rows, kanbanLoading = false, selectedKanbanIds = emptySet()) }
-            }.onFailure { e ->
-                _uiState.update { it.copy(kanbanLoading = false, snackbarMessage = e.message ?: "カンバン取得失敗") }
+        viewModelScope.launch { loadKanbanListSync(showLoading = true, showErrors = true) }
+    }
+
+    private suspend fun loadKanbanListSync(
+        showLoading: Boolean,
+        showErrors: Boolean,
+        preserveSelection: Boolean = false,
+    ) {
+        val state = _uiState.value
+        if (showLoading) _uiState.update { it.copy(kanbanLoading = true) }
+        runCatching {
+            val rows = repository.loadKanbanList(state.kanbanDate, state.kanbanStatus, state.kanbanProductName)
+            _uiState.update {
+                it.copy(
+                    kanbanRows = rows,
+                    kanbanLoading = false,
+                    kanbanPage = if (preserveSelection) it.kanbanPage else 1,
+                    selectedKanbanIds = if (preserveSelection) it.selectedKanbanIds else emptySet(),
+                )
             }
+        }.onFailure { e ->
+            _uiState.update { it.copy(kanbanLoading = false) }
+            if (showErrors) _uiState.update { it.copy(snackbarMessage = e.message ?: "カンバン取得失敗") }
         }
     }
     fun issueKanban(id: Int) {
+        val row = _uiState.value.kanbanRows.find { it.id == id } ?: return
         viewModelScope.launch {
+            _uiState.update { it.copy(kanbanIssuePendingLoading = id) }
             runCatching {
-                repository.issueKanban(id)
-                loadKanbanList()
-                _uiState.update { it.copy(snackbarMessage = "カンバンを発行しました") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "発行失敗") } }
+                val kanbanNo = repository.issueKanban(id)
+                loadKanbanListSync(showLoading = false, showErrors = true)
+                val snackbar = if (kanbanNo.isNotBlank()) "カンバン発行: $kanbanNo" else "カンバンを発行しました"
+                _uiState.update {
+                    it.copy(
+                        kanbanIssuePendingLoading = null,
+                        snackbarMessage = snackbar,
+                        pendingPrintHtml = buildKanbanTicketPrintHtml(row, kanbanNo),
+                        pendingPrintSubject = "切断現品票",
+                        pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(kanbanIssuePendingLoading = null, snackbarMessage = e.message ?: "発行失敗") }
+            }
         }
     }
     fun reissueKanban(id: Int) {
+        val row = _uiState.value.kanbanRows.find { it.id == id } ?: return
         viewModelScope.launch {
+            _uiState.update { it.copy(kanbanReissueLoading = id) }
             runCatching {
-                repository.reissueKanban(id)
-                loadKanbanList()
-                _uiState.update { it.copy(snackbarMessage = "再発行しました") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "再発行失敗") } }
+                val kanbanNo = repository.reissueKanban(id)
+                loadKanbanListSync(showLoading = false, showErrors = true)
+                val snackbar = if (kanbanNo.isNotBlank()) "再発行: $kanbanNo" else "カンバンを再発行しました"
+                _uiState.update {
+                    it.copy(
+                        kanbanReissueLoading = null,
+                        snackbarMessage = snackbar,
+                        pendingPrintHtml = buildKanbanTicketPrintHtml(row, kanbanNo),
+                        pendingPrintSubject = "切断現品票",
+                        pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(kanbanReissueLoading = null, snackbarMessage = e.message ?: "再発行失敗") }
+            }
         }
     }
     fun batchIssueKanban() {
-        val ids = _uiState.value.selectedKanbanIds.toList()
+        val state = _uiState.value
+        val ids = state.selectedKanbanIds
         if (ids.isEmpty()) {
             _uiState.update { it.copy(snackbarMessage = "カンバンを選択してください") }
             return
         }
+        val pendingRows = state.kanbanRows.filter { row ->
+            row.id in ids && (row.status == "pending" || row.status == "issued")
+        }
+        if (pendingRows.isEmpty()) {
+            _uiState.update { it.copy(snackbarMessage = "発行対象のカンバン（待発行・発行済）を選択してください") }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(kanbanBatchIssueLoading = true) }
             runCatching {
-                repository.batchIssueKanban(ids)
-                loadKanbanList()
-                val issued = _uiState.value.kanbanRows.filter { it.id in ids }
-                val items = issued.mapNotNull { row -> row.kanbanNo?.let { no -> row to no } }
-                if (items.isNotEmpty()) {
-                    _uiState.update { it.copy(pendingPrintHtml = buildKanbanBatchPrintHtml(items), pendingPrintSubject = "カンバン一括印刷") }
+                val result = repository.batchIssueKanban(pendingRows.mapNotNull { it.id })
+                loadKanbanListSync(showLoading = false, showErrors = true)
+                val toPrint = pendingRows.mapNotNull { row ->
+                    val item = result.issuedItems.orEmpty().find { it.id == row.id }
+                    if (item != null && item.kanbanNo.isNotBlank()) row to item.kanbanNo else null
                 }
-                _uiState.update { it.copy(snackbarMessage = "一括発行しました") }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "一括発行失敗") } }
+                val snackbar = buildString {
+                    val issued = result.issued ?: 0
+                    if (issued > 0) append(result.message ?: "$issued 件発行しました")
+                    result.errors.orEmpty().take(3).forEach { err ->
+                        if (isNotEmpty()) append("; ")
+                        append(err)
+                    }
+                }.ifBlank { "一括発行しました" }
+                _uiState.update { state ->
+                    val base = state.copy(
+                        selectedKanbanIds = emptySet(),
+                        snackbarMessage = snackbar,
+                        kanbanBatchIssueLoading = false,
+                    )
+                    if (toPrint.isNotEmpty()) {
+                        base.copy(
+                            pendingPrintHtml = buildKanbanBatchPrintHtml(toPrint),
+                            pendingPrintSubject = "切断現品票（${toPrint.size}枚）",
+                            pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                        )
+                    } else {
+                        base
+                    }
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(snackbarMessage = e.message ?: "一括発行失敗", kanbanBatchIssueLoading = false) }
+            }
         }
     }
     fun openEditKanban(row: KanbanIssuanceRowDto) = openDialog(CuttingInstructionDialog.EditKanban(row))
@@ -1119,11 +1660,14 @@ class CuttingInstructionViewModel(
     }
     fun syncKanbanProductionDay() {
         viewModelScope.launch {
+            _uiState.update { it.copy(kanbanSyncLoading = true) }
             runCatching {
                 val msg = repository.syncKanbanProductionDay()
-                loadKanbanList()
-                _uiState.update { it.copy(snackbarMessage = msg) }
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "同期失敗") } }
+                loadKanbanListSync(showLoading = false, showErrors = true)
+                _uiState.update { it.copy(snackbarMessage = msg, kanbanSyncLoading = false) }
+            }.onFailure { e ->
+                _uiState.update { it.copy(snackbarMessage = e.message ?: "同期失敗", kanbanSyncLoading = false) }
+            }
         }
     }
     fun openConfirmUsageReflection() = openDialog(CuttingInstructionDialog.ConfirmUsageReflection)
@@ -1167,6 +1711,7 @@ class CuttingInstructionViewModel(
             it.copy(
                 pendingPrintHtml = buildMoldingPreInventoryPrintHtml(it.moldingPreInventoryDate, groups),
                 pendingPrintSubject = "成型前在庫・時間換算",
+                pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
             )
         }
     }
@@ -1247,37 +1792,74 @@ class CuttingInstructionViewModel(
         openDialog(CuttingInstructionDialog.Notes)
         refreshNotes()
     }
-    fun refreshNotes() {
+    fun refreshNotes(showSuccessMessage: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { it.copy(notesLoading = true) }
             runCatching {
                 val notes = repository.loadNotes()
-                _uiState.update { it.copy(notes = notes, notesCount = notes.count { n -> n.isDone != true }, notesLoading = false) }
-            }.onFailure { e -> _uiState.update { it.copy(notesLoading = false) } }
+                _uiState.update {
+                    it.copy(
+                        notes = notes,
+                        notesCount = notes.size,
+                        notesLoading = false,
+                        notesSaving = false,
+                        snackbarMessage = if (showSuccessMessage) "追加しました" else it.snackbarMessage,
+                    )
+                }
+            }.onFailure {
+                _uiState.update { it.copy(notesLoading = false, notesSaving = false) }
+            }
         }
     }
-    fun createNote(content: String) {
+    fun createNote(content: String, onSuccess: () -> Unit = {}) {
+        val trimmed = content.trim()
+        if (trimmed.isBlank()) {
+            _uiState.update { it.copy(snackbarMessage = "内容を入力してください") }
+            return
+        }
+        if (trimmed.length > 200) {
+            _uiState.update { it.copy(snackbarMessage = "content は200文字以内で指定してください") }
+            return
+        }
         viewModelScope.launch {
+            _uiState.update { it.copy(notesSaving = true) }
             runCatching {
-                repository.createNote(content)
-                refreshNotes()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "追加失敗") } }
+                repository.createNote(trimmed)
+                refreshNotes(showSuccessMessage = true)
+                onSuccess()
+            }.onFailure { e ->
+                _uiState.update { it.copy(notesSaving = false, snackbarMessage = e.message ?: "追加に失敗しました") }
+            }
         }
     }
     fun toggleNoteDone(id: Int, done: Boolean) {
         viewModelScope.launch {
+            _uiState.update { it.copy(notesSaving = true) }
             runCatching {
-                repository.patchNote(id, isDone = done)
+                repository.patchNote(id, isDone = if (done) 1 else 0)
+                _uiState.update { state ->
+                    state.copy(
+                        notes = state.notes.map { note ->
+                            if (note.id == id) note.copy(isDone = if (done) 1 else 0) else note
+                        },
+                        notesSaving = false,
+                    )
+                }
+            }.onFailure { e ->
+                _uiState.update { it.copy(notesSaving = false, snackbarMessage = e.message ?: "更新に失敗しました") }
                 refreshNotes()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "更新失敗") } }
+            }
         }
     }
     fun deleteNote(id: Int) {
         viewModelScope.launch {
+            _uiState.update { it.copy(notesSaving = true) }
             runCatching {
                 repository.deleteNote(id)
                 refreshNotes()
-            }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "削除失敗") } }
+            }.onFailure { e ->
+                _uiState.update { it.copy(notesSaving = false, snackbarMessage = e.message ?: "削除に失敗しました") }
+            }
         }
     }
     fun openSpecifiedDateMaterial() {
@@ -1305,11 +1887,23 @@ class CuttingInstructionViewModel(
             runCatching {
                 val stock = repository.loadMaterialStockForPrint(date)
                 val sub = repository.loadMaterialStockSubForPrint()
-                _uiState.update { it.copy(pendingPrintHtml = buildCuttingPlanPrintHtml(date, rows, stock, sub), pendingPrintSubject = "指定日材料数") }
+                _uiState.update {
+                    it.copy(
+                        pendingPrintHtml = buildCuttingPlanPrintHtml(date, rows, stock, sub),
+                        pendingPrintSubject = "指定日材料数",
+                        pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                    )
+                }
             }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "印刷失敗") } }
         }
     }
-    fun clearPendingPrintHtml() = _uiState.update { it.copy(pendingPrintHtml = null, pendingPrintSubject = null) }
+    fun clearPendingPrintHtml() = _uiState.update {
+        it.copy(
+            pendingPrintHtml = null,
+            pendingPrintSubject = null,
+            pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+        )
+    }
     fun clearSnackbar() = _uiState.update { it.copy(snackbarMessage = null) }
     private fun refreshPlanRow(id: Int, transform: (InstructionPlanRowDto) -> InstructionPlanRowDto) {
         _uiState.update { state -> state.copy(allPlans = state.allPlans.map { if (it.id == id) transform(it) else it }) }
@@ -1431,27 +2025,45 @@ private fun PlanFormState.toPatchBody() = PatchInstructionPlanBody(
     useMaterialStockSub = if (useMaterialStockSub) 1 else 0,
     usageCount = usageCount.toDoubleOrNull(),
 )
+private fun validateChamferingPlanForm(form: ChamferingPlanFormState): String? {
+    val month = form.productionMonth.trim()
+    val day = form.productionDay.trim().take(10)
+    val line = form.productionLine.trim()
+    val productCd = form.productCd.trim()
+    val productName = form.productName.trim()
+    return when {
+        month.length < 7 -> "生産月を選択してください"
+        day.length < 10 -> "生産日を選択してください"
+        line.isBlank() -> "ライン（面取機）を選択してください"
+        productCd.isBlank() || productName.isBlank() -> "製品を選択してください"
+        else -> null
+    }
+}
 private fun InstructionChamferingPlanRowDto.toChamferingPlanFormState() = ChamferingPlanFormState(
     productionMonth = productionMonth?.take(7).orEmpty(),
     productionDay = productionDay?.take(10).orEmpty(),
     productionLine = productionLine.orEmpty(),
+    productionOrder = productionOrder?.toString().orEmpty(),
     productCd = productCd.orEmpty(),
     productName = productName.orEmpty(),
     actualProductionQuantity = actualProductionQuantity?.toString() ?: "0",
     productionLotSize = productionLotSize?.toString().orEmpty(),
     lotNumber = lotNumber.orEmpty(),
     materialName = materialName.orEmpty(),
+    chamferingLength = chamferingLength?.toString().orEmpty(),
     hasSwProcess = hasSwProcess == 1,
 )
 private fun ChamferingPlanFormState.toCreateBody() = CreateChamferingPlanBody(
-    productionMonth = productionMonth,
-    productionDay = productionDay,
-    productionLine = productionLine,
-    productCd = productCd,
-    productName = productName,
-    actualProductionQuantity = actualProductionQuantity.toIntOrNull(),
+    productionMonth = productionMonth.trim().take(7),
+    productionDay = productionDay.trim().take(10),
+    productionLine = productionLine.trim(),
+    productionOrder = productionOrder.toIntOrNull(),
+    productCd = productCd.trim(),
+    productName = productName.trim(),
+    actualProductionQuantity = actualProductionQuantity.toIntOrNull() ?: 0,
     productionLotSize = productionLotSize.toIntOrNull(),
     lotNumber = lotNumber.ifBlank { null },
+    chamferingLength = chamferingLength.toDoubleOrNull(),
     materialName = materialName.ifBlank { null },
     hasSwProcess = if (hasSwProcess) 1 else 0,
 )
@@ -1459,11 +2071,13 @@ private fun ChamferingPlanFormState.toUpdateBody() = UpdateChamferingPlanContent
     productionMonth = productionMonth.ifBlank { null },
     productionDay = productionDay.ifBlank { null },
     productionLine = productionLine,
+    productionOrder = productionOrder.toIntOrNull(),
     productCd = productCd,
     productName = productName,
     actualProductionQuantity = actualProductionQuantity.toIntOrNull(),
     productionLotSize = productionLotSize.toIntOrNull(),
     lotNumber = lotNumber.ifBlank { null },
+    chamferingLength = chamferingLength.toDoubleOrNull(),
     materialName = materialName.ifBlank { null },
     hasSwProcess = if (hasSwProcess) 1 else 0,
 )

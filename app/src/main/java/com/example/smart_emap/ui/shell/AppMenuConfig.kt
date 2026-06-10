@@ -1,7 +1,11 @@
 package com.example.smart_emap.ui.shell
 
+import com.example.smart_emap.core.auth.canAccessMenuCode
+import com.example.smart_emap.data.model.UserDto
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CheckCircle
@@ -15,8 +19,11 @@ import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
  * 与 Smart-EMAPs frontend `src/router/menuConfig.ts` 的层级对齐。
@@ -138,7 +145,17 @@ object AppMenuConfig {
                     icon = Icons.Default.Settings,
                     children = listOf(
                         AppMenuNode.Leaf("ERP_PRODUCTION_HOME", "生産ホーム", Icons.Default.Home, "/erp/production", isHome = true),
-                        AppMenuNode.Leaf("ERP_PRODUCTION_PLANNING", "生産計画", Icons.Default.CalendarMonth, "/erp/production/data-management"),
+                        AppMenuNode.Group(
+                            code = "ERP_PRODUCTION_PLANNING",
+                            label = "生産計画",
+                            icon = Icons.Default.CalendarMonth,
+                            children = listOf(
+                                AppMenuNode.Leaf("ERP_PRODUCTION_DATA", "生産データ管理", Icons.Default.List, "/erp/production/data-management"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_BASELINE", "計画ベースライン", Icons.Default.TrendingUp, "/erp/production/plan-baseline"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_PLAN_SCHEDULES", "生産スケジュール", Icons.Default.List, "/erp/production/plan-schedules"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_PROCESS_MACHINE_PLAN", "工程別設備別計画", Icons.Default.TrendingUp, "/erp/production/process-machine-plan"),
+                            ),
+                        ),
                         AppMenuNode.Leaf("ERP_PRODUCTION_REQUIREMENTS", "生産需要量", Icons.Default.TrendingUp, "/erp/production-requirements/material"),
                         AppMenuNode.Leaf("ERP_PRODUCTION_METRICS", "生産指標", Icons.Default.TrendingUp, "/erp/production/metrics/scrap-rate"),
                         AppMenuNode.Leaf("ERP_PRODUCTION_RESULT", "生産実績", Icons.Default.Description, "/erp/production/actual-management"),
@@ -241,6 +258,48 @@ object AppMenuConfig {
                         AppMenuNode.Leaf("MES_ACTUAL_INSPECTION", "検査実績収集", Icons.Default.GridView, "/mes/actualDataCollection/inspection"),
                     ),
                 ),
+                AppMenuNode.Group(
+                    code = "MES_ACTUAL_ANALYSIS",
+                    label = "実績分析項目",
+                    icon = Icons.Default.Analytics,
+                    children = listOf(
+                        mesActualAnalysisCategoryGroup(
+                            code = "MES_ACTUAL_ANALYSIS_PRODUCTIVITY",
+                            label = "生産性分析",
+                            icon = Icons.Default.TrendingUp,
+                            analysisCategory = "productivity",
+                            categoryLabel = "生産性",
+                        ),
+                        mesActualAnalysisCategoryGroup(
+                            code = "MES_ACTUAL_ANALYSIS_UTILIZATION",
+                            label = "稼働率分析",
+                            icon = Icons.Default.Speed,
+                            analysisCategory = "utilization",
+                            categoryLabel = "稼働率",
+                        ),
+                        mesActualAnalysisCategoryGroup(
+                            code = "MES_ACTUAL_ANALYSIS_PROGRESS",
+                            label = "進捗分析",
+                            icon = Icons.Default.Timeline,
+                            analysisCategory = "progress",
+                            categoryLabel = "進捗",
+                        ),
+                        mesActualAnalysisCategoryGroup(
+                            code = "MES_ACTUAL_ANALYSIS_QUALITY",
+                            label = "品質分析",
+                            icon = Icons.Default.CheckCircle,
+                            analysisCategory = "quality",
+                            categoryLabel = "品質",
+                        ),
+                        mesActualAnalysisCategoryGroup(
+                            code = "MES_ACTUAL_ANALYSIS_COST",
+                            label = "コスト分析",
+                            icon = Icons.Default.BarChart,
+                            analysisCategory = "cost",
+                            categoryLabel = "コスト",
+                        ),
+                    ),
+                ),
             ),
         ),
 
@@ -270,6 +329,7 @@ object AppMenuConfig {
                         AppMenuNode.Leaf("MASTER_ROLLER_MASTER", "ローラーマスタ", Icons.Default.Description, "/master/roller-master"),
                         AppMenuNode.Leaf("MASTER_DESTINATION", "納入先マスタ", Icons.Default.Description, "/master/destination"),
                         AppMenuNode.Leaf("MASTER_DESTINATION_HOLIDAY", "納入先休日設定", Icons.Default.Description, "/master/destination/holiday"),
+                        AppMenuNode.Leaf("MASTER_COMPANY_WORK_CALENDAR", "会社稼働カレンダー", Icons.Default.CalendarMonth, "/master/company-work-calendar"),
                         AppMenuNode.Leaf("MASTER_PROCESS_PROCESSING_FEE", "工程加工費マスタ", Icons.Default.TrendingUp, "/master/bom/process-processing-fee"),
                     ),
                 ),
@@ -304,7 +364,7 @@ object AppMenuConfig {
                     children = listOf(
                         AppMenuNode.Leaf("SYSTEM_HOME", "システムホーム", Icons.Default.Home, "/system", isHome = true),
                         AppMenuNode.Leaf("SYSTEM_USERS", "ユーザー管理", Icons.Default.Person, "/system/users"),
-                        AppMenuNode.Leaf("SYSTEM_ORG", "組織・部門管理", Icons.Default.Description, "/system/organization"),
+                        AppMenuNode.Leaf("SYSTEM_ORG", "組織・部門管理", Icons.Default.Business, "/system/organization"),
                         AppMenuNode.Leaf("SYSTEM_ROLE", "権限・ロール管理", Icons.Default.Settings, "/system/roles"),
                     ),
                 ),
@@ -352,4 +412,78 @@ object AppMenuConfig {
     }
 
     fun isKnownPath(path: String): Boolean = findLeaf(path) != null
+
+    /** 同一路由可能对应多个菜单 code（例如各模块ホーム） */
+    fun codesForPath(path: String): List<String> {
+        val codes = mutableListOf<String>()
+        fun walk(nodes: List<AppMenuNode>) {
+            for (node in nodes) {
+                when (node) {
+                    is AppMenuNode.Leaf -> if (node.path == path) codes.add(node.code)
+                    is AppMenuNode.Group -> walk(node.children)
+                }
+            }
+        }
+        walk(rootMenus)
+        return codes
+    }
+
+    /** 按登录用户的 menu_codes（角色菜单权限）过滤侧栏 */
+    fun menusForUser(user: UserDto): List<AppMenuNode> =
+        rootMenus.mapNotNull { filterNodeForUser(it, user) }
+
+    private fun filterNodeForUser(node: AppMenuNode, user: UserDto): AppMenuNode? {
+        return when (node) {
+            is AppMenuNode.Group -> {
+                val children = node.children.mapNotNull { filterNodeForUser(it, user) }
+                if (children.isEmpty()) return null
+                node.copy(children = children)
+            }
+
+            is AppMenuNode.Leaf -> if (user.canAccessMenuCode(node.code)) node else null
+        }
+    }
 }
+
+private data class MesActualAnalysisProcess(
+    val codeSuffix: String,
+    val processLabel: String,
+    val pathSegment: String,
+    val icon: ImageVector,
+)
+
+private val mesActualAnalysisProcesses = listOf(
+    MesActualAnalysisProcess("CUTTING", "切断", "cutting", Icons.Default.Settings),
+    MesActualAnalysisProcess("CHAMFERING", "面取", "chamfering", Icons.Default.Build),
+    MesActualAnalysisProcess("FORMING", "成型", "forming", Icons.Default.Inventory2),
+    MesActualAnalysisProcess("PLATING", "メッキ", "plating", Icons.Default.Description),
+    MesActualAnalysisProcess("WELDING", "溶接", "welding", Icons.Default.Monitor),
+    MesActualAnalysisProcess("INSPECTION", "検査", "inspection", Icons.Default.CheckCircle),
+)
+
+/** Web `menuConfig.ts` と同じ命名（例: 切断生産性 / 切断稼働率）で leaf を生成する */
+private fun mesActualAnalysisProcessLeaves(
+    codePrefix: String,
+    analysisCategory: String,
+    categoryLabel: String,
+): List<AppMenuNode.Leaf> = mesActualAnalysisProcesses.map { process ->
+    AppMenuNode.Leaf(
+        code = "${codePrefix}_${process.codeSuffix}",
+        label = "${process.processLabel}$categoryLabel",
+        icon = process.icon,
+        path = "/mes/actualAnalysis/$analysisCategory/${process.pathSegment}",
+    )
+}
+
+private fun mesActualAnalysisCategoryGroup(
+    code: String,
+    label: String,
+    icon: ImageVector,
+    analysisCategory: String,
+    categoryLabel: String,
+): AppMenuNode.Group = AppMenuNode.Group(
+    code = code,
+    label = label,
+    icon = icon,
+    children = mesActualAnalysisProcessLeaves(code, analysisCategory, categoryLabel),
+)

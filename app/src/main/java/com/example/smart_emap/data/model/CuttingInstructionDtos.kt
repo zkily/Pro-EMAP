@@ -110,6 +110,10 @@ data class InstructionCuttingRowDto(
 
     @Json(name = "production_sequence") val productionSequence: Int? = null,
 
+    @Json(name = "production_lot_size") val productionLotSize: Int? = null,
+
+    @Json(name = "lot_number") val lotNumber: String? = null,
+
     @Json(name = "production_time") val productionTime: String? = null,
 
     val remarks: String? = null,
@@ -278,6 +282,33 @@ data class ProductBatchDetailDto(
 
     @Json(name = "scrap_length") val scrapLength: Double? = null,
 
+    @Json(name = "material_manufacturer") val materialManufacturer: String? = null,
+
+    @Json(name = "standard_specification") val standardSpecification: String? = null,
+
+    @Json(name = "cutting_length") val cuttingLength: Double? = null,
+
+    @Json(name = "chamfering_length") val chamferingLength: Double? = null,
+
+    @Json(name = "has_chamfering_process") val hasChamferingProcess: Boolean? = null,
+
+    @Json(name = "has_sw_process") val hasSwProcess: Boolean? = null,
+
+)
+
+
+
+fun MasterProductDto.toProductBatchDetail(): ProductBatchDetailDto = ProductBatchDetailDto(
+    productCd = productCd,
+    productName = productName,
+    lotSize = lotSize,
+    materialCd = materialCd,
+    materialName = materialName,
+    takeCount = takeCount,
+    cutLength = cutLength,
+    chamferLength = chamferLength,
+    developedLength = developedLength,
+    scrapLength = scrapLength,
 )
 
 
@@ -297,6 +328,8 @@ data class ProductBatchDetailResponse(
 data class EquipmentEfficiencyRowDto(
 
     @Json(name = "product_cd") val productCd: String? = null,
+
+    @Json(name = "product_name") val productName: String? = null,
 
     @Json(name = "machine_cd") val machineCd: String? = null,
 
@@ -378,9 +411,15 @@ data class ProductByProcessDto(
 
 data class ProductMachineConfigRowDto(
 
+    val id: Int? = null,
+
     @Json(name = "product_cd") val productCd: String? = null,
 
+    @Json(name = "product_name") val productName: String? = null,
+
     @Json(name = "molding_machine") val moldingMachine: String? = null,
+
+    @Json(name = "welding_machine") val weldingMachine: String? = null,
 
 )
 
@@ -392,9 +431,17 @@ data class CuttingInstructionNoteDto(
 
     val content: String? = null,
 
-    @Json(name = "is_done") val isDone: Boolean? = null,
+    @Json(name = "is_done") val isDone: Int? = null,
 
     @Json(name = "created_at") val createdAt: String? = null,
+
+)
+
+
+
+data class CuttingInstructionNotesListData(
+
+    val list: List<CuttingInstructionNoteDto>? = null,
 
 )
 
@@ -404,7 +451,9 @@ data class CuttingInstructionNotesResponse(
 
     val success: Boolean? = null,
 
-    val data: List<CuttingInstructionNoteDto>? = null,
+    val data: CuttingInstructionNotesListData? = null,
+
+    val message: String? = null,
 
 )
 
@@ -638,6 +687,10 @@ data class PatchInstructionCuttingBody(
 
     @Json(name = "defect_qty") val defectQty: Int? = null,
 
+    @Json(name = "production_lot_size") val productionLotSize: Int? = null,
+
+    @Json(name = "lot_number") val lotNumber: String? = null,
+
     @Json(name = "production_completed_check") val productionCompletedCheck: Boolean? = null,
 
     @Json(name = "remarks") val remarks: String? = null,
@@ -822,6 +875,50 @@ data class KanbanBatchIssueBody(
 
 
 
+data class KanbanIssueResponse(
+
+    val success: Boolean? = null,
+
+    val message: String? = null,
+
+    val detail: String? = null,
+
+    @Json(name = "kanban_no") val kanbanNo: String? = null,
+
+)
+
+
+
+data class KanbanIssuedItemDto(
+
+    val id: Int,
+
+    @Json(name = "kanban_no") val kanbanNo: String,
+
+)
+
+
+
+data class KanbanBatchIssueResponse(
+
+    val success: Boolean? = null,
+
+    val message: String? = null,
+
+    val detail: String? = null,
+
+    val issued: Int? = null,
+
+    val skipped: Int? = null,
+
+    val errors: List<String>? = null,
+
+    @Json(name = "issued_items") val issuedItems: List<KanbanIssuedItemDto>? = null,
+
+)
+
+
+
 data class MaterialUsageCommitBody(
 
     @Json(name = "today_date") val todayDate: String,
@@ -844,7 +941,7 @@ data class CreateNoteBody(
 
 data class PatchNoteBody(
 
-    @Json(name = "is_done") val isDone: Boolean? = null,
+    @Json(name = "is_done") val isDone: Int? = null,
 
     val content: String? = null,
 

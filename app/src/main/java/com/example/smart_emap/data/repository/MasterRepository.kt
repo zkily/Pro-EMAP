@@ -1,6 +1,10 @@
 package com.example.smart_emap.data.repository
 
 import com.example.smart_emap.core.network.ApiClient
+import com.example.smart_emap.data.model.CompanyWorkCalendarBatchBodyDto
+import com.example.smart_emap.data.model.CompanyWorkCalendarBatchResponse
+import com.example.smart_emap.data.model.CompanyWorkCalendarDayTypeDto
+import com.example.smart_emap.data.model.CompanyWorkCalendarListResponse
 import com.example.smart_emap.data.model.DestinationOptionDto
 import com.example.smart_emap.data.model.MasterBatchDeleteBodyDto
 import com.example.smart_emap.data.model.MasterCarrierBodyDto
@@ -9,8 +13,16 @@ import com.example.smart_emap.data.model.MasterDestinationBodyDto
 import com.example.smart_emap.data.model.MasterDestinationHolidayDto
 import com.example.smart_emap.data.model.MasterDestinationWorkdayDto
 import com.example.smart_emap.data.model.MasterInspectionBodyDto
+import com.example.smart_emap.data.model.MasterInspectionDto
+import com.example.smart_emap.data.model.MasterPartDto
 import com.example.smart_emap.data.model.MasterMachineBodyDto
 import com.example.smart_emap.data.model.MasterMaterialBodyDto
+import com.example.smart_emap.data.model.MasterMaterialDto
+import com.example.smart_emap.data.model.MaterialCsvExportItemDto
+import com.example.smart_emap.data.model.MaterialMasterStatsDto
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import com.example.smart_emap.data.model.MasterPartBodyDto
 import com.example.smart_emap.data.model.MasterProcessBodyDto
 import com.example.smart_emap.data.model.MasterProcessRouteBodyDto
@@ -23,7 +35,10 @@ import com.example.smart_emap.data.model.ProductMasterStatsDto
 import com.example.smart_emap.data.model.MasterProductRouteInfoDto
 import com.example.smart_emap.data.model.MasterProductRouteStepDto
 import com.example.smart_emap.data.model.MasterRollerBodyDto
+import com.example.smart_emap.data.model.MasterProcessRouteDto
 import com.example.smart_emap.data.model.MasterRouteStepBodyDto
+import com.example.smart_emap.data.model.MasterRouteStepOrderItemDto
+import com.example.smart_emap.data.model.MasterRouteStepUpdateDto
 import com.example.smart_emap.data.model.MasterSupplierBodyDto
 import com.example.smart_emap.ui.master.MasterPageKind
 import com.example.smart_emap.ui.master.MasterTableRow
@@ -298,6 +313,69 @@ class MasterRepository(
         apiClient.masterApi().listDestinationWorkdays(destinationCd)
     }.getOrElse { emptyList() }
 
+    suspend fun loadCompanyWorkCalendar(startDate: String, endDate: String): CompanyWorkCalendarListResponse? =
+        runCatching {
+            apiClient.masterApi().listCompanyWorkCalendar(startDate, endDate)
+        }.getOrNull()
+
+    suspend fun loadCompanyWorkCalendarDayTypes(): List<CompanyWorkCalendarDayTypeDto> = runCatching {
+        apiClient.masterApi().listCompanyWorkCalendarDayTypes()
+    }.getOrElse {
+        listOf(
+            CompanyWorkCalendarDayTypeDto("national_holiday", "祝日"),
+            CompanyWorkCalendarDayTypeDto("company_holiday", "会社休"),
+            CompanyWorkCalendarDayTypeDto("paid_leave", "有給"),
+            CompanyWorkCalendarDayTypeDto("extra_workday", "臨時出勤"),
+        )
+    }
+
+    suspend fun batchCreateCompanyWorkCalendar(dates: List<String>, dayType: String, name: String?): CompanyWorkCalendarBatchResponse? =
+        runCatching {
+            apiClient.masterApi().batchCreateCompanyWorkCalendar(
+                CompanyWorkCalendarBatchBodyDto(dates = dates, dayType = dayType, name = name?.trim()?.ifBlank { null }),
+            )
+        }.getOrNull()
+
+    suspend fun deleteCompanyWorkCalendarEntry(id: Int) {
+        apiClient.masterApi().deleteCompanyWorkCalendarEntry(id)
+    }
+
+    /** 会社稼働カレンダーに基づく月間稼働日数（API 失敗時は月〜金） */
+    suspend fun loadScheduledWorkdaysForMonth(yearMonth: String): Int {
+        val trimmed = yearMonth.trim()
+        if (!Regex("""\d{4}-\d{2}""").matches(trimmed)) return 20
+        val parts = trimmed.split("-").mapNotNull { it.toIntOrNull() }
+        if (parts.size != 2) return 20
+        val start = LocalDate.of(parts[0], parts[1], 1)
+        val end = start.withDayOfMonth(start.lengthOfMonth())
+        val fmt = DateTimeFormatter.ISO_LOCAL_DATE
+        val count = loadCompanyWorkCalendar(start.format(fmt), end.format(fmt))
+            ?.data?.scheduledWorkdayCount
+        return count?.coerceAtLeast(1) ?: weekdayFallbackForMonth(trimmed)
+    }
+
+    private fun weekdayFallbackForMonth(yearMonth: String): Int {
+        val trimmed = yearMonth.trim()
+        if (!Regex("""\d{4}-\d{2}""").matches(trimmed)) return 20
+        val parts = trimmed.split("-").mapNotNull { it.toIntOrNull() }
+        if (parts.size != 2) return 20
+        val start = LocalDate.of(parts[0], parts[1], 1)
+        val end = start.withDayOfMonth(start.lengthOfMonth())
+        var count = 0
+        var cursor = start
+        while (!cursor.isAfter(end)) {
+            if (cursor.dayOfWeek != DayOfWeek.SATURDAY && cursor.dayOfWeek != DayOfWeek.SUNDAY) count++
+            cursor = cursor.plusDays(1)
+        }
+        return count.coerceAtLeast(1)
+    }
+
+    suspend fun loadScheduledWorkdaysForDateIso(dateIso: String): Int {
+        val date = dateIso.trim().take(10)
+        if (date.length < 7) return 20
+        return loadScheduledWorkdaysForMonth(date.take(7))
+    }
+
     suspend fun loadProcessOptions(): List<Pair<String, String>> = runCatching {
         apiClient.masterApi().listProcesses(pageSize = 500).items()
             .map { (it.processCd.orEmpty()) to (it.processName.orEmpty()) }
@@ -399,7 +477,7 @@ class MasterRepository(
                     shortName = fields["short_name"],
                     category = fields["category"],
                     isOutsource = fields["is_outsource"] == "true",
-                    defaultCycleSec = fields["default_cycle_sec"]?.toIntOrNull(),
+                    defaultCycleSec = fields["default_cycle_sec"]?.toDoubleOrNull(),
                     defaultYield = fields["default_yield"]?.toDoubleOrNull(),
                     capacityUnit = fields["capacity_unit"],
                     remark = fields["remark"],
@@ -509,11 +587,345 @@ class MasterRepository(
         apiClient.masterApi().deleteDestinationWorkday(id)
     }
 
-    suspend fun createRouteStep(routeCd: String, stepNo: Int, processCd: String) {
-        apiClient.masterApi().createRouteStep(routeCd, MasterRouteStepBodyDto(stepNo, processCd))
+    suspend fun loadProcessRoutes(
+        keyword: String,
+        page: Int,
+        pageSize: Int,
+    ): Pair<List<MasterProcessRouteDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listProcessRoutes(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            page = page,
+            pageSize = pageSize,
+        )
+        resp.items() to resp.totalCount()
+    }.getOrElse { emptyList<MasterProcessRouteDto>() to 0 }
+
+    suspend fun getProcessRouteByCd(routeCd: String): MasterProcessRouteDto? = runCatching {
+        apiClient.masterApi().getProcessRouteByCd(routeCd)
+    }.getOrNull()
+
+    suspend fun saveProcessRouteMaster(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        val body = MasterProcessRouteBodyDto(
+            routeCd = fields["route_cd"].orEmpty().trim(),
+            routeName = fields["route_name"].orEmpty().trim(),
+            description = fields["description"]?.trim()?.takeIf { it.isNotEmpty() },
+            isActive = fields["is_active"] != "false",
+            isDefault = fields["is_default"] == "true",
+        )
+        if (id == null) apiClient.masterApi().createProcessRoute(body)
+        else apiClient.masterApi().updateProcessRoute(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun deleteProcessRouteMaster(id: Int) {
+        apiClient.masterApi().deleteProcessRoute(id)
+    }
+
+    suspend fun loadProcessDetailsMap(): Map<String, com.example.smart_emap.data.model.MasterProcessDto> = runCatching {
+        apiClient.masterApi().listProcesses(pageSize = 500).items()
+            .filter { !it.processCd.isNullOrBlank() }
+            .associateBy { it.processCd.orEmpty() }
+    }.getOrElse { emptyMap() }
+
+    suspend fun createRouteStep(routeCd: String, fields: Map<String, String>) {
+        val body = MasterRouteStepBodyDto(
+            stepNo = fields["step_no"]?.toIntOrNull() ?: 1,
+            processCd = fields["process_cd"].orEmpty(),
+            yieldPercent = fields["yield_percent"]?.toDoubleOrNull() ?: 100.0,
+            cycleSec = fields["cycle_sec"]?.toDoubleOrNull() ?: 0.0,
+            remarks = fields["remarks"]?.trim()?.takeIf { it.isNotEmpty() },
+        )
+        apiClient.masterApi().createRouteStep(routeCd, body)
+    }
+
+    suspend fun updateRouteStep(stepId: Int, fields: Map<String, String>) {
+        val body = MasterRouteStepUpdateDto(
+            stepNo = fields["step_no"]?.toIntOrNull(),
+            processCd = fields["process_cd"]?.takeIf { it.isNotBlank() },
+            yieldPercent = fields["yield_percent"]?.toDoubleOrNull(),
+            cycleSec = fields["cycle_sec"]?.toDoubleOrNull(),
+            remarks = fields["remarks"]?.trim(),
+        )
+        apiClient.masterApi().updateRouteStep(stepId, body)
+    }
+
+    suspend fun updateRouteStepOrder(routeCd: String, steps: List<com.example.smart_emap.data.model.MasterRouteStepDto>) {
+        val order = steps.mapNotNull { step ->
+            val id = step.id ?: return@mapNotNull null
+            val no = step.stepNo ?: return@mapNotNull null
+            MasterRouteStepOrderItemDto(id, no)
+        }
+        apiClient.masterApi().updateRouteStepOrder(routeCd, order)
     }
 
     suspend fun deleteRouteStep(routeCd: String, stepId: Int) {
         apiClient.masterApi().deleteRouteStep(routeCd, stepId)
     }
+
+    suspend fun loadAllMaterials(): List<MasterMaterialDto> = runCatching {
+        apiClient.masterApi().listMaterials(pageSize = 10000).items()
+    }.getOrElse { emptyList() }
+
+    suspend fun loadMaterialMasterStats(): MaterialMasterStatsDto = runCatching {
+        val all = loadAllMaterials()
+        val active = all.count { it.status == 1 }
+        MaterialMasterStatsDto(total = all.size, active = active, inactive = all.size - active)
+    }.getOrElse { MaterialMasterStatsDto() }
+
+    suspend fun loadSupplierOptionsForMaterial(): List<Pair<String, String>> = runCatching {
+        apiClient.masterApi().listSuppliers(pageSize = 5000).items()
+            .map { (it.supplierCd.orEmpty()) to (it.supplierName.orEmpty()) }
+            .filter { it.first.isNotBlank() }
+    }.getOrElse { emptyList() }
+
+    suspend fun loadMaterialById(id: Int): MasterMaterialDto? = runCatching {
+        apiClient.masterApi().getMaterial(id)
+    }.getOrNull()
+
+    suspend fun loadNextMaterialCd(): String = runCatching {
+        val maxCd = apiClient.masterApi().getMaxMaterialCd()["max_code"] ?: 0
+        ((if (maxCd > 0) maxCd else 0) + 1).toString().padStart(5, '0')
+    }.getOrElse { "10001" }
+
+    private fun buildMaterialBody(fields: Map<String, String>): MasterMaterialBodyDto {
+        fun blankToNull(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }
+        fun toDouble(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+        fun toInt(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }?.toIntOrNull()
+        return MasterMaterialBodyDto(
+            materialCd = fields["material_cd"].orEmpty().trim(),
+            materialName = fields["material_name"].orEmpty().trim(),
+            materialType = blankToNull(fields["material_type"]),
+            standardSpec = blankToNull(fields["standard_spec"]),
+            unit = blankToNull(fields["unit"]),
+            diameter = toDouble(fields["diameter"]),
+            thickness = toDouble(fields["thickness"]),
+            length = toDouble(fields["length"]),
+            supplyClassification = blankToNull(fields["supply_classification"]),
+            piecesPerBundle = toInt(fields["pieces_per_bundle"]),
+            usegae = blankToNull(fields["usegae"]),
+            supplierCd = blankToNull(fields["supplier_cd"]),
+            unitPrice = toDouble(fields["unit_price"]),
+            longWeight = toDouble(fields["long_weight"]),
+            singlePrice = toDouble(fields["single_price"]),
+            safetyStock = toInt(fields["safety_stock"]),
+            leadTime = toInt(fields["lead_time"]),
+            storageLocation = blankToNull(fields["storage_location"]),
+            status = toInt(fields["status"]) ?: 1,
+            toleranceRange = blankToNull(fields["tolerance_range"]),
+            tolerance1 = toDouble(fields["tolerance_1"]),
+            tolerance2 = toDouble(fields["tolerance_2"]),
+            rangeValue = blankToNull(fields["range_value"]),
+            minValue = toDouble(fields["min_value"]),
+            maxValue = toDouble(fields["max_value"]),
+            actualValue1 = toDouble(fields["actual_value_1"]),
+            actualValue2 = toDouble(fields["actual_value_2"]),
+            actualValue3 = toDouble(fields["actual_value_3"]),
+            representativeModel = blankToNull(fields["representative_model"]),
+            note = blankToNull(fields["note"]),
+        )
+    }
+
+    suspend fun saveMaterial(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        val body = buildMaterialBody(fields)
+        val api = apiClient.masterApi()
+        if (id == null) api.createMaterial(body) else api.updateMaterial(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun deleteMaterial(id: Int) {
+        apiClient.masterApi().deleteMaterial(id)
+    }
+
+    suspend fun updateMaterialStatus(material: MasterMaterialDto, status: Int): Boolean = runCatching {
+        val id = material.id ?: return@runCatching false
+        val body = MasterMaterialBodyDto(
+            materialCd = material.materialCd.orEmpty(),
+            materialName = material.materialName.orEmpty(),
+            materialType = material.materialType,
+            standardSpec = material.standardSpec,
+            unit = material.unit,
+            diameter = material.diameter,
+            thickness = material.thickness,
+            length = material.length,
+            supplyClassification = material.supplyClassification,
+            piecesPerBundle = material.piecesPerBundle,
+            usegae = material.usegae,
+            supplierCd = material.supplierCd,
+            unitPrice = material.unitPrice,
+            longWeight = material.longWeight,
+            singlePrice = material.singlePrice,
+            safetyStock = material.safetyStock,
+            leadTime = material.leadTime,
+            storageLocation = material.storageLocation,
+            status = status,
+            toleranceRange = material.toleranceRange,
+            tolerance1 = material.tolerance1,
+            tolerance2 = material.tolerance2,
+            rangeValue = material.rangeValue,
+            minValue = material.minValue,
+            maxValue = material.maxValue,
+            actualValue1 = material.actualValue1,
+            actualValue2 = material.actualValue2,
+            actualValue3 = material.actualValue3,
+            representativeModel = material.representativeModel,
+            note = material.note,
+        )
+        apiClient.masterApi().updateMaterial(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun exportMaterialMasterCsv(items: List<MaterialCsvExportItemDto>): String = runCatching {
+        val response = apiClient.masterApi().exportMaterialsCsv(items)
+        response.string()
+    }.getOrElse { throw IllegalStateException("CSVファイルの出力に失敗しました") }
+
+    suspend fun loadInspectionMasters(
+        keyword: String,
+        page: Int,
+        pageSize: Int,
+    ): Pair<List<MasterInspectionDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listInspectionMasters(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            page = page,
+            pageSize = pageSize,
+        )
+        val list = resp.data?.list.orEmpty()
+        list to (resp.data?.total ?: list.size)
+    }.getOrElse { emptyList<MasterInspectionDto>() to 0 }
+
+    suspend fun saveInspectionMaster(id: Int?, inspectionCd: String, inspectionStandard: String): Boolean =
+        runCatching {
+            val body = MasterInspectionBodyDto(inspectionCd = inspectionCd, inspectionStandard = inspectionStandard)
+            if (id == null) apiClient.masterApi().createInspectionMaster(body) else apiClient.masterApi().updateInspectionMaster(id, body)
+            true
+        }.getOrElse { false }
+
+    suspend fun deleteInspectionMaster(id: Int) {
+        apiClient.masterApi().deleteInspectionMaster(id)
+    }
+
+    suspend fun loadParts(
+        keyword: String,
+        status: Int?,
+        page: Int,
+        pageSize: Int,
+    ): Pair<List<MasterPartDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listParts(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            status = status,
+            page = page,
+            pageSize = pageSize,
+        )
+        resp.items() to resp.totalCount()
+    }.getOrElse { emptyList<MasterPartDto>() to 0 }
+
+    suspend fun loadAllPartsForQr(): List<MasterPartDto> = runCatching {
+        apiClient.masterApi().listParts(pageSize = 10000).items()
+    }.getOrElse { emptyList() }
+
+    suspend fun loadPartById(id: Int): MasterPartDto? = runCatching {
+        apiClient.masterApi().getPart(id).data
+    }.getOrNull()
+
+    suspend fun savePartMaster(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        fun blankToNull(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }
+        val body = MasterPartBodyDto(
+            partCd = fields["part_cd"].orEmpty().trim(),
+            partName = fields["part_name"].orEmpty().trim(),
+            category = blankToNull(fields["category"]),
+            kind = blankToNull(fields["kind"]),
+            settlementType = blankToNull(fields["settlement_type"]),
+            uom = blankToNull(fields["uom"]),
+            unitPrice = fields["unit_price"]?.trim()?.takeIf { it.isNotEmpty() }?.toDoubleOrNull(),
+            materialUnitPrice = fields["material_unit_price"]?.trim()?.takeIf { it.isNotEmpty() }?.toDoubleOrNull(),
+            currency = blankToNull(fields["currency"]),
+            exchangeRate = fields["exchange_rate"]?.trim()?.takeIf { it.isNotEmpty() }?.toDoubleOrNull(),
+            supplierCd = blankToNull(fields["supplier_cd"]),
+            status = fields["status"]?.toIntOrNull() ?: 1,
+            remarks = blankToNull(fields["remarks"]),
+        )
+        if (id == null) apiClient.masterApi().createPart(body) else apiClient.masterApi().updatePart(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun deletePartMaster(id: Int) {
+        apiClient.masterApi().deletePart(id)
+    }
+
+    suspend fun loadSuppliers(
+        keyword: String,
+        page: Int,
+        pageSize: Int,
+    ): Pair<List<com.example.smart_emap.data.model.MasterSupplierDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listSuppliers(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            page = page,
+            pageSize = pageSize,
+        )
+        resp.items() to resp.totalCount()
+    }.getOrElse { emptyList<com.example.smart_emap.data.model.MasterSupplierDto>() to 0 }
+
+    suspend fun saveSupplierMaster(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        fun blankToNull(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }
+        val body = MasterSupplierBodyDto(
+            supplierCd = fields["supplier_cd"].orEmpty().trim(),
+            supplierName = fields["supplier_name"].orEmpty().trim(),
+            supplierKana = blankToNull(fields["supplier_kana"]),
+            contactPerson = blankToNull(fields["contact_person"]),
+            phone = blankToNull(fields["phone"]),
+            fax = blankToNull(fields["fax"]),
+            email = blankToNull(fields["email"]),
+            postalCode = blankToNull(fields["postal_code"]),
+            address1 = blankToNull(fields["address1"]),
+            address2 = blankToNull(fields["address2"]),
+            paymentTerms = blankToNull(fields["payment_terms"]),
+            currency = blankToNull(fields["currency"]) ?: "JPY",
+            remarks = blankToNull(fields["remarks"]),
+        )
+        if (id == null) apiClient.masterApi().createSupplier(body) else apiClient.masterApi().updateSupplier(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun deleteSupplierMaster(id: Int) {
+        apiClient.masterApi().deleteSupplier(id)
+    }
+
+    suspend fun loadProcesses(keyword: String = ""): Pair<List<com.example.smart_emap.data.model.MasterProcessDto>, Int> = runCatching {
+        val resp = apiClient.masterApi().listProcesses(
+            keyword = keyword.takeIf { it.isNotBlank() },
+            page = 1,
+            pageSize = 1000,
+        )
+        resp.items() to resp.totalCount()
+    }.getOrElse { emptyList<com.example.smart_emap.data.model.MasterProcessDto>() to 0 }
+
+    suspend fun saveProcessMaster(id: Int?, fields: Map<String, String>): Boolean = runCatching {
+        fun blankToNull(v: String?) = v?.trim()?.takeIf { it.isNotEmpty() }
+        val yieldPercent = fields["default_yield_percent"]?.toDoubleOrNull() ?: 100.0
+        val body = MasterProcessBodyDto(
+            processCd = fields["process_cd"].orEmpty().trim(),
+            processName = fields["process_name"].orEmpty().trim(),
+            shortName = blankToNull(fields["short_name"]),
+            category = blankToNull(fields["category"]),
+            isOutsource = fields["is_outsource"] == "true",
+            defaultCycleSec = fields["default_cycle_sec"]?.toDoubleOrNull() ?: 0.0,
+            defaultYield = yieldPercent / 100.0,
+            capacityUnit = blankToNull(fields["capacity_unit"]) ?: "pcs",
+            remark = blankToNull(fields["remark"]),
+        )
+        if (id == null) apiClient.masterApi().createProcess(body) else apiClient.masterApi().updateProcess(id, body)
+        true
+    }.getOrElse { false }
+
+    suspend fun deleteProcessMaster(id: Int) {
+        apiClient.masterApi().deleteProcess(id)
+    }
+
+    suspend fun loadAllProcessesForQr(): List<com.example.smart_emap.data.model.MasterProcessDto> = runCatching {
+        apiClient.masterApi().listProcesses(page = 1, pageSize = 10000).items()
+    }.getOrElse { emptyList() }
+
+    suspend fun exportPartMasterCsv(items: List<com.example.smart_emap.data.model.PartCsvExportItemDto>): String = runCatching {
+        apiClient.masterApi().exportPartsCsv(items).string()
+    }.getOrElse { throw IllegalStateException("CSVファイルの出力に失敗しました") }
 }

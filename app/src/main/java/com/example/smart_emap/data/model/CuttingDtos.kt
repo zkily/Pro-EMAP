@@ -76,13 +76,21 @@ data class CuttingPlanningMachineDto(
 data class UserListResponse(
     val items: List<UserListItemDto>? = null,
     val total: Int? = null,
+    val page: Int? = null,
+    @Json(name = "page_size") val pageSize: Int? = null,
+    val pages: Int? = null,
 )
 
 data class UserListItemDto(
     val id: Int? = null,
     val username: String? = null,
     @Json(name = "full_name") val fullName: String? = null,
+    val email: String? = null,
+    val department: String? = null,
+    val role: String? = null,
     val status: String? = null,
+    @Json(name = "two_factor") val twoFactor: Boolean? = null,
+    @Json(name = "last_login") val lastLogin: String? = null,
 ) {
     fun displayLabel(): String = fullName?.trim().orEmpty().ifEmpty { username?.trim().orEmpty() }
 }

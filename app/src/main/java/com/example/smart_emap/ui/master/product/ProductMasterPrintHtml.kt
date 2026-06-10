@@ -60,11 +60,7 @@ fun buildProductQrPrintItems(
 ): List<ProductQrPrintItem> {
     val sorted = products
         .asSequence()
-        .filter { product ->
-            val type = product.productType.orEmpty().ifBlank { "その他" }
-            val normalizedType = if (type in productTypePrintOptions) type else "その他"
-            selectedTypes.contains(normalizedType)
-        }
+        .filter { product -> selectedTypes.contains(product.productType.orEmpty()) }
         .filter { product ->
             val cd = product.productCd.orEmpty()
             cd.isNotBlank() && cd.last() == '1'

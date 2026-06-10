@@ -5,6 +5,7 @@ import com.example.smart_emap.data.model.CreateWeldingBody
 import com.example.smart_emap.data.model.CreateWeldingResponse
 import com.example.smart_emap.data.model.PatchWeldingBody
 import com.example.smart_emap.data.model.WeldingListResponse
+import com.example.smart_emap.data.model.WeldingProductivityAnalysisResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.PATCH
@@ -28,4 +29,14 @@ interface WeldingApiService {
         @Path("id") id: Int,
         @Body body: PatchWeldingBody,
     ): ApiMessageResponse
+
+    @GET("/api/plan/welding-management/productivity-analysis")
+    suspend fun productivityAnalysis(
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("mes_operator_user_id") mesOperatorUserId: Int? = null,
+        @Query("product_cd") productCd: String? = null,
+        @Query("include_incomplete") includeIncomplete: Boolean? = null,
+        @Query("limit") limit: Int? = null,
+    ): WeldingProductivityAnalysisResponse
 }

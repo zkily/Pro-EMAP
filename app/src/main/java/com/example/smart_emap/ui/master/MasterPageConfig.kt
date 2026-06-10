@@ -91,6 +91,7 @@ object MasterPageRegistry {
         MasterHomeModule("/master/roller-master", "ローラーマスタ", "ローラー情報の登録・編集", Color(0xFF43E97B), Color(0xFF38F9D7), Icons.Default.Factory),
         MasterHomeModule("/master/destination", "納入先マスタ", "納入先情報の登録・編集", Color(0xFFFDDB92), Color(0xFFD1FDFF), Icons.Default.DirectionsCar),
         MasterHomeModule("/master/destination/holiday", "納入先休日設定", "納入先休日・臨時出勤の設定", Color(0xFFE6A23C), Color(0xFFF7BA2A), Icons.Default.CalendarMonth),
+        MasterHomeModule("/master/company-work-calendar", "会社稼働カレンダー", "祝日・有給・会社休・臨時出勤", Color(0xFF2563EB), Color(0xFF60A5FA), Icons.Default.CalendarMonth),
     )
 
     private val pages: Map<String, MasterPageDef> = mapOf(

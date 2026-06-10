@@ -159,7 +159,7 @@ private fun defaultQuickAccess(): List<QuickAccessUi> = listOf(
     QuickAccessUi("/erp/shipping/list", "出荷構成表管理", "出荷構成表の作成・編集", Color(0xFFF43F5E), Color(0xFFE11D48)),
     QuickAccessUi("/erp/shipping/report", "出荷報告書管理", "出荷報告の登録・一覧", Color(0xFFFB7185), Color(0xFFDB2777)),
     QuickAccessUi("/erp/production/data-management", "生産データ管理", "実績・計画データの更新", Color(0xFF10B981), Color(0xFF059669)),
-    QuickAccessUi("/erp/production/plan-schedules", "スケジューリング", "生産スケジュールの確認", Color(0xFF8B5CF6), Color(0xFF7C3AED)),
+    QuickAccessUi("/aps/scheduling", "スケジューリング", "生産スケジューリングボード", Color(0xFF1D4ED8), Color(0xFF1E3A8A)),
     QuickAccessUi("/aps/planning-list", "成型計画一覧", "APS 成型計画の一覧・照会", Color(0xFFA855F7), Color(0xFF9333EA)),
     QuickAccessUi("/aps/welding-planning-list", "溶接計画一覧", "APS 溶接計画の一覧・照会", Color(0xFF7C3AED), Color(0xFF6D28D9)),
     QuickAccessUi("/mes/productionInstruction/cutting", "切断・面取指示", "切断・面取の作業指示", Color(0xFFF59E0B), Color(0xFFD97706)),

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -150,6 +151,20 @@ fun HeaderBar(
                     onDismissRequest = { userMenuExpanded = false },
                 ) {
                     DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(user.fullName ?: user.username, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = roleDisplayName(user.role),
+                                    fontSize = 11.sp,
+                                    color = Color.Gray,
+                                )
+                            }
+                        },
+                        onClick = { userMenuExpanded = false },
+                        enabled = false,
+                    )
+                    DropdownMenuItem(
                         text = { Text("ログアウト") },
                         onClick = {
                             userMenuExpanded = false
@@ -210,4 +225,13 @@ private fun HeaderWeatherInline(
 private fun formatHeaderTime(): String {
     val formatter = DateTimeFormatter.ofPattern("MM/dd (E) HH:mm", Locale.JAPAN)
     return ZonedDateTime.now(ZoneId.of("Asia/Tokyo")).format(formatter)
+}
+
+private fun roleDisplayName(role: String): String = when (role) {
+    "admin" -> "管理者"
+    "manager" -> "マネージャー"
+    "worker" -> "作業者"
+    "guest" -> "ゲスト"
+    "viewer" -> "閲覧者"
+    else -> "一般ユーザー"
 }

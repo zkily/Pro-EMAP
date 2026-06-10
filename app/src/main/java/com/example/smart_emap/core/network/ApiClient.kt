@@ -9,16 +9,22 @@ import com.example.smart_emap.data.api.CuttingApiService
 import com.example.smart_emap.data.api.CuttingInstructionApiService
 import com.example.smart_emap.data.api.DatabaseApiService
 import com.example.smart_emap.data.api.CuttingPlanningApiService
+import com.example.smart_emap.data.api.PlanBaselineApiService
+import com.example.smart_emap.data.api.PlanDataApiService
+import com.example.smart_emap.data.api.ProductionSummaryApiService
+import com.example.smart_emap.data.api.StockTransactionLogApiService
 import com.example.smart_emap.data.api.DashboardApiService
 import com.example.smart_emap.data.api.ErpOptionsApiService
 import com.example.smart_emap.data.api.InspectionApiService
 import com.example.smart_emap.data.api.MaterialApiService
 import com.example.smart_emap.data.api.MasterApiService
 import com.example.smart_emap.data.api.PartApiService
+import com.example.smart_emap.data.api.PlanInstructionApiService
 import com.example.smart_emap.data.api.OrderBatchApiService
 import com.example.smart_emap.data.api.OrderDailyApiService
 import com.example.smart_emap.data.api.OrderMonthlyApiService
 import com.example.smart_emap.data.api.ProcessDefectApiService
+import com.example.smart_emap.data.api.SystemApiService
 import com.example.smart_emap.data.api.SystemUsersApiService
 import com.example.smart_emap.data.api.WeldingApiService
 import com.squareup.moshi.Moshi
@@ -75,13 +81,17 @@ class ApiClient(
     suspend fun cuttingPlanningApi(): CuttingPlanningApiService =
         retrofit().create(CuttingPlanningApiService::class.java)
 
-    suspend fun systemUsersApi(): SystemUsersApiService = retrofit().create(SystemUsersApiService::class.java)
+    suspend fun systemApi(): SystemApiService = retrofit().create(SystemApiService::class.java)
+
+    suspend fun systemUsersApi(): SystemUsersApiService = systemApi()
 
     suspend fun weldingApi(): WeldingApiService = retrofit().create(WeldingApiService::class.java)
 
     suspend fun masterApi(): MasterApiService = retrofit().create(MasterApiService::class.java)
 
     suspend fun apsApi(): ApsApiService = retrofit().create(ApsApiService::class.java)
+
+    suspend fun apsApiLong(): ApsApiService = retrofitWithLongTimeout().create(ApsApiService::class.java)
 
     suspend fun erpOptionsApi(): ErpOptionsApiService = retrofit().create(ErpOptionsApiService::class.java)
 
@@ -101,6 +111,27 @@ class ApiClient(
     suspend fun partApi(): PartApiService = retrofit().create(PartApiService::class.java)
 
     suspend fun partApiLong(): PartApiService = retrofitWithLongTimeout().create(PartApiService::class.java)
+
+    suspend fun planInstructionApi(): PlanInstructionApiService =
+        retrofit().create(PlanInstructionApiService::class.java)
+
+    suspend fun productionSummaryApi(): ProductionSummaryApiService =
+        retrofit().create(ProductionSummaryApiService::class.java)
+
+    suspend fun productionSummaryApiLong(): ProductionSummaryApiService =
+        retrofitWithLongTimeout().create(ProductionSummaryApiService::class.java)
+
+    suspend fun stockTransactionLogApi(): StockTransactionLogApiService =
+        retrofit().create(StockTransactionLogApiService::class.java)
+
+    suspend fun stockTransactionLogApiLong(): StockTransactionLogApiService =
+        retrofitWithLongTimeout().create(StockTransactionLogApiService::class.java)
+
+    suspend fun planBaselineApi(): PlanBaselineApiService =
+        retrofit().create(PlanBaselineApiService::class.java)
+
+    suspend fun planDataApi(): PlanDataApiService =
+        retrofit().create(PlanDataApiService::class.java)
 
     private suspend fun retrofitWithLongTimeout(): Retrofit {
         val baseUrl = sessionStore.getApiBaseUrl(ApiDefaults.displayBaseUrl)

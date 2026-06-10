@@ -86,6 +86,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.data.model.DailyConfirmedSeriesDto
+import com.example.smart_emap.core.auth.canAccessPath
+import com.example.smart_emap.core.auth.isAdmin
+import com.example.smart_emap.ui.shell.LocalCurrentUser
 import com.example.smart_emap.ui.theme.LoginColors
 import java.text.NumberFormat
 import java.time.LocalDate
@@ -104,6 +107,13 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val user = LocalCurrentUser.current
+    val visibleQuickAccessItems = remember(uiState.quickAccessItems, user.id, user.menuCodes) {
+        uiState.quickAccessItems.filter { user.canAccessPath(it.route) }
+    }
+    val showMenuAccessWarning = remember(user.id, user.menuCodes) {
+        !user.isAdmin() && user.menuCodes.isEmpty()
+    }
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
@@ -146,9 +156,13 @@ fun DashboardScreen(
                 DailyOrderChartSection(series = uiState.dailySeries)
             }
 
+            if (showMenuAccessWarning) {
+                MenuAccessWarningBanner()
+            }
+
             StaggeredReveal(index = 3) {
                 QuickAccessSection(
-                    items = uiState.quickAccessItems,
+                    items = visibleQuickAccessItems,
                     onNavigate = onNavigate,
                 )
             }
@@ -162,6 +176,25 @@ fun DashboardScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun MenuAccessWarningBanner() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFFFFBEB))
+            .border(1.dp, Color(0xFFFDE68A), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(
+            text = "メニュー権限が未設定です。管理者にロールとメニュー権限の割り当てを依頼してください。",
+            color = Color(0xFF92400E),
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+        )
     }
 }
 
@@ -444,7 +477,7 @@ private fun quickIconForRoute(route: String): ImageVector = when {
     route.contains("shipping/list") -> Icons.Default.GridView
     route.contains("shipping/report") -> Icons.Default.LocalShipping
     route.contains("data-management") -> Icons.Default.TrendingUp
-    route.contains("plan-schedules") -> Icons.Default.Settings
+    route.contains("/aps/scheduling") -> Icons.Default.TrendingUp
     route.contains("welding-planning") -> Icons.Default.Description
     route.contains("planning-list") -> Icons.Default.Description
     route.contains("actualDataCollection/cutting") -> Icons.Default.Settings

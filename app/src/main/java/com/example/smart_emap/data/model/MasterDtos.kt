@@ -25,6 +25,8 @@ data class MasterProductDto(
     @Json(name = "lot_size") val lotSize: Int? = null,
     @Json(name = "unit_per_box") val unitPerBox: Int? = null,
     @Json(name = "material_cd") val materialCd: String? = null,
+    @Json(name = "material_name") val materialName: String? = null,
+    @Json(name = "pieces_per_bundle") val piecesPerBundle: Int? = null,
     @Json(name = "cut_length") val cutLength: Double? = null,
     @Json(name = "part_number") val partNumber: String? = null,
     @Json(name = "box_type") val boxType: String? = null,
@@ -62,12 +64,40 @@ data class MasterMaterialDto(
     @Json(name = "material_type") val materialType: String? = null,
     @Json(name = "standard_spec") val standardSpec: String? = null,
     val unit: String? = null,
+    val diameter: Double? = null,
+    val thickness: Double? = null,
+    val length: Double? = null,
+    @Json(name = "supply_classification") val supplyClassification: String? = null,
+    @Json(name = "pieces_per_bundle") val piecesPerBundle: Int? = null,
+    val usegae: String? = null,
     @Json(name = "supplier_cd") val supplierCd: String? = null,
     @Json(name = "supplier_name") val supplierName: String? = null,
     @Json(name = "unit_price") val unitPrice: Double? = null,
+    @Json(name = "long_weight") val longWeight: Double? = null,
+    @Json(name = "single_price") val singlePrice: Double? = null,
     @Json(name = "safety_stock") val safetyStock: Int? = null,
+    @Json(name = "lead_time") val leadTime: Int? = null,
+    @Json(name = "storage_location") val storageLocation: String? = null,
     val status: Int? = null,
+    @Json(name = "tolerance_range") val toleranceRange: String? = null,
+    @Json(name = "tolerance_1") val tolerance1: Double? = null,
+    @Json(name = "tolerance_2") val tolerance2: Double? = null,
+    @Json(name = "range_value") val rangeValue: String? = null,
+    @Json(name = "min_value") val minValue: Double? = null,
+    @Json(name = "max_value") val maxValue: Double? = null,
+    @Json(name = "actual_value_1") val actualValue1: Double? = null,
+    @Json(name = "actual_value_2") val actualValue2: Double? = null,
+    @Json(name = "actual_value_3") val actualValue3: Double? = null,
+    @Json(name = "representative_model") val representativeModel: String? = null,
     val note: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
+)
+
+data class MaterialMasterStatsDto(
+    val total: Int = 0,
+    val active: Int = 0,
+    val inactive: Int = 0,
 )
 
 data class MasterMaterialBodyDto(
@@ -76,17 +106,44 @@ data class MasterMaterialBodyDto(
     @Json(name = "material_type") val materialType: String? = null,
     @Json(name = "standard_spec") val standardSpec: String? = null,
     val unit: String? = null,
+    val diameter: Double? = null,
+    val thickness: Double? = null,
+    val length: Double? = null,
+    @Json(name = "supply_classification") val supplyClassification: String? = null,
+    @Json(name = "pieces_per_bundle") val piecesPerBundle: Int? = null,
+    val usegae: String? = null,
     @Json(name = "supplier_cd") val supplierCd: String? = null,
     @Json(name = "unit_price") val unitPrice: Double? = null,
+    @Json(name = "long_weight") val longWeight: Double? = null,
+    @Json(name = "single_price") val singlePrice: Double? = null,
     @Json(name = "safety_stock") val safetyStock: Int? = null,
+    @Json(name = "lead_time") val leadTime: Int? = null,
+    @Json(name = "storage_location") val storageLocation: String? = null,
     val status: Int? = null,
+    @Json(name = "tolerance_range") val toleranceRange: String? = null,
+    @Json(name = "tolerance_1") val tolerance1: Double? = null,
+    @Json(name = "tolerance_2") val tolerance2: Double? = null,
+    @Json(name = "range_value") val rangeValue: String? = null,
+    @Json(name = "min_value") val minValue: Double? = null,
+    @Json(name = "max_value") val maxValue: Double? = null,
+    @Json(name = "actual_value_1") val actualValue1: Double? = null,
+    @Json(name = "actual_value_2") val actualValue2: Double? = null,
+    @Json(name = "actual_value_3") val actualValue3: Double? = null,
+    @Json(name = "representative_model") val representativeModel: String? = null,
     val note: String? = null,
+)
+
+data class MaterialCsvExportItemDto(
+    @Json(name = "material_cd") val materialCd: String? = null,
+    @Json(name = "material_name") val materialName: String? = null,
 )
 
 data class MasterInspectionDto(
     val id: Int? = null,
     @Json(name = "inspection_cd") val inspectionCd: String? = null,
     @Json(name = "inspection_standard") val inspectionStandard: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
 )
 
 data class MasterInspectionBodyDto(
@@ -103,11 +160,22 @@ data class MasterPartDto(
     @Json(name = "settlement_type") val settlementType: String? = null,
     val uom: String? = null,
     @Json(name = "unit_price") val unitPrice: Double? = null,
+    @Json(name = "material_unit_price") val materialUnitPrice: Double? = null,
+    @Json(name = "total_unit_price") val totalUnitPrice: Double? = null,
+    val currency: String? = null,
+    @Json(name = "exchange_rate") val exchangeRate: Double? = null,
     @Json(name = "standard_price_jpy") val standardPriceJpy: Double? = null,
     @Json(name = "supplier_cd") val supplierCd: String? = null,
     @Json(name = "supplier_name") val supplierName: String? = null,
     val status: Int? = null,
     val remarks: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
+)
+
+data class PartCsvExportItemDto(
+    @Json(name = "part_cd") val partCd: String? = null,
+    @Json(name = "part_name") val partName: String? = null,
 )
 
 data class MasterPartBodyDto(
@@ -166,7 +234,7 @@ data class MasterProcessDto(
     @Json(name = "short_name") val shortName: String? = null,
     val category: String? = null,
     @Json(name = "is_outsource") val isOutsource: Boolean? = null,
-    @Json(name = "default_cycle_sec") val defaultCycleSec: Int? = null,
+    @Json(name = "default_cycle_sec") val defaultCycleSec: Double? = null,
     @Json(name = "default_yield") val defaultYield: Double? = null,
     @Json(name = "capacity_unit") val capacityUnit: String? = null,
     val remark: String? = null,
@@ -178,7 +246,7 @@ data class MasterProcessBodyDto(
     @Json(name = "short_name") val shortName: String? = null,
     val category: String? = null,
     @Json(name = "is_outsource") val isOutsource: Boolean? = null,
-    @Json(name = "default_cycle_sec") val defaultCycleSec: Int? = null,
+    @Json(name = "default_cycle_sec") val defaultCycleSec: Double? = null,
     @Json(name = "default_yield") val defaultYield: Double? = null,
     @Json(name = "capacity_unit") val capacityUnit: String? = null,
     val remark: String? = null,
@@ -207,11 +275,30 @@ data class MasterRouteStepDto(
     @Json(name = "step_no") val stepNo: Int? = null,
     @Json(name = "process_cd") val processCd: String? = null,
     @Json(name = "process_name") val processName: String? = null,
+    @Json(name = "yield_percent") val yieldPercent: Double? = null,
+    @Json(name = "cycle_sec") val cycleSec: Double? = null,
+    val remarks: String? = null,
 )
 
 data class MasterRouteStepBodyDto(
     @Json(name = "step_no") val stepNo: Int,
     @Json(name = "process_cd") val processCd: String,
+    @Json(name = "yield_percent") val yieldPercent: Double? = 100.0,
+    @Json(name = "cycle_sec") val cycleSec: Double? = 0.0,
+    val remarks: String? = null,
+)
+
+data class MasterRouteStepUpdateDto(
+    @Json(name = "step_no") val stepNo: Int? = null,
+    @Json(name = "process_cd") val processCd: String? = null,
+    @Json(name = "yield_percent") val yieldPercent: Double? = null,
+    @Json(name = "cycle_sec") val cycleSec: Double? = null,
+    val remarks: String? = null,
+)
+
+data class MasterRouteStepOrderItemDto(
+    val id: Int,
+    @Json(name = "step_no") val stepNo: Int,
 )
 
 data class MasterCustomerDto(
@@ -378,6 +465,46 @@ data class MasterDestinationWorkdayDto(
     @Json(name = "destination_cd") val destinationCd: String? = null,
     @Json(name = "work_date") val workDate: String? = null,
     val reason: String? = null,
+)
+
+data class CompanyWorkCalendarListResponse(
+    val success: Boolean? = null,
+    val data: CompanyWorkCalendarListDataDto? = null,
+)
+
+data class CompanyWorkCalendarListDataDto(
+    @Json(name = "start_date") val startDate: String? = null,
+    @Json(name = "end_date") val endDate: String? = null,
+    val items: List<CompanyWorkCalendarItemDto>? = null,
+    @Json(name = "scheduled_workday_count") val scheduledWorkdayCount: Int? = null,
+    @Json(name = "total_days") val totalDays: Int? = null,
+)
+
+data class CompanyWorkCalendarItemDto(
+    val id: Int? = null,
+    @Json(name = "calendar_date") val calendarDate: String? = null,
+    @Json(name = "day_type") val dayType: String? = null,
+    @Json(name = "day_type_label") val dayTypeLabel: String? = null,
+    @Json(name = "is_scheduled") val isScheduled: Boolean? = null,
+    val name: String? = null,
+    val note: String? = null,
+)
+
+data class CompanyWorkCalendarDayTypeDto(
+    val value: String? = null,
+    val label: String? = null,
+)
+
+data class CompanyWorkCalendarBatchBodyDto(
+    val dates: List<String>,
+    @Json(name = "day_type") val dayType: String,
+    val name: String? = null,
+)
+
+data class CompanyWorkCalendarBatchResponse(
+    val success: Boolean? = null,
+    val created: Int? = null,
+    val skipped: Int? = null,
 )
 
 data class MasterOptionDto(

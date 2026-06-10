@@ -32,6 +32,10 @@ fun MaterialForecastScreen(viewModel: MaterialForecastViewModel) {
     val scroll = rememberScrollState()
     val useStatsForSummary = uiState.supplierCd.isBlank() && uiState.keyword.isBlank()
 
+    LaunchedEffect(Unit) {
+        viewModel.refreshAll()
+    }
+
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)

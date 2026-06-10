@@ -20,8 +20,8 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 开发模式默认：直连 Smart-EMAPs 后端 API（startsub.py 默认 8010）
-        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:8010/\"")
+        // 开发模式默认：Smart-EMAPs 前端 HTTP 代理（startsub.py 默认 3010）
+        buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:3010/\"")
     }
 
     buildTypes {
@@ -30,7 +30,7 @@ android {
             buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://your-server.example.com\"")
         }
         debug {
-            buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:8010/\"")
+            buildConfigField("String", "DEFAULT_API_BASE_URL", "\"http://192.168.1.62:3010/\"")
         }
     }
 
@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)

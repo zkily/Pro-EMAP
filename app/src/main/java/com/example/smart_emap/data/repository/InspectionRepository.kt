@@ -6,6 +6,8 @@ import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.ErpProductsEnvelope
 import com.example.smart_emap.data.model.InspectionManagementRowDto
+import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
+import com.example.smart_emap.data.model.InspectionUtilizationAnalysisDataDto
 import com.example.smart_emap.data.model.PatchInspectionBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.squareup.moshi.Moshi
@@ -119,5 +121,48 @@ class InspectionRepository(
             return InspectionPatchException(e.code(), message)
         }
         return InspectionPatchException(e.code(), "保存に失敗しました (${e.code()})")
+    }
+
+    suspend fun loadProductivityAnalysis(
+        startDate: String,
+        endDate: String,
+        inspectorUserId: Int? = null,
+        productCd: String? = null,
+        includeIncomplete: Boolean = false,
+    ): Result<InspectionProductivityAnalysisDataDto> = runCatching {
+        val res = apiClient.inspectionApi().productivityAnalysis(
+            startDate = startDate,
+            endDate = endDate,
+            mesInspectorUserId = inspectorUserId,
+            productCd = productCd?.trim()?.ifBlank { null },
+            includeIncomplete = if (includeIncomplete) true else null,
+        )
+        if (res.success == false || res.data == null) {
+            throw IllegalStateException(res.message ?: "分析データの取得に失敗しました")
+        }
+        res.data
+    }
+
+    suspend fun loadUtilizationAnalysis(
+        startDate: String,
+        endDate: String,
+        inspectorUserId: Int? = null,
+        includeIncomplete: Boolean = false,
+        extraWorkdays: List<String> = emptyList(),
+        extraHolidays: List<String> = emptyList(),
+    ): Result<InspectionUtilizationAnalysisDataDto> = runCatching {
+        val res = apiClient.inspectionApi().utilizationAnalysis(
+            startDate = startDate,
+            endDate = endDate,
+            mesInspectorUserId = inspectorUserId,
+            includeIncomplete = if (includeIncomplete) true else null,
+            extraWorkdays = extraWorkdays.joinToString(",").ifBlank { null },
+            extraHolidays = extraHolidays.joinToString(",").ifBlank { null },
+            useCompanyCalendar = true,
+        )
+        if (res.success == false || res.data == null) {
+            throw IllegalStateException(res.message ?: "分析データの取得に失敗しました")
+        }
+        res.data
     }
 }

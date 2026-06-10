@@ -13,6 +13,15 @@ data class LoginResponse(
     val user: UserDto,
 )
 
+data class OperationPermissionDto(
+    val module: String,
+    @Json(name = "can_create") val canCreate: Boolean = false,
+    @Json(name = "can_edit") val canEdit: Boolean = false,
+    @Json(name = "can_delete") val canDelete: Boolean = false,
+    @Json(name = "can_export") val canExport: Boolean = false,
+    @Json(name = "can_approve") val canApprove: Boolean = false,
+)
+
 data class UserDto(
     val id: Int,
     val username: String,
@@ -21,6 +30,8 @@ data class UserDto(
     val role: String,
     @Json(name = "is_active") val isActive: Boolean = true,
     val permissions: List<String> = emptyList(),
+    @Json(name = "menu_codes") val menuCodes: List<String> = emptyList(),
+    @Json(name = "operation_permissions") val operationPermissions: List<OperationPermissionDto> = emptyList(),
     @Json(name = "department_id") val departmentId: Int? = null,
     @Json(name = "department_name") val departmentName: String? = null,
 )

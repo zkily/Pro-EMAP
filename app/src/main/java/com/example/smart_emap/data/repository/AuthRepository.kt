@@ -20,7 +20,32 @@ class AuthRepository(
 
     suspend fun getSavedUser(): UserDto? = sessionStore.getUser()
 
+    suspend fun getToken(): String? = sessionStore.getToken()
+
     suspend fun getApiBaseUrl(defaultUrl: String): String = sessionStore.getApiBaseUrl(defaultUrl)
+
+    /** 清除本地登录态，不调用后端 logout（用于 token 已失效时）。 */
+    suspend fun clearLocalSession() {
+        sessionStore.clear()
+        apiClient.invalidate()
+    }
+
+    /**
+     * 启动时恢复会话：必须同时存在 user + token，且 /api/auth/me 校验通过。
+     * 失败则清空本地会话，避免无 token 进入主界面触发大量 401。
+     */
+    suspend fun restoreSession(): UserDto? {
+        val user = sessionStore.getUser() ?: return null
+        val token = sessionStore.getToken()
+        if (token.isNullOrBlank()) {
+            clearLocalSession()
+            return null
+        }
+        return refreshMe().getOrElse {
+            clearLocalSession()
+            null
+        }
+    }
 
     suspend fun getRememberedCredentials() = sessionStore.getRememberedCredentials()
 

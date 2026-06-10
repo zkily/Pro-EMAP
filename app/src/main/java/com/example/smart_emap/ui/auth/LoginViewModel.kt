@@ -3,7 +3,6 @@ package com.example.smart_emap.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.smart_emap.BuildConfig
 import com.example.smart_emap.core.network.ApiDefaults
 import com.example.smart_emap.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,7 +16,6 @@ data class LoginUiState(
     val password: String = "",
     val apiBaseUrl: String = ApiDefaults.displayBaseUrl,
     val rememberMe: Boolean = false,
-    val showServerSettings: Boolean = BuildConfig.DEBUG,
     val passwordVisible: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -58,19 +56,11 @@ class LoginViewModel(
         _uiState.update { it.copy(password = value, passwordError = null, errorMessage = null) }
     }
 
-    fun onApiBaseUrlChange(value: String) {
-        _uiState.update { it.copy(apiBaseUrl = value, errorMessage = null) }
-    }
-
     fun onRememberMeChange(checked: Boolean) {
         _uiState.update { it.copy(rememberMe = checked) }
         if (!checked) {
             viewModelScope.launch { authRepository.clearRememberedCredentials() }
         }
-    }
-
-    fun toggleServerSettings() {
-        _uiState.update { it.copy(showServerSettings = !it.showServerSettings) }
     }
 
     fun togglePasswordVisible() {
@@ -95,16 +85,6 @@ class LoginViewModel(
             state.password.length < 6 -> "パスワードは6文字以上である必要があります"
             else -> null
         }
-        if (state.apiBaseUrl.isBlank()) {
-            _uiState.update {
-                it.copy(
-                    showServerSettings = true,
-                    errorMessage = "サーバーアドレスを入力してください",
-                )
-            }
-            return
-        }
-
         if (usernameError != null || passwordError != null) {
             valid = false
             _uiState.update {
@@ -113,12 +93,16 @@ class LoginViewModel(
         }
         if (!valid) return
 
+        val apiBaseUrl = ApiDefaults.resolveApiBaseUrl(
+            state.apiBaseUrl.takeIf { it.isNotBlank() } ?: ApiDefaults.displayBaseUrl,
+        )
+
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             val result = authRepository.login(
                 username = state.username,
                 password = state.password,
-                apiBaseUrl = state.apiBaseUrl,
+                apiBaseUrl = apiBaseUrl,
                 rememberMe = state.rememberMe,
             )
             _uiState.update { it.copy(isLoading = false) }

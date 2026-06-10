@@ -53,6 +53,7 @@ import com.example.smart_emap.data.model.PatchKanbanBody
 import com.example.smart_emap.data.model.PatchNoteBody
 
 import com.example.smart_emap.data.model.ProductBatchDetailDto
+import com.example.smart_emap.data.model.toProductBatchDetail
 
 import com.example.smart_emap.data.model.ReorderChamferingBody
 
@@ -77,6 +78,32 @@ class CuttingInstructionRepository(
     private suspend fun api() = apiClient.cuttingInstructionApi()
 
     private suspend fun master() = apiClient.masterApi()
+
+
+
+    suspend fun loadFormingMachines(): List<Pair<String, String>> = runCatching {
+
+        master().listMachines(keyword = "成型", pageSize = 9999).items()
+
+            .filter { m ->
+
+                val name = m.machineName.orEmpty()
+
+                name.isNotBlank() && name.contains("成型") && !name.contains("外注")
+
+            }
+
+            .mapNotNull { m ->
+
+                val name = m.machineName.orEmpty()
+
+                if (name.isBlank()) null else name to name
+
+            }
+
+            .distinctBy { it.first }
+
+    }.getOrElse { emptyList() }
 
 
 
@@ -121,6 +148,58 @@ class CuttingInstructionRepository(
             .distinctBy { it.first }
 
     }.getOrElse { emptyList() }
+
+
+
+    suspend fun loadPlanProductOptions(isTrial: Boolean): List<Pair<String, String>> = runCatching {
+
+        val productType = if (isTrial) "試作品" else "量産品"
+
+        master().listProducts(productType = productType, pageSize = 10000).items()
+
+            .filter { matchesPlanProductOptionFilter(it, isTrial) }
+
+            .sortedBy { it.productName.orEmpty() }
+
+            .mapNotNull { p ->
+
+                val cd = p.productCd.orEmpty().trim()
+
+                if (cd.isBlank()) return@mapNotNull null
+
+                val name = (p.productName ?: cd).trim()
+
+                cd to "$name  [$cd]"
+
+            }
+
+    }.getOrElse { emptyList() }
+
+
+
+    suspend fun loadPlanProductBatchDetail(productCd: String): ProductBatchDetailDto? = runCatching {
+
+        api().getProductBatchDetail(productCd).data
+
+    }.getOrNull()
+
+
+
+    private fun matchesPlanProductOptionFilter(product: com.example.smart_emap.data.model.MasterProductDto, isTrial: Boolean): Boolean {
+
+        val cd = product.productCd.orEmpty().trim()
+
+        val name = product.productName.orEmpty()
+
+        if (cd.isBlank()) return false
+
+        val lastChar1 = cd.lastOrNull() == '1'
+
+        val noKagyo = !name.contains("加工")
+
+        return if (isTrial) lastChar1 || noKagyo else lastChar1 && noKagyo
+
+    }
 
 
 
@@ -522,31 +601,37 @@ class CuttingInstructionRepository(
 
 
 
-    suspend fun issueKanban(id: Int) {
+    suspend fun issueKanban(id: Int): String {
 
         val res = api().issueKanban(id)
 
         if (res.success == false) throw IllegalStateException(res.message ?: res.detail ?: "発行に失敗しました")
 
+        return res.kanbanNo.orEmpty()
+
     }
 
 
 
-    suspend fun reissueKanban(id: Int) {
+    suspend fun reissueKanban(id: Int): String {
 
         val res = api().reissueKanban(id)
 
         if (res.success == false) throw IllegalStateException(res.message ?: res.detail ?: "再発行に失敗しました")
 
+        return res.kanbanNo.orEmpty()
+
     }
 
 
 
-    suspend fun batchIssueKanban(ids: List<Int>) {
+    suspend fun batchIssueKanban(ids: List<Int>): com.example.smart_emap.data.model.KanbanBatchIssueResponse {
 
         val res = api().batchIssueKanban(com.example.smart_emap.data.model.KanbanBatchIssueBody(ids))
 
         if (res.success == false) throw IllegalStateException(res.message ?: res.detail ?: "一括発行に失敗しました")
+
+        return res
 
     }
 
@@ -566,7 +651,11 @@ class CuttingInstructionRepository(
 
     suspend fun loadProductDetail(productCd: String): ProductBatchDetailDto? = runCatching {
 
-        api().getProductBatchDetail(productCd).data
+        master()
+            .listProducts(productCd = productCd, page = 1, pageSize = 1)
+            .items()
+            .firstOrNull()
+            ?.toProductBatchDetail()
 
     }.getOrNull()
 
@@ -594,6 +683,7 @@ class CuttingInstructionRepository(
 
     suspend fun loadChamferingProductOptions(): List<Pair<String, String>> = runCatching {
         master().listProductsByProcess("KT02")
+            .filter { it.productCd.trim().endsWith("1") }
             .sortedBy { it.productName.orEmpty() }
             .map { it.productCd to (it.productName.orEmpty().ifBlank { it.productCd }) }
     }.getOrElse { emptyList() }
@@ -642,7 +732,7 @@ class CuttingInstructionRepository(
 
     suspend fun loadNotes(): List<CuttingInstructionNoteDto> = runCatching {
 
-        api().listNotes().data.orEmpty()
+        api().listNotes().data?.list.orEmpty()
 
     }.getOrElse { emptyList() }
 
@@ -658,7 +748,7 @@ class CuttingInstructionRepository(
 
 
 
-    suspend fun patchNote(id: Int, isDone: Boolean? = null, content: String? = null) {
+    suspend fun patchNote(id: Int, isDone: Int? = null, content: String? = null) {
 
         val res = api().patchNote(id, PatchNoteBody(isDone = isDone, content = content))
 

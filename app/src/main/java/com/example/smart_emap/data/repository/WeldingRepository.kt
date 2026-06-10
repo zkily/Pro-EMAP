@@ -8,6 +8,7 @@ import com.example.smart_emap.data.model.MachineDto
 import com.example.smart_emap.data.model.PatchWeldingBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.example.smart_emap.data.model.WeldingManagementRowDto
+import com.example.smart_emap.data.model.WeldingProductivityAnalysisDataDto
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.HttpException
@@ -83,6 +84,26 @@ class WeldingRepository(
     suspend fun loadDefectItems(): List<ProcessDefectItemDto> {
         val res = apiClient.processDefectApi().getOptions(WELDING_DEFECT_DETECTION_PROCESS_CD)
         return res.data.orEmpty()
+    }
+
+    suspend fun loadProductivityAnalysis(
+        startDate: String,
+        endDate: String,
+        operatorUserId: Int? = null,
+        productCd: String? = null,
+        includeIncomplete: Boolean = false,
+    ): Result<WeldingProductivityAnalysisDataDto> = runCatching {
+        val res = apiClient.weldingApi().productivityAnalysis(
+            startDate = startDate,
+            endDate = endDate,
+            mesOperatorUserId = operatorUserId,
+            productCd = productCd?.trim()?.ifBlank { null },
+            includeIncomplete = if (includeIncomplete) true else null,
+        )
+        if (res.success == false || res.data == null) {
+            throw IllegalStateException(res.message ?: "分析データの取得に失敗しました")
+        }
+        res.data
     }
 
     suspend fun loadPlans(productionDay: String): List<WeldingManagementRowDto> {
