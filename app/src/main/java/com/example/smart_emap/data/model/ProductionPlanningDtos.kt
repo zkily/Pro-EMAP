@@ -282,32 +282,174 @@ data class BatchActualBody(
 data class ProductProcessBomRowDto(
     @Json(name = "product_cd") val productCd: Int? = null,
     @Json(name = "product_name") val productName: String? = null,
+    @Json(name = "min_stock_days") val minStockDays: Int? = null,
     @Json(name = "safety_stock_days") val safetyStockDays: Int? = null,
+    @Json(name = "material_process") val materialProcess: Int? = null,
+    @Json(name = "material_process_lt") val materialProcessLt: Int? = null,
+    @Json(name = "cuting_process") val cutingProcess: Int? = null,
+    @Json(name = "cuting_process_lt") val cutingProcessLt: Int? = null,
+    @Json(name = "chamfering_process") val chamferingProcess: Int? = null,
+    @Json(name = "chamfering_process_lt") val chamferingProcessLt: Int? = null,
+    @Json(name = "swaging_process") val swagingProcess: Int? = null,
+    @Json(name = "swaging_process_lt") val swagingProcessLt: Int? = null,
+    @Json(name = "forming_process") val formingProcess: Int? = null,
     @Json(name = "forming_process_lt") val formingProcessLt: Int? = null,
+    @Json(name = "plating_process") val platingProcess: Int? = null,
+    @Json(name = "plating_process_lt") val platingProcessLt: Int? = null,
+    @Json(name = "outsourced_plating_process") val outsourcedPlatingProcess: Int? = null,
+    @Json(name = "outsourced_plating_process_lt") val outsourcedPlatingProcessLt: Int? = null,
+    @Json(name = "welding_process") val weldingProcess: Int? = null,
     @Json(name = "welding_process_lt") val weldingProcessLt: Int? = null,
+    @Json(name = "outsourced_welding_process") val outsourcedWeldingProcess: Int? = null,
+    @Json(name = "outsourced_welding_process_lt") val outsourcedWeldingProcessLt: Int? = null,
+    @Json(name = "inspection_process") val inspectionProcess: Int? = null,
+    @Json(name = "inspection_process_lt") val inspectionProcessLt: Int? = null,
+    @Json(name = "outsourced_warehouse_process") val outsourcedWarehouseProcess: Int? = null,
+    @Json(name = "outsourced_warehouse_process_lt") val outsourcedWarehouseProcessLt: Int? = null,
+    @Json(name = "pre_plating_welding") val prePlatingWelding: Int? = null,
+    @Json(name = "post_inspection_welding") val postInspectionWelding: Int? = null,
+    @Json(name = "post_inspection_welding_lt") val postInspectionWeldingLt: Int? = null,
+    @Json(name = "is_discontinued") val isDiscontinued: Int? = null,
 )
 
 data class ProductProcessBomListData(
     val list: List<ProductProcessBomRowDto>? = null,
     val total: Int? = null,
+    @Json(name = "active_count") val activeCount: Int? = null,
+    @Json(name = "discontinued_count") val discontinuedCount: Int? = null,
 )
 
-data class ProductProcessBomListResponse(
-    val data: ProductProcessBomListData? = null,
-    val list: List<ProductProcessBomRowDto>? = null,
+data class ProductProcessBomWeldingProductsData(
+    @Json(name = "product_cds") val productCds: List<Int>? = null,
+    val count: Int? = null,
+)
+
+data class ProductProcessBomWeldingProductsResponse(
+    val success: Boolean? = null,
+    val data: ProductProcessBomWeldingProductsData? = null,
 ) {
-    fun items(): List<ProductProcessBomRowDto> = data?.list.orEmpty().ifEmpty { list.orEmpty() }
+    fun productCds(): List<Int> = data?.productCds.orEmpty()
 }
 
+data class ProductProcessBomListResponse(
+    val success: Boolean? = null,
+    val data: ProductProcessBomListData? = null,
+    val list: List<ProductProcessBomRowDto>? = null,
+    val total: Int? = null,
+    @Json(name = "active_count") val activeCount: Int? = null,
+    @Json(name = "discontinued_count") val discontinuedCount: Int? = null,
+) {
+    fun items(): List<ProductProcessBomRowDto> = data?.list.orEmpty().ifEmpty { list.orEmpty() }
+
+    fun totalCount(): Int = data?.total ?: total ?: items().size
+
+    fun stats(): ProductProcessBomStatsDto = ProductProcessBomStatsDto(
+        total = totalCount(),
+        activeCount = data?.activeCount ?: activeCount ?: 0,
+        discontinuedCount = data?.discontinuedCount ?: discontinuedCount ?: 0,
+    )
+}
+
+data class ProductProcessBomStatsDto(
+    val total: Int = 0,
+    val activeCount: Int = 0,
+    val discontinuedCount: Int = 0,
+)
+
+data class ProductProcessBomSyncDataDto(
+    @Json(name = "inserted_count") val insertedCount: Int? = null,
+    @Json(name = "updated_count") val updatedCount: Int? = null,
+    @Json(name = "total_processed") val totalProcessed: Int? = null,
+    val message: String? = null,
+)
+
+data class ProductProcessBomSyncResponse(
+    val success: Boolean? = null,
+    val data: ProductProcessBomSyncDataDto? = null,
+)
+
+data class ProductProcessBomPageResult(
+    val items: List<ProductProcessBomRowDto>,
+    val stats: ProductProcessBomStatsDto,
+)
+
 data class UpdateProductProcessBomBody(
+    @Json(name = "min_stock_days") val minStockDays: Int? = null,
     @Json(name = "safety_stock_days") val safetyStockDays: Int? = null,
+    @Json(name = "material_process") val materialProcess: Int? = null,
+    @Json(name = "material_process_lt") val materialProcessLt: Int? = null,
+    @Json(name = "cuting_process") val cutingProcess: Int? = null,
+    @Json(name = "cuting_process_lt") val cutingProcessLt: Int? = null,
+    @Json(name = "chamfering_process") val chamferingProcess: Int? = null,
+    @Json(name = "chamfering_process_lt") val chamferingProcessLt: Int? = null,
+    @Json(name = "swaging_process") val swagingProcess: Int? = null,
+    @Json(name = "swaging_process_lt") val swagingProcessLt: Int? = null,
+    @Json(name = "forming_process") val formingProcess: Int? = null,
     @Json(name = "forming_process_lt") val formingProcessLt: Int? = null,
+    @Json(name = "plating_process") val platingProcess: Int? = null,
+    @Json(name = "plating_process_lt") val platingProcessLt: Int? = null,
+    @Json(name = "outsourced_plating_process") val outsourcedPlatingProcess: Int? = null,
+    @Json(name = "outsourced_plating_process_lt") val outsourcedPlatingProcessLt: Int? = null,
+    @Json(name = "welding_process") val weldingProcess: Int? = null,
     @Json(name = "welding_process_lt") val weldingProcessLt: Int? = null,
+    @Json(name = "outsourced_welding_process") val outsourcedWeldingProcess: Int? = null,
+    @Json(name = "outsourced_welding_process_lt") val outsourcedWeldingProcessLt: Int? = null,
+    @Json(name = "inspection_process") val inspectionProcess: Int? = null,
+    @Json(name = "inspection_process_lt") val inspectionProcessLt: Int? = null,
+    @Json(name = "outsourced_warehouse_process") val outsourcedWarehouseProcess: Int? = null,
+    @Json(name = "outsourced_warehouse_process_lt") val outsourcedWarehouseProcessLt: Int? = null,
+    @Json(name = "pre_plating_welding") val prePlatingWelding: Int? = null,
+    @Json(name = "post_inspection_welding") val postInspectionWelding: Int? = null,
+    @Json(name = "post_inspection_welding_lt") val postInspectionWeldingLt: Int? = null,
+    @Json(name = "is_discontinued") val isDiscontinued: Int? = null,
 )
 
 data class ProductMachineConfigUpdateBody(
+    @Json(name = "product_name") val productName: String? = null,
+    @Json(name = "cutting_machine") val cuttingMachine: String? = null,
+    @Json(name = "chamfering_machine") val chamferingMachine: String? = null,
+    @Json(name = "sw_machine") val swMachine: String? = null,
     @Json(name = "molding_machine") val moldingMachine: String? = null,
+    @Json(name = "plating_machine") val platingMachine: String? = null,
     @Json(name = "welding_machine") val weldingMachine: String? = null,
+    @Json(name = "inspector_machine") val inspectorMachine: String? = null,
+    @Json(name = "outsourced_plating_machine") val outsourcedPlatingMachine: String? = null,
+    @Json(name = "outsourced_welding_machine") val outsourcedWeldingMachine: String? = null,
+)
+
+data class ProductMachineConfigCreateBody(
+    @Json(name = "product_cd") val productCd: String,
+    @Json(name = "product_name") val productName: String,
+    @Json(name = "cutting_machine") val cuttingMachine: String? = null,
+    @Json(name = "chamfering_machine") val chamferingMachine: String? = null,
+    @Json(name = "sw_machine") val swMachine: String? = null,
+    @Json(name = "molding_machine") val moldingMachine: String? = null,
+    @Json(name = "plating_machine") val platingMachine: String? = null,
+    @Json(name = "welding_machine") val weldingMachine: String? = null,
+    @Json(name = "inspector_machine") val inspectorMachine: String? = null,
+    @Json(name = "outsourced_plating_machine") val outsourcedPlatingMachine: String? = null,
+    @Json(name = "outsourced_welding_machine") val outsourcedWeldingMachine: String? = null,
+)
+
+data class AvailableProductDto(
+    @Json(name = "product_cd") val productCd: String? = null,
+    @Json(name = "product_name") val productName: String? = null,
+)
+
+data class AvailableProductsResponse(
+    val success: Boolean? = null,
+    val data: List<AvailableProductDto>? = null,
+)
+
+data class ProductMachineConfigSyncDataDto(
+    val added: Int? = null,
+    val updated: Int? = null,
+    val total: Int? = null,
+)
+
+data class ProductMachineConfigSyncResponse(
+    val success: Boolean? = null,
+    val data: ProductMachineConfigSyncDataDto? = null,
 )
 
 data class ClearPlanFieldsData(

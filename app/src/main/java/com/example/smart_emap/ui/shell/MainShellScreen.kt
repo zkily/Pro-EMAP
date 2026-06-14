@@ -75,6 +75,12 @@ import com.example.smart_emap.ui.master.process.ProcessMasterScreen
 import com.example.smart_emap.ui.master.process.ProcessMasterViewModel
 import com.example.smart_emap.ui.master.processroute.ProcessRouteMasterScreen
 import com.example.smart_emap.ui.master.processroute.ProcessRouteMasterViewModel
+import com.example.smart_emap.ui.master.equipmentefficiency.EquipmentEfficiencyMasterScreen
+import com.example.smart_emap.ui.master.equipmentefficiency.EquipmentEfficiencyMasterViewModel
+import com.example.smart_emap.ui.master.productmachineconfig.ProductMachineConfigMasterScreen
+import com.example.smart_emap.ui.master.productmachineconfig.ProductMachineConfigMasterViewModel
+import com.example.smart_emap.ui.master.productprocessbom.ProductProcessBomMasterScreen
+import com.example.smart_emap.ui.master.productprocessbom.ProductProcessBomMasterViewModel
 import com.example.smart_emap.ui.master.productprocessroute.ProductProcessRouteMasterScreen
 import com.example.smart_emap.ui.master.productprocessroute.ProductProcessRouteMasterViewModel
 import com.example.smart_emap.ui.master.carrier.CarrierMasterScreen
@@ -136,7 +142,6 @@ fun MainShellScreen(
     val inspectionUtilizationViewModel: InspectionUtilizationViewModel = viewModel(
         factory = InspectionUtilizationViewModel.Factory(
             inspectionRepository = appContainer.inspectionRepository,
-            userRepository = appContainer.systemUserRepository,
         ),
     )
     val inspectionProductivityViewModel: InspectionProductivityViewModel = viewModel(
@@ -293,6 +298,24 @@ fun MainShellScreen(
         ),
     )
 
+    val productProcessBomMasterViewModel: ProductProcessBomMasterViewModel = viewModel(
+        factory = ProductProcessBomMasterViewModel.Factory(
+            repository = appContainer.masterRepository,
+        ),
+    )
+
+    val productMachineConfigMasterViewModel: ProductMachineConfigMasterViewModel = viewModel(
+        factory = ProductMachineConfigMasterViewModel.Factory(
+            repository = appContainer.masterRepository,
+        ),
+    )
+
+    val equipmentEfficiencyMasterViewModel: EquipmentEfficiencyMasterViewModel = viewModel(
+        factory = EquipmentEfficiencyMasterViewModel.Factory(
+            repository = appContainer.masterRepository,
+        ),
+    )
+
     val companyWorkCalendarViewModel: CompanyWorkCalendarViewModel = viewModel(
         factory = CompanyWorkCalendarViewModel.Factory(
             repository = appContainer.masterRepository,
@@ -417,6 +440,9 @@ fun MainShellScreen(
             processMasterViewModel = processMasterViewModel,
             processRouteMasterViewModel = processRouteMasterViewModel,
             productProcessRouteMasterViewModel = productProcessRouteMasterViewModel,
+            productProcessBomMasterViewModel = productProcessBomMasterViewModel,
+            productMachineConfigMasterViewModel = productMachineConfigMasterViewModel,
+            equipmentEfficiencyMasterViewModel = equipmentEfficiencyMasterViewModel,
             companyWorkCalendarViewModel = companyWorkCalendarViewModel,
             cuttingInstructionViewModel = cuttingInstructionViewModel,
             formingInstructionViewModel = formingInstructionViewModel,
@@ -468,6 +494,9 @@ private fun MainShellContent(
     processMasterViewModel: ProcessMasterViewModel,
     processRouteMasterViewModel: ProcessRouteMasterViewModel,
     productProcessRouteMasterViewModel: ProductProcessRouteMasterViewModel,
+    productProcessBomMasterViewModel: ProductProcessBomMasterViewModel,
+    productMachineConfigMasterViewModel: ProductMachineConfigMasterViewModel,
+    equipmentEfficiencyMasterViewModel: EquipmentEfficiencyMasterViewModel,
     companyWorkCalendarViewModel: CompanyWorkCalendarViewModel,
     cuttingInstructionViewModel: CuttingInstructionViewModel,
     formingInstructionViewModel: PlanInstructionViewModel,
@@ -600,6 +629,9 @@ private fun MainShellContent(
                                     "/master/process" -> processMasterViewModel.refreshAll()
                                     "/master/process-route" -> processRouteMasterViewModel.refreshAll()
                                     "/master/product-process-route" -> productProcessRouteMasterViewModel.refreshAll()
+                                    "/master/bom/product-process" -> productProcessBomMasterViewModel.refreshAll()
+                                    "/master/bom/product-machine-config" -> productMachineConfigMasterViewModel.refreshAll()
+                                    "/master/bom/equipment-efficiency" -> equipmentEfficiencyMasterViewModel.refreshAll()
                                     "/master/company-work-calendar" -> companyWorkCalendarViewModel.refreshAll()
                                     else -> masterViewModel.refreshAll()
                                 }
@@ -644,6 +676,9 @@ private fun MainShellContent(
                             processMasterViewModel = processMasterViewModel,
                             processRouteMasterViewModel = processRouteMasterViewModel,
                             productProcessRouteMasterViewModel = productProcessRouteMasterViewModel,
+                            productProcessBomMasterViewModel = productProcessBomMasterViewModel,
+                            productMachineConfigMasterViewModel = productMachineConfigMasterViewModel,
+                            equipmentEfficiencyMasterViewModel = equipmentEfficiencyMasterViewModel,
                             companyWorkCalendarViewModel = companyWorkCalendarViewModel,
                             cuttingInstructionViewModel = cuttingInstructionViewModel,
                             formingInstructionViewModel = formingInstructionViewModel,
@@ -695,6 +730,9 @@ private fun ShellRouteContent(
     processMasterViewModel: ProcessMasterViewModel,
     processRouteMasterViewModel: ProcessRouteMasterViewModel,
     productProcessRouteMasterViewModel: ProductProcessRouteMasterViewModel,
+    productProcessBomMasterViewModel: ProductProcessBomMasterViewModel,
+    productMachineConfigMasterViewModel: ProductMachineConfigMasterViewModel,
+    equipmentEfficiencyMasterViewModel: EquipmentEfficiencyMasterViewModel,
     companyWorkCalendarViewModel: CompanyWorkCalendarViewModel,
     cuttingInstructionViewModel: CuttingInstructionViewModel,
     formingInstructionViewModel: PlanInstructionViewModel,
@@ -725,6 +763,9 @@ private fun ShellRouteContent(
         "/master/process" -> ProcessMasterScreen(viewModel = processMasterViewModel)
         "/master/process-route" -> ProcessRouteMasterScreen(viewModel = processRouteMasterViewModel)
         "/master/product-process-route" -> ProductProcessRouteMasterScreen(viewModel = productProcessRouteMasterViewModel)
+        "/master/bom/product-process" -> ProductProcessBomMasterScreen(viewModel = productProcessBomMasterViewModel)
+        "/master/bom/product-machine-config" -> ProductMachineConfigMasterScreen(viewModel = productMachineConfigMasterViewModel)
+        "/master/bom/equipment-efficiency" -> EquipmentEfficiencyMasterScreen(viewModel = equipmentEfficiencyMasterViewModel)
         "/master/company-work-calendar" -> CompanyWorkCalendarScreen(viewModel = companyWorkCalendarViewModel)
         "/master/bom/process-processing-fee",
         "/master/machine",

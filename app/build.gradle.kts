@@ -5,7 +5,8 @@ plugins {
 
 /** 登录页默认 API 地址（可在登录画面手动修改） */
 val DEFAULT_API_HOST = "192.168.0.12"
-val DEFAULT_API_PORT = 3005
+/** 后端 API 端口（startsub: 8010 / start.py: 8005）。勿用 3005/5010 等前端端口。 */
+val DEFAULT_API_PORT = 8010
 
 val defaultDevApiBaseUrl = "http://$DEFAULT_API_HOST:$DEFAULT_API_PORT/"
 println("SmartEMAP DEFAULT_API_BASE_URL = $defaultDevApiBaseUrl")

@@ -10,10 +10,16 @@ import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisDataDto
 import com.example.smart_emap.data.model.PatchInspectionBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
+import com.example.smart_emap.data.model.ProductProcessBomRowDto
+import com.example.smart_emap.ui.mes.productivity.InspectionProductivityLogic
+import com.squareup.moshi.JsonDataException
+import com.squareup.moshi.JsonEncodingException
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import kotlinx.coroutines.delay
 import retrofit2.HttpException
+import java.io.IOException
 
 const val INSPECTION_DEFECT_DETECTION_PROCESS_CD = "KT09"
 
@@ -123,6 +129,57 @@ class InspectionRepository(
         return InspectionPatchException(e.code(), "保存に失敗しました (${e.code()})")
     }
 
+    suspend fun loadWeldingProductCdSet(): Set<String> {
+        return try {
+            fetchWeldingProductCdSetLightweight()
+        } catch (e: HttpException) {
+            if (e.code() == 404) {
+                InspectionProductivityLogic.buildWeldingProductCdSet(fetchAllProductProcessBomRows())
+            } else {
+                throw e
+            }
+        }
+    }
+
+    private suspend fun fetchWeldingProductCdSetLightweight(): Set<String> {
+        val cds = withIoRetry {
+            apiClient.masterApiLong().listProductProcessBomWeldingProducts().productCds()
+        }
+        return InspectionProductivityLogic.buildWeldingProductCdSetFromProductCds(cds)
+    }
+
+    private suspend fun fetchAllProductProcessBomRows(): List<ProductProcessBomRowDto> {
+        val all = mutableListOf<ProductProcessBomRowDto>()
+        var page = 1
+        val limit = 100
+        val maxPages = 30
+        while (page <= maxPages) {
+            val list = withIoRetry {
+                apiClient.masterApiLong().listProductProcessBom(page = page, limit = limit).items()
+            }
+            if (list.isEmpty()) break
+            all.addAll(list)
+            if (list.size < limit) break
+            page += 1
+        }
+        return all
+    }
+
+    private suspend fun <T> withIoRetry(times: Int = 3, block: suspend () -> T): T {
+        var last: IOException? = null
+        repeat(times) { attempt ->
+            try {
+                return block()
+            } catch (e: IOException) {
+                last = e
+                if (attempt < times - 1) {
+                    delay(400L * (attempt + 1))
+                }
+            }
+        }
+        throw last ?: IOException("ネットワークエラー")
+    }
+
     suspend fun loadProductivityAnalysis(
         startDate: String,
         endDate: String,
@@ -130,17 +187,80 @@ class InspectionRepository(
         productCd: String? = null,
         includeIncomplete: Boolean = false,
     ): Result<InspectionProductivityAnalysisDataDto> = runCatching {
-        val res = apiClient.inspectionApi().productivityAnalysis(
-            startDate = startDate,
-            endDate = endDate,
-            mesInspectorUserId = inspectorUserId,
-            productCd = productCd?.trim()?.ifBlank { null },
-            includeIncomplete = if (includeIncomplete) true else null,
-        )
+        val res = try {
+            fetchProductivityAnalysisWithRetry(
+                startDate = startDate,
+                endDate = endDate,
+                inspectorUserId = inspectorUserId,
+                productCd = productCd,
+                includeIncomplete = includeIncomplete,
+            )
+        } catch (e: HttpException) {
+            throw mapProductivityHttpError(e)
+        } catch (e: JsonDataException) {
+            throw mapProductivityJsonError(e)
+        } catch (e: JsonEncodingException) {
+            throw mapProductivityJsonError(e)
+        } catch (e: IOException) {
+            throw IllegalStateException(e.message ?: "ネットワークエラー")
+        }
         if (res.success == false || res.data == null) {
             throw IllegalStateException(res.message ?: "分析データの取得に失敗しました")
         }
         res.data
+    }
+
+    private suspend fun fetchProductivityAnalysisWithRetry(
+        startDate: String,
+        endDate: String,
+        inspectorUserId: Int?,
+        productCd: String?,
+        includeIncomplete: Boolean,
+    ): com.example.smart_emap.data.model.InspectionProductivityAnalysisResponse {
+        var lastJson: Exception? = null
+        repeat(2) { attempt ->
+            try {
+                return withIoRetry {
+                    apiClient.inspectionApiLong().productivityAnalysis(
+                        startDate = startDate,
+                        endDate = endDate,
+                        mesInspectorUserId = inspectorUserId,
+                        productCd = productCd?.trim()?.ifBlank { null },
+                        includeIncomplete = if (includeIncomplete) true else null,
+                        limit = 5000,
+                    )
+                }
+            } catch (e: JsonDataException) {
+                lastJson = e
+                if (attempt == 0) delay(600)
+            } catch (e: JsonEncodingException) {
+                lastJson = e
+                if (attempt == 0) delay(600)
+            }
+        }
+        throw lastJson ?: JsonDataException("分析データの解析に失敗しました")
+    }
+
+    private fun mapProductivityJsonError(e: Exception): IllegalStateException {
+        val detail = e.message?.trim().orEmpty()
+        val hint = if (detail.contains("Expected", ignoreCase = true)) {
+            " 响应体可能在传输中被截断，请重启后端后重试。"
+        } else {
+            ""
+        }
+        return IllegalStateException("分析データの解析に失敗しました: $detail$hint")
+    }
+
+    private fun mapProductivityHttpError(e: HttpException): IllegalStateException {
+        val body = e.response()?.errorBody()?.string()
+        if (!body.isNullOrBlank()) {
+            val parsed = runCatching { errorAdapter.fromJson(body) }.getOrNull()
+            val message = parsed?.detail?.trim()
+                ?: parsed?.message?.trim()
+                ?: "分析データの取得に失敗しました (${e.code()})"
+            return IllegalStateException(message)
+        }
+        return IllegalStateException("分析データの取得に失敗しました (${e.code()})")
     }
 
     suspend fun loadUtilizationAnalysis(
@@ -151,18 +271,41 @@ class InspectionRepository(
         extraWorkdays: List<String> = emptyList(),
         extraHolidays: List<String> = emptyList(),
     ): Result<InspectionUtilizationAnalysisDataDto> = runCatching {
-        val res = apiClient.inspectionApi().utilizationAnalysis(
-            startDate = startDate,
-            endDate = endDate,
-            mesInspectorUserId = inspectorUserId,
-            includeIncomplete = if (includeIncomplete) true else null,
-            extraWorkdays = extraWorkdays.joinToString(",").ifBlank { null },
-            extraHolidays = extraHolidays.joinToString(",").ifBlank { null },
-            useCompanyCalendar = true,
-        )
+        val res = try {
+            apiClient.inspectionApiLong().utilizationAnalysis(
+                startDate = startDate,
+                endDate = endDate,
+                mesInspectorUserId = inspectorUserId,
+                includeIncomplete = if (includeIncomplete) true else null,
+                extraWorkdays = extraWorkdays.joinToString(",").ifBlank { null },
+                extraHolidays = extraHolidays.joinToString(",").ifBlank { null },
+                useCompanyCalendar = true,
+                limit = 5000,
+            )
+        } catch (e: HttpException) {
+            throw mapUtilizationHttpError(e)
+        } catch (e: JsonDataException) {
+            throw IllegalStateException("分析データの解析に失敗しました: ${e.message}")
+        } catch (e: JsonEncodingException) {
+            throw IllegalStateException("分析データの解析に失敗しました: ${e.message}")
+        } catch (e: IOException) {
+            throw IllegalStateException(e.message ?: "ネットワークエラー")
+        }
         if (res.success == false || res.data == null) {
             throw IllegalStateException(res.message ?: "分析データの取得に失敗しました")
         }
         res.data
+    }
+
+    private fun mapUtilizationHttpError(e: HttpException): IllegalStateException {
+        val body = e.response()?.errorBody()?.string()
+        if (!body.isNullOrBlank()) {
+            val parsed = runCatching { errorAdapter.fromJson(body) }.getOrNull()
+            val message = parsed?.detail?.trim()
+                ?: parsed?.message?.trim()
+                ?: "分析データの取得に失敗しました (${e.code()})"
+            return IllegalStateException(message)
+        }
+        return IllegalStateException("分析データの取得に失敗しました (${e.code()})")
     }
 }

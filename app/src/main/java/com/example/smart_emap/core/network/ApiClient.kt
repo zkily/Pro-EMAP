@@ -76,6 +76,9 @@ class ApiClient(
 
     suspend fun inspectionApi(): InspectionApiService = retrofit().create(InspectionApiService::class.java)
 
+    suspend fun inspectionApiLong(): InspectionApiService =
+        retrofitWithLongTimeout().create(InspectionApiService::class.java)
+
     suspend fun cuttingApi(): CuttingApiService = retrofit().create(CuttingApiService::class.java)
 
     suspend fun chamferingApi(): ChamferingApiService = retrofit().create(ChamferingApiService::class.java)
@@ -96,6 +99,8 @@ class ApiClient(
     suspend fun weldingApi(): WeldingApiService = retrofit().create(WeldingApiService::class.java)
 
     suspend fun masterApi(): MasterApiService = retrofit().create(MasterApiService::class.java)
+
+    suspend fun masterApiLong(): MasterApiService = retrofitWithLongTimeout().create(MasterApiService::class.java)
 
     suspend fun apsApi(): ApsApiService = retrofit().create(ApsApiService::class.java)
 
@@ -146,7 +151,7 @@ class ApiClient(
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
-                HttpLoggingInterceptor.Level.BODY
+                HttpLoggingInterceptor.Level.HEADERS
             } else {
                 HttpLoggingInterceptor.Level.NONE
             }
@@ -185,7 +190,7 @@ class ApiClient(
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
-                HttpLoggingInterceptor.Level.BODY
+                HttpLoggingInterceptor.Level.HEADERS
             } else {
                 HttpLoggingInterceptor.Level.NONE
             }
@@ -193,8 +198,8 @@ class ApiClient(
 
         val clientBuilder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
 

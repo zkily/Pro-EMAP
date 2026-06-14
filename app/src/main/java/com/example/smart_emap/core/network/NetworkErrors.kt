@@ -110,7 +110,9 @@ object NetworkErrors {
             detail.contains("Connection refused", ignoreCase = true) ||
             detail.contains("Unable to resolve host", ignoreCase = true) ||
             detail.contains("Network is unreachable", ignoreCase = true) ||
-            detail.contains("No address associated with hostname", ignoreCase = true)
+            detail.contains("No address associated with hostname", ignoreCase = true) ||
+            detail.contains("unexpected end of stream", ignoreCase = true) ||
+            detail.contains("stream was reset", ignoreCase = true)
         ) {
             return ErrorKind.Connection
         }

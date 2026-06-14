@@ -97,6 +97,7 @@ data class InspectionProductivityDefectRowDto(
 )
 
 data class InspectionProductivitySessionRowDto(
+    val id: Int? = null,
     @Json(name = "production_day") val productionDay: String? = null,
     @Json(name = "inspector_display_name") val inspectorDisplayName: String? = null,
     @Json(name = "mes_inspector_name") val mesInspectorName: String? = null,

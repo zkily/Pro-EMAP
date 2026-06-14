@@ -20,26 +20,38 @@ object ApiDefaults {
     fun resolveApiBaseUrl(saved: String?): String {
         val normalized = saved?.trim().orEmpty()
         if (normalized.isBlank() || isLegacyDevUrl(normalized)) {
-            return displayBaseUrl
+            return migrateDevApiUrl(displayBaseUrl.trimEnd('/')).let { ensureTrailingSlash(it) }
         }
         return migrateDevApiUrl(normalized)
     }
 
     /**
      * 开发环境：前端 Vite 端口 (5010/5000) 仅用于浏览器，Android 应直连后端 API。
-     * 使用 HTTP 避免 LAN 自签名证书在 OkHttp 上出现 BAD_DECRYPT。
+     * 局域网 HTTPS / 自签名证书在 OkHttp 上易出现 BAD_DECRYPT，私有网段后端改 HTTP。
      */
     fun migrateDevApiUrl(url: String): String {
-        val trimmed = url.trim().trimEnd('/')
+        var trimmed = url.trim().trimEnd('/')
+        val httpsBackend = Regex("^https://([^/:]+):(8010|8005|8020)$", RegexOption.IGNORE_CASE).find(trimmed)
+        if (httpsBackend != null && isPrivateOrLocalHost(httpsBackend.groupValues[1])) {
+            trimmed = "http://${httpsBackend.groupValues[1]}:${httpsBackend.groupValues[2]}"
+        }
         val frontendProd = Regex("^(https?)://([^/:]+):(3005|5005)$", RegexOption.IGNORE_CASE).find(trimmed)
         if (frontendProd != null) {
             return ensureTrailingSlash("http://${frontendProd.groupValues[2]}:8005")
         }
         val match = Regex("^(https?)://([^/:]+):(5010|5000)$", RegexOption.IGNORE_CASE).find(trimmed)
-            ?: return ensureTrailingSlash(url)
+            ?: return ensureTrailingSlash(trimmed)
         val host = match.groupValues[2]
         val backendPort = if (match.groupValues[3] == "5010") 8010 else 8005
         return ensureTrailingSlash("http://$host:$backendPort")
+    }
+
+    private fun isPrivateOrLocalHost(host: String): Boolean {
+        val h = host.lowercase()
+        if (h == "localhost" || h == "10.0.2.2" || h == "127.0.0.1") return true
+        if (h.startsWith("192.168.")) return true
+        if (h.startsWith("10.")) return true
+        return Regex("^172\\.(1[6-9]|2\\d|3[01])\\.").containsMatchIn(h)
     }
 
     fun isLegacyDevUrl(url: String): Boolean {

@@ -327,6 +327,8 @@ data class ProductBatchDetailResponse(
 
 data class EquipmentEfficiencyRowDto(
 
+    val id: Int? = null,
+
     @Json(name = "product_cd") val productCd: String? = null,
 
     @Json(name = "product_name") val productName: String? = null,
@@ -337,7 +339,35 @@ data class EquipmentEfficiencyRowDto(
 
     @Json(name = "efficiency_rate") val efficiencyRate: Double? = null,
 
+    @Json(name = "step_time") val stepTime: Int? = null,
+
+    val unit: String? = null,
+
+    val remarks: String? = null,
+
     val status: Int? = null,
+
+)
+
+
+
+data class EquipmentEfficiencyTabCountsDto(
+
+    val all: Int? = null,
+
+    val cutting: Int? = null,
+
+    val chamfering: Int? = null,
+
+    val forming: Int? = null,
+
+    val welding: Int? = null,
+
+    val plating: Int? = null,
+
+    val inspection: Int? = null,
+
+    val other: Int? = null,
 
 )
 
@@ -346,6 +376,14 @@ data class EquipmentEfficiencyRowDto(
 data class EquipmentEfficiencyPagedData(
 
     val list: List<EquipmentEfficiencyRowDto>? = null,
+
+    val total: Int? = null,
+
+    @Json(name = "tab_counts") val tabCounts: EquipmentEfficiencyTabCountsDto? = null,
+
+    @Json(name = "machine_distinct_count") val machineDistinctCount: Int? = null,
+
+    @Json(name = "product_distinct_count") val productDistinctCount: Int? = null,
 
 )
 
@@ -359,13 +397,77 @@ data class EquipmentEfficiencyListResponse(
 
     val list: List<EquipmentEfficiencyRowDto>? = null,
 
+    val total: Int? = null,
+
+    @Json(name = "tab_counts") val tabCounts: EquipmentEfficiencyTabCountsDto? = null,
+
+    @Json(name = "machine_distinct_count") val machineDistinctCount: Int? = null,
+
+    @Json(name = "product_distinct_count") val productDistinctCount: Int? = null,
+
 ) {
 
     fun items(): List<EquipmentEfficiencyRowDto> =
 
         list.orEmpty().ifEmpty { data?.list.orEmpty() }
 
+    fun totalCount(): Int = total ?: data?.total ?: items().size
+
+    fun resolvedTabCounts(): EquipmentEfficiencyTabCountsDto? = tabCounts ?: data?.tabCounts
+
+    fun resolvedMachineDistinctCount(): Int = machineDistinctCount ?: data?.machineDistinctCount ?: 0
+
+    fun resolvedProductDistinctCount(): Int = productDistinctCount ?: data?.productDistinctCount ?: 0
+
 }
+
+
+
+data class EquipmentEfficiencyCreateBody(
+
+    @Json(name = "machine_cd") val machineCd: String,
+
+    @Json(name = "machines_name") val machinesName: String? = null,
+
+    @Json(name = "product_cd") val productCd: String,
+
+    @Json(name = "product_name") val productName: String? = null,
+
+    @Json(name = "efficiency_rate") val efficiencyRate: Double,
+
+    @Json(name = "step_time") val stepTime: Int? = null,
+
+    val unit: String? = null,
+
+    val remarks: String? = null,
+
+    val status: Int = 1,
+
+)
+
+
+
+data class EquipmentEfficiencyUpdateBody(
+
+    @Json(name = "machine_cd") val machineCd: String? = null,
+
+    @Json(name = "machines_name") val machinesName: String? = null,
+
+    @Json(name = "product_cd") val productCd: String? = null,
+
+    @Json(name = "product_name") val productName: String? = null,
+
+    @Json(name = "efficiency_rate") val efficiencyRate: Double? = null,
+
+    @Json(name = "step_time") val stepTime: Int? = null,
+
+    val unit: String? = null,
+
+    val remarks: String? = null,
+
+    val status: Int? = null,
+
+)
 
 
 
@@ -417,9 +519,27 @@ data class ProductMachineConfigRowDto(
 
     @Json(name = "product_name") val productName: String? = null,
 
+    @Json(name = "cutting_machine") val cuttingMachine: String? = null,
+
+    @Json(name = "chamfering_machine") val chamferingMachine: String? = null,
+
+    @Json(name = "sw_machine") val swMachine: String? = null,
+
     @Json(name = "molding_machine") val moldingMachine: String? = null,
 
+    @Json(name = "plating_machine") val platingMachine: String? = null,
+
     @Json(name = "welding_machine") val weldingMachine: String? = null,
+
+    @Json(name = "inspector_machine") val inspectorMachine: String? = null,
+
+    @Json(name = "outsourced_plating_machine") val outsourcedPlatingMachine: String? = null,
+
+    @Json(name = "outsourced_welding_machine") val outsourcedWeldingMachine: String? = null,
+
+    @Json(name = "created_at") val createdAt: String? = null,
+
+    @Json(name = "updated_at") val updatedAt: String? = null,
 
 )
 

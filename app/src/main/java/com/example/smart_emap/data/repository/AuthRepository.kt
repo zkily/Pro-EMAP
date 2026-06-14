@@ -3,6 +3,8 @@ package com.example.smart_emap.data.repository
 import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.core.network.ApiDefaults
+import com.example.smart_emap.core.network.NetworkErrorHints
+import com.example.smart_emap.core.network.NetworkErrors
 import com.example.smart_emap.data.model.ApiErrorBody
 import com.example.smart_emap.data.model.LoginRequest
 import com.example.smart_emap.data.model.UserDto
@@ -70,7 +72,9 @@ class AuthRepository(
             val identifier = username.trim().let {
                 if (it.contains('@')) it.lowercase() else it
             }
-            val normalizedUrl = ApiDefaults.ensureTrailingSlash(apiBaseUrl.trim())
+            val normalizedUrl = ApiDefaults.ensureTrailingSlash(
+                ApiDefaults.migrateDevApiUrl(apiBaseUrl.trim().trimEnd('/')),
+            )
             sessionStore.saveApiBaseUrl(normalizedUrl)
             apiClient.invalidate()
             val response = apiClient.authApiForBaseUrl(normalizedUrl).login(
@@ -124,17 +128,16 @@ class AuthRepository(
             return Exception("请求失败 (${throwable.code()})")
         }
         if (throwable is IOException) {
-            val detail = throwable.message.orEmpty()
-            return when {
-                detail.contains("unexpected end of stream", ignoreCase = true) ||
-                    detail.contains("Connection reset", ignoreCase = true) ||
-                    detail.contains("Failed to connect", ignoreCase = true) ->
-                    Exception(
-                        "サーバーに接続できません。API サーバー欄のアドレス・ポートが正しいか、バックエンドが起動しているか確認してください。",
-                    )
-                detail.isNotBlank() -> Exception(detail)
-                else -> Exception("ネットワークエラー。サーバーアドレスを確認してください。")
-            }
+            val sslHints = NetworkErrorHints(
+                ssl = "SSL 连接失败。请将 API 地址改为后端 HTTP（如 http://局域网IP:8010/），勿用 https 或前端端口 5010/3005。",
+                connection = "无法连接服务器，请检查地址、端口与后端是否已启动。",
+                timeout = "连接超时，请检查网络或稍后重试。",
+                server = "服务器暂时不可用，请稍后重试。",
+                noConnection = "无法连接网络，请检查 Wi‑Fi 或移动数据。",
+            )
+            return Exception(
+                NetworkErrors.formatError(throwable, "ネットワークエラー。サーバーアドレスを確認してください。", sslHints),
+            )
         }
         return Exception(throwable.message ?: "ネットワークエラー。サーバーアドレスを確認してください。")
     }

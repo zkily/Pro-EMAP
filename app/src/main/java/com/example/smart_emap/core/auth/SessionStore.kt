@@ -50,14 +50,20 @@ class SessionStore(private val context: Context) {
         return runCatching { userAdapter.fromJson(json) }.getOrNull()
     }
 
-    /** 返回用户保存的 API 地址（不做端口迁移），登录页与 ApiClient 均以此为准。 */
+    /** 返回经 [ApiDefaults.resolveApiBaseUrl] 迁移后的 API 地址；旧前端/HTTPS 地址会自动纠正并写回。 */
     suspend fun getApiBaseUrl(defaultUrl: String): String {
         val raw = context.dataStore.data.first()[apiBaseUrlKey]?.trim().orEmpty()
-        return if (raw.isBlank()) {
-            ApiDefaults.ensureTrailingSlash(defaultUrl)
-        } else {
-            ApiDefaults.ensureTrailingSlash(raw)
+        val resolved = ApiDefaults.resolveApiBaseUrl(raw.ifBlank { defaultUrl })
+        val resolvedNormalized = ApiDefaults.ensureTrailingSlash(resolved)
+        if (raw.isNotBlank()) {
+            val storedNormalized = ApiDefaults.ensureTrailingSlash(raw)
+            if (storedNormalized != resolvedNormalized) {
+                context.dataStore.edit { prefs ->
+                    prefs[apiBaseUrlKey] = resolvedNormalized
+                }
+            }
         }
+        return resolvedNormalized
     }
 
     suspend fun getRememberedCredentials(): RememberedCredentials {
@@ -78,8 +84,11 @@ class SessionStore(private val context: Context) {
     }
 
     suspend fun saveApiBaseUrl(url: String) {
+        val migrated = ApiDefaults.ensureTrailingSlash(
+            ApiDefaults.migrateDevApiUrl(url.trim().trimEnd('/')),
+        )
         context.dataStore.edit { prefs ->
-            prefs[apiBaseUrlKey] = ApiDefaults.ensureTrailingSlash(url)
+            prefs[apiBaseUrlKey] = migrated
         }
     }
 

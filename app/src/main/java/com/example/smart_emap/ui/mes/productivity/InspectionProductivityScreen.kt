@@ -1,5 +1,6 @@
 package com.example.smart_emap.ui.mes.productivity
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
@@ -30,11 +33,44 @@ fun InspectionProductivityScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scroll = rememberScrollState()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.onPageEnter()
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         viewModel.clearSnackbar()
+    }
+
+    LaunchedEffect(uiState.pendingCsvContent) {
+        val csv = uiState.pendingCsvContent ?: return@LaunchedEffect
+        val subject = uiState.pendingCsvSubject ?: "sessions.csv"
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/csv"
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+            putExtra(Intent.EXTRA_TEXT, csv)
+        }
+        context.startActivity(Intent.createChooser(intent, "CSV共有"))
+        viewModel.clearPendingCsv()
+    }
+
+    LaunchedEffect(uiState.pendingPrintHtml) {
+        val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
+        val subject = uiState.pendingPrintSubject ?: "検査生産性分析"
+        val opened = HtmlPrintHelper.printHtml(context, html, subject, uiState.pendingPrintLayout)
+        viewModel.clearPendingPrintHtml()
+        if (!opened) snackbarHostState.showSnackbar("印刷画面を開けませんでした")
+    }
+
+    uiState.inspectorProductDialog?.let { dialog ->
+        IpaInspectorProductDialog(
+            state = dialog,
+            rangeLabel = uiState.rangeLabel,
+            onDismiss = viewModel::closeInspectorProductDialog,
+        )
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = LayoutColors.ShellBg) { padding ->
@@ -43,13 +79,16 @@ fun InspectionProductivityScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
                     .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 IpaHeroBar(
                     rangeLabel = uiState.rangeLabel,
                     loading = uiState.isLoading,
+                    reportBusy = uiState.reportBusy,
+                    reportEnabled = uiState.analysisData != null,
+                    onReportCommand = viewModel::handleReportCommand,
                     onRefresh = viewModel::loadAnalysis,
                 )
 
@@ -61,12 +100,10 @@ fun InspectionProductivityScreen(
                     inspectorOptions = uiState.inspectorOptions,
                     productOptions = uiState.productOptions,
                     includeIncomplete = uiState.includeIncomplete,
-                    loading = uiState.isLoading,
                     onDateRangeChange = viewModel::setDateRange,
                     onInspectorChange = viewModel::setFilterInspectorId,
                     onProductChange = viewModel::setFilterProductCd,
                     onIncludeIncompleteChange = viewModel::setIncludeIncomplete,
-                    onAnalyze = viewModel::loadAnalysis,
                 )
 
                 Box(Modifier.fillMaxWidth()) {
@@ -87,6 +124,15 @@ fun InspectionProductivityScreen(
                                 IpaInspectorProductSplit(
                                     inspectorRows = data.byInspector.orEmpty(),
                                     productRows = data.byProduct.orEmpty(),
+                                    inspectorCount = data.byInspector.orEmpty().size,
+                                    inspectorSectionAvgEfficiency = uiState.inspectorSectionAvgEfficiency,
+                                    productSectionTotalQty = uiState.productSectionTotalQty,
+                                )
+                                IpaWeldRankSplit(
+                                    rankOff = uiState.weldRankOff,
+                                    rankOn = uiState.weldRankOn,
+                                    weldingProductBomCount = uiState.weldingProductCdSet.size,
+                                    onInspectorClick = viewModel::openInspectorProductDialog,
                                 )
                                 IpaProductRankSection(
                                     productRankList = uiState.productRankList,
@@ -101,10 +147,14 @@ fun InspectionProductivityScreen(
                                     rows = data.defectByItem.orEmpty(),
                                     defectLabel = viewModel::defectLabel,
                                 )
-                                IpaSessionDetailSection(data.sessions.orEmpty())
+                                IpaSessionDetailSection(
+                                    rows = data.sessions.orEmpty(),
+                                    exportBusy = uiState.sessionExportBusy,
+                                    onExportCsv = viewModel::exportSessionsCsv,
+                                )
                             }
                         }
-                        !uiState.isLoading -> IpaEmptyState()
+                        !uiState.isLoading -> IpaEmptyState(errorMessage = uiState.lastLoadError)
                     }
                     if (uiState.isLoading && uiState.analysisData != null) {
                         Box(

@@ -14,6 +14,8 @@ data class InspectionUtilizationAnalysisDataDto(
     @Json(name = "include_incomplete") val includeIncomplete: Boolean? = null,
     @Json(name = "standard_workday_hours") val standardWorkdayHours: Double? = null,
     @Json(name = "standard_workday_sec") val standardWorkdaySec: Int? = null,
+    @Json(name = "default_standard_workday_hours") val defaultStandardWorkdayHours: Double? = null,
+    @Json(name = "inspector_schedule_applied") val inspectorScheduleApplied: Boolean? = null,
     @Json(name = "extra_workdays") val extraWorkdays: List<String>? = null,
     @Json(name = "extra_holidays") val extraHolidays: List<String>? = null,
     @Json(name = "company_calendar_applied") val companyCalendarApplied: Boolean? = null,
@@ -25,6 +27,7 @@ data class InspectionUtilizationAnalysisDataDto(
     @Json(name = "daily_by_inspector") val dailyByInspector: List<InspectionUtilizationDailyInspectorRowDto>? = null,
     val daily: List<InspectionUtilizationDailyRowDto>? = null,
     @Json(name = "data_gaps") val dataGaps: List<String>? = null,
+    @Json(name = "sessions_without_time") val sessionsWithoutTime: List<InspectionUtilizationSessionGapDto>? = null,
 )
 
 data class InspectionUtilizationSummaryDto(
@@ -64,7 +67,9 @@ data class InspectionUtilizationDailyInspectorRowDto(
     @Json(name = "is_scheduled_workday") val isScheduledWorkday: Boolean? = null,
     @Json(name = "is_extra_workday") val isExtraWorkday: Boolean? = null,
     @Json(name = "session_count") val sessionCount: Int? = null,
+    @Json(name = "scheduled_hours") val scheduledHours: Double? = null,
     @Json(name = "sum_net_production_min") val sumNetProductionMin: Int? = null,
+    @Json(name = "sum_overtime_sec") val sumOvertimeSec: Int? = null,
     @Json(name = "regular_min") val regularMin: Int? = null,
     @Json(name = "overtime_min") val overtimeMin: Int? = null,
     @Json(name = "utilization_percent") val utilizationPercent: Double? = null,
@@ -77,5 +82,19 @@ data class InspectionUtilizationDailyRowDto(
     @Json(name = "session_count") val sessionCount: Int? = null,
     @Json(name = "inspector_count") val inspectorCount: Int? = null,
     @Json(name = "sum_net_production_min") val sumNetProductionMin: Int? = null,
+    @Json(name = "sum_overtime_sec") val sumOvertimeSec: Int? = null,
+    @Json(name = "overtime_min") val overtimeMin: Int? = null,
     @Json(name = "utilization_percent") val utilizationPercent: Double? = null,
+)
+
+data class InspectionUtilizationSessionGapDto(
+    val id: Int? = null,
+    @Json(name = "production_day") val productionDay: String? = null,
+    @Json(name = "inspector_user_id") val inspectorUserId: Int? = null,
+    @Json(name = "inspector_name") val inspectorName: String? = null,
+    @Json(name = "product_cd") val productCd: String? = null,
+    @Json(name = "product_name") val productName: String? = null,
+    @Json(name = "production_completed_check") val productionCompletedCheck: Boolean? = null,
+    @Json(name = "mes_production_started_at") val mesProductionStartedAt: String? = null,
+    @Json(name = "mes_production_ended_at") val mesProductionEndedAt: String? = null,
 )

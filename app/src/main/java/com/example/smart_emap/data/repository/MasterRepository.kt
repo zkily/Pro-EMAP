@@ -1040,4 +1040,127 @@ class MasterRepository(
     suspend fun exportPartMasterCsv(items: List<com.example.smart_emap.data.model.PartCsvExportItemDto>): String = runCatching {
         apiClient.masterApi().exportPartsCsv(items).string()
     }.getOrElse { throw IllegalStateException("CSVファイルの出力に失敗しました") }
+
+    suspend fun loadProductProcessBomPage(
+        keyword: String = "",
+        page: Int = 1,
+        limit: Int = 20,
+        sortBy: String = "product_name",
+        sortOrder: String = "asc",
+    ): com.example.smart_emap.data.model.ProductProcessBomPageResult {
+        val res = apiClient.masterApi().listProductProcessBom(
+            page = page,
+            limit = limit,
+            keyword = keyword.trim().ifBlank { null },
+            sortBy = sortBy,
+            sortOrder = sortOrder,
+        )
+        return com.example.smart_emap.data.model.ProductProcessBomPageResult(
+            items = res.items(),
+            stats = res.stats(),
+        )
+    }
+
+    suspend fun getProductProcessBom(productCd: Int): com.example.smart_emap.data.model.ProductProcessBomRowDto =
+        apiClient.masterApi().getProductProcessBom(productCd)
+
+    suspend fun updateProductProcessBom(
+        productCd: Int,
+        body: com.example.smart_emap.data.model.UpdateProductProcessBomBody,
+    ): com.example.smart_emap.data.model.ProductProcessBomRowDto =
+        apiClient.masterApi().updateProductProcessBom(productCd, body)
+
+    suspend fun deleteProductProcessBom(productCd: Int) {
+        apiClient.masterApi().deleteProductProcessBom(productCd)
+    }
+
+    suspend fun syncProductProcessBom(): com.example.smart_emap.data.model.ProductProcessBomSyncDataDto {
+        val res = apiClient.masterApi().syncProductProcessBom()
+        return res.data ?: com.example.smart_emap.data.model.ProductProcessBomSyncDataDto()
+    }
+
+    suspend fun loadProductMachineConfigList(): List<com.example.smart_emap.data.model.ProductMachineConfigRowDto> =
+        apiClient.masterApi().listProductMachineConfig(limit = 99999).items()
+
+    suspend fun loadAvailableProductsForMachineConfig(): List<com.example.smart_emap.data.model.AvailableProductDto> {
+        val res = apiClient.masterApi().listAvailableProductsForMachineConfig()
+        return res.data.orEmpty()
+    }
+
+    suspend fun loadMachineOptions(): List<com.example.smart_emap.data.model.MasterMachineFullDto> =
+        apiClient.masterApi().listMachines(pageSize = 5000).items()
+
+    suspend fun createProductMachineConfig(
+        body: com.example.smart_emap.data.model.ProductMachineConfigCreateBody,
+    ): com.example.smart_emap.data.model.ProductMachineConfigRowDto =
+        apiClient.masterApi().createProductMachineConfig(body)
+
+    suspend fun updateProductMachineConfigFull(
+        id: Int,
+        body: com.example.smart_emap.data.model.ProductMachineConfigUpdateBody,
+    ): com.example.smart_emap.data.model.ProductMachineConfigRowDto =
+        apiClient.masterApi().updateProductMachineConfig(id, body)
+
+    suspend fun deleteProductMachineConfig(id: Int) {
+        apiClient.masterApi().deleteProductMachineConfig(id)
+    }
+
+    suspend fun syncProductMachineConfig(): com.example.smart_emap.data.model.ProductMachineConfigSyncDataDto {
+        val res = apiClient.masterApi().syncProductMachineConfig()
+        return res.data ?: com.example.smart_emap.data.model.ProductMachineConfigSyncDataDto()
+    }
+
+    data class EquipmentEfficiencyPageResult(
+        val rows: List<com.example.smart_emap.data.model.EquipmentEfficiencyRowDto>,
+        val total: Int,
+        val tabCounts: com.example.smart_emap.data.model.EquipmentEfficiencyTabCountsDto,
+        val machineDistinctCount: Int,
+        val productDistinctCount: Int,
+    )
+
+    suspend fun loadEquipmentEfficiencyPage(
+        keyword: String?,
+        processType: String,
+        page: Int,
+        pageSize: Int,
+    ): EquipmentEfficiencyPageResult {
+        val res = apiClient.masterApi().listEquipmentEfficiencyMaster(
+            keyword = keyword?.trim()?.takeIf { it.isNotEmpty() },
+            processType = processType,
+            page = page,
+            pageSize = pageSize,
+        )
+        return EquipmentEfficiencyPageResult(
+            rows = res.items(),
+            total = res.totalCount(),
+            tabCounts = res.resolvedTabCounts() ?: com.example.smart_emap.data.model.EquipmentEfficiencyTabCountsDto(),
+            machineDistinctCount = res.resolvedMachineDistinctCount(),
+            productDistinctCount = res.resolvedProductDistinctCount(),
+        )
+    }
+
+    suspend fun createEquipmentEfficiency(
+        body: com.example.smart_emap.data.model.EquipmentEfficiencyCreateBody,
+    ): com.example.smart_emap.data.model.EquipmentEfficiencyRowDto =
+        apiClient.masterApi().createEquipmentEfficiencyMaster(body)
+
+    suspend fun updateEquipmentEfficiency(
+        id: Int,
+        body: com.example.smart_emap.data.model.EquipmentEfficiencyUpdateBody,
+    ): com.example.smart_emap.data.model.EquipmentEfficiencyRowDto =
+        apiClient.masterApi().updateEquipmentEfficiencyMaster(id, body)
+
+    suspend fun deleteEquipmentEfficiency(id: Int) {
+        apiClient.masterApi().deleteEquipmentEfficiencyMaster(id)
+    }
+
+    suspend fun loadProductsForEquipmentEfficiency(): List<Pair<String, String>> = runCatching {
+        apiClient.masterApi().listProducts(page = 1, pageSize = 10_000).items()
+            .mapNotNull { p ->
+                val cd = p.productCd?.trim().orEmpty()
+                if (cd.isEmpty()) return@mapNotNull null
+                val name = p.productName.orEmpty()
+                cd to if (name.isBlank()) cd else "$name ($cd)"
+            }
+    }.getOrElse { emptyList() }
 }

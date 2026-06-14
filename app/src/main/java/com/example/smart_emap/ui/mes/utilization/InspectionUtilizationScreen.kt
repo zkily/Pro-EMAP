@@ -16,14 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.smart_emap.ui.erp.production.planning.ProductionPageBackground
+import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
@@ -34,7 +33,11 @@ fun InspectionUtilizationScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scroll = rememberScrollState()
-    var overrideExpanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.onPageEnter()
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
@@ -42,20 +45,34 @@ fun InspectionUtilizationScreen(
         viewModel.clearSnackbar()
     }
 
+    LaunchedEffect(uiState.pendingPrintHtml) {
+        val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
+        val subject = uiState.pendingPrintSubject ?: "検査稼働率分析"
+        val opened = HtmlPrintHelper.printHtml(context, html, subject, uiState.pendingPrintLayout)
+        viewModel.clearPendingPrintHtml()
+        if (!opened) snackbarHostState.showSnackbar("印刷画面を開けませんでした")
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = LayoutColors.ShellBg) { padding ->
-        ProductionPageBackground {
+        IuaPageBackground {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
                     .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 IuaHeroBar(
-                    standardHours = uiState.standardHours,
+                    defaultStandardHours = uiState.defaultStandardHours,
+                    inspectorScheduleApplied = uiState.inspectorScheduleApplied,
                     rangeLabel = uiState.rangeLabel,
                     loading = uiState.isLoading,
+                    reportBusy = uiState.reportBusy,
+                    reportEnabled = uiState.analysisData != null,
+                    dataGaps = uiState.dataGaps,
+                    sessionsWithoutTime = uiState.sessionsWithoutTime,
+                    onReportCommand = viewModel::handleReportCommand,
                     onRefresh = viewModel::loadAnalysis,
                 )
 
@@ -65,11 +82,9 @@ fun InspectionUtilizationScreen(
                     filterInspectorId = uiState.filterInspectorId,
                     inspectorOptions = uiState.inspectorOptions,
                     includeIncomplete = uiState.includeIncomplete,
-                    loading = uiState.isLoading,
                     onDateRangeChange = viewModel::setDateRange,
                     onInspectorChange = viewModel::setFilterInspectorId,
                     onIncludeIncompleteChange = viewModel::setIncludeIncomplete,
-                    onAnalyze = viewModel::loadAnalysis,
                 )
 
                 uiState.analysisData?.let { data ->
@@ -78,21 +93,9 @@ fun InspectionUtilizationScreen(
                         extraWorkdaysCount = data.companyCalendarExtraWorkdays?.size ?: 0,
                         holidaysCount = data.companyCalendarHolidays?.size ?: 0,
                         onOpenCalendar = { onNavigate("/master/company-work-calendar") },
+                        onOpenSchedule = { onNavigate("/master/inspection-inspector-work-schedule") },
                     )
                 }
-
-                IuaOverrideCard(
-                    expanded = overrideExpanded,
-                    onToggle = { overrideExpanded = !overrideExpanded },
-                    extraWorkdays = uiState.extraWorkdays,
-                    extraHolidays = uiState.extraHolidays,
-                    onAddExtraWorkday = viewModel::addExtraWorkday,
-                    onRemoveExtraWorkday = viewModel::removeExtraWorkday,
-                    onAddExtraHoliday = viewModel::addExtraHoliday,
-                    onRemoveExtraHoliday = viewModel::removeExtraHoliday,
-                )
-
-                uiState.analysisData?.dataGaps?.let { IuaDataGapsBanner(it) }
 
                 Box(Modifier.fillMaxWidth()) {
                     when {
@@ -107,12 +110,15 @@ fun InspectionUtilizationScreen(
                         uiState.analysisData != null -> {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 IuaKpiGrid(uiState.kpiCards)
-                                IuaDailyChartCard(uiState.analysisData!!.daily.orEmpty())
-                                IuaInspectorSummaryCard(uiState.analysisData!!.byInspector.orEmpty())
-                                IuaDailyDetailCard(uiState.filteredDailyRows)
+                                IuaDailyChartCard(uiState.chartDailyRows, uiState.chartBadgeLabel)
+                                IuaOvertimeChartCard(uiState.chartDailyRows, uiState.overtimeChartTotalLabel)
+                                IuaInspectorDailySplit(
+                                    inspectorRows = uiState.filteredByInspector,
+                                    dailyRows = uiState.filteredDailyRows,
+                                )
                             }
                         }
-                        !uiState.isLoading -> IuaEmptyState()
+                        !uiState.isLoading -> IuaEmptyState(errorMessage = uiState.lastLoadError)
                     }
                     if (uiState.isLoading && uiState.analysisData != null) {
                         Box(

@@ -14,6 +14,7 @@ object OperationModules {
     const val MES = "製造実行"
     const val QUALITY = "品質管理"
     const val SYSTEM = "システム管理"
+    const val MASTER = "マスタ管理"
 }
 
 enum class OperationAction {

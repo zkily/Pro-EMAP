@@ -106,7 +106,9 @@ class LoginViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            val apiBaseUrl = ApiDefaults.ensureTrailingSlash(state.apiBaseUrl.trim())
+            val apiBaseUrl = ApiDefaults.ensureTrailingSlash(
+                ApiDefaults.migrateDevApiUrl(state.apiBaseUrl.trim().trimEnd('/')),
+            )
             val result = authRepository.login(
                 username = state.username,
                 password = state.password,

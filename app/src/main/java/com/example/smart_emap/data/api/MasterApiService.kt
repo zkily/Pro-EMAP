@@ -1,5 +1,6 @@
 package com.example.smart_emap.data.api
 
+import com.example.smart_emap.data.model.ApiMessageResponse
 import com.example.smart_emap.data.model.CompanyWorkCalendarBatchBodyDto
 import com.example.smart_emap.data.model.CompanyWorkCalendarBatchResponse
 import com.example.smart_emap.data.model.CompanyWorkCalendarDayTypeDto
@@ -32,12 +33,20 @@ import com.example.smart_emap.data.model.MasterProcessingFeeBodyDto
 import com.example.smart_emap.data.model.MasterProcessingFeeDto
 import com.example.smart_emap.data.model.MasterProductBodyDto
 import com.example.smart_emap.data.model.MasterProductDto
+import com.example.smart_emap.data.model.EquipmentEfficiencyCreateBody
 import com.example.smart_emap.data.model.EquipmentEfficiencyListResponse
+import com.example.smart_emap.data.model.EquipmentEfficiencyRowDto
+import com.example.smart_emap.data.model.EquipmentEfficiencyUpdateBody
 import com.example.smart_emap.data.model.ProductByProcessDto
+import com.example.smart_emap.data.model.ProductMachineConfigCreateBody
 import com.example.smart_emap.data.model.ProductMachineConfigRowDto
+import com.example.smart_emap.data.model.ProductMachineConfigSyncResponse
 import com.example.smart_emap.data.model.ProductMachineConfigUpdateBody
+import com.example.smart_emap.data.model.AvailableProductsResponse
 import com.example.smart_emap.data.model.ProductProcessBomListResponse
 import com.example.smart_emap.data.model.ProductProcessBomRowDto
+import com.example.smart_emap.data.model.ProductProcessBomSyncResponse
+import com.example.smart_emap.data.model.ProductProcessBomWeldingProductsResponse
 import com.example.smart_emap.data.model.UpdateProductProcessBomBody
 import com.example.smart_emap.data.model.ProductCsvExportItemDto
 import com.example.smart_emap.data.model.ProductCsvExportResultDto
@@ -476,8 +485,20 @@ interface MasterApiService {
 
     @GET("/api/master/product-machine-config")
     suspend fun listProductMachineConfig(
+        @Query("keyword") keyword: String? = null,
         @Query("limit") limit: Int = 99999,
     ): MasterListEnvelope<ProductMachineConfigRowDto>
+
+    @GET("/api/master/product-machine-config/available-products")
+    suspend fun listAvailableProductsForMachineConfig(): AvailableProductsResponse
+
+    @GET("/api/master/product-machine-config/{id}")
+    suspend fun getProductMachineConfig(@Path("id") id: Int): ProductMachineConfigRowDto
+
+    @POST("/api/master/product-machine-config")
+    suspend fun createProductMachineConfig(
+        @Body body: ProductMachineConfigCreateBody,
+    ): ProductMachineConfigRowDto
 
     @PUT("/api/master/product-machine-config/{id}")
     suspend fun updateProductMachineConfig(
@@ -485,13 +506,26 @@ interface MasterApiService {
         @Body body: ProductMachineConfigUpdateBody,
     ): ProductMachineConfigRowDto
 
+    @DELETE("/api/master/product-machine-config/{id}")
+    suspend fun deleteProductMachineConfig(@Path("id") id: Int): ApiMessageResponse
+
+    @POST("/api/master/product-machine-config/sync")
+    suspend fun syncProductMachineConfig(): ProductMachineConfigSyncResponse
+
+    @GET("/api/master/product-process-bom/welding-products")
+    suspend fun listProductProcessBomWeldingProducts(): ProductProcessBomWeldingProductsResponse
+
     @GET("/api/master/product-process-bom")
     suspend fun listProductProcessBom(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100,
+        @Query("keyword") keyword: String? = null,
         @Query("sort_by") sortBy: String? = "product_name",
         @Query("sort_order") sortOrder: String? = "asc",
     ): ProductProcessBomListResponse
+
+    @GET("/api/master/product-process-bom/{productCd}")
+    suspend fun getProductProcessBom(@Path("productCd") productCd: Int): ProductProcessBomRowDto
 
     @PUT("/api/master/product-process-bom/{productCd}")
     suspend fun updateProductProcessBom(
@@ -499,9 +533,32 @@ interface MasterApiService {
         @Body body: UpdateProductProcessBomBody,
     ): ProductProcessBomRowDto
 
+    @DELETE("/api/master/product-process-bom/{productCd}")
+    suspend fun deleteProductProcessBom(@Path("productCd") productCd: Int): ApiMessageResponse
+
+    @POST("/api/master/product-process-bom/sync")
+    suspend fun syncProductProcessBom(): ProductProcessBomSyncResponse
+
     @GET("/api/master/equipment-efficiency")
     suspend fun listEquipmentEfficiencyMaster(
+        @Query("keyword") keyword: String? = null,
         @Query("processType") processType: String? = null,
+        @Query("page") page: Int? = null,
+        @Query("pageSize") pageSize: Int? = null,
         @Query("limit") limit: Int? = null,
     ): EquipmentEfficiencyListResponse
+
+    @POST("/api/master/equipment-efficiency")
+    suspend fun createEquipmentEfficiencyMaster(
+        @Body body: EquipmentEfficiencyCreateBody,
+    ): EquipmentEfficiencyRowDto
+
+    @PUT("/api/master/equipment-efficiency/{id}")
+    suspend fun updateEquipmentEfficiencyMaster(
+        @Path("id") id: Int,
+        @Body body: EquipmentEfficiencyUpdateBody,
+    ): EquipmentEfficiencyRowDto
+
+    @DELETE("/api/master/equipment-efficiency/{id}")
+    suspend fun deleteEquipmentEfficiencyMaster(@Path("id") id: Int): ApiMessageResponse
 }
