@@ -43,6 +43,7 @@ data class MainShellUiState(
     val tabs: List<ShellTab> = listOf(
         ShellTab(path = "/dashboard", title = "ダッシュボード", closable = false),
     ),
+    val isRouteLoading: Boolean = false,
 )
 
 class MainShellViewModel(
@@ -82,12 +83,17 @@ class MainShellViewModel(
         val normalizedPath = user.resolveAccessiblePath(path)
         val title = titleForAccessiblePath(normalizedPath)
         updateState { state ->
+            val pathChanged = state.activePath != normalizedPath
             val newTabs = if (state.tabs.none { it.path == normalizedPath }) {
                 state.tabs + ShellTab(path = normalizedPath, title = title)
             } else {
                 state.tabs
             }
-            state.copy(activePath = normalizedPath, tabs = newTabs)
+            state.copy(
+                activePath = normalizedPath,
+                tabs = newTabs,
+                isRouteLoading = pathChanged,
+            )
         }
     }
 
@@ -116,7 +122,12 @@ class MainShellViewModel(
     }
 
     fun selectTab(path: String) {
-        updateState { it.copy(activePath = path) }
+        updateState { state ->
+            state.copy(
+                activePath = path,
+                isRouteLoading = state.activePath != path,
+            )
+        }
     }
 
     fun closeTab(path: String) {
@@ -129,8 +140,16 @@ class MainShellViewModel(
             } else {
                 state.activePath
             }
-            state.copy(tabs = newTabs, activePath = newActivePath)
+            state.copy(
+                tabs = newTabs,
+                activePath = newActivePath,
+                isRouteLoading = newActivePath != state.activePath,
+            )
         }
+    }
+
+    fun finishRouteTransition() {
+        _uiState.update { it.copy(isRouteLoading = false) }
     }
 
     fun closeOtherTabs() {

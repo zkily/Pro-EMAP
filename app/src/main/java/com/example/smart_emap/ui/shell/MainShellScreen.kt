@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -102,6 +102,8 @@ import com.example.smart_emap.ui.mes.cutting.CuttingActualViewModel
 import com.example.smart_emap.ui.mes.cutting.CuttingActualViewModelFactory
 import com.example.smart_emap.ui.mes.inspection.InspectionActualScreen
 import com.example.smart_emap.ui.mes.inspection.InspectionActualViewModel
+import com.example.smart_emap.ui.mes.inspectionregistration.InspectionManualRegistrationScreen
+import com.example.smart_emap.ui.mes.inspectionregistration.InspectionManualRegistrationViewModel
 import com.example.smart_emap.ui.mes.productivity.InspectionProductivityScreen
 import com.example.smart_emap.ui.mes.productivity.InspectionProductivityViewModel
 import com.example.smart_emap.ui.mes.productivity.WeldingProductivityScreen
@@ -137,6 +139,12 @@ fun MainShellScreen(
             networkMonitor = appContainer.networkMonitor,
             userId = user.id,
             inspectorLabel = user.fullName?.trim().orEmpty().ifEmpty { user.username },
+        ),
+    )
+    val inspectionManualRegistrationViewModel: InspectionManualRegistrationViewModel = viewModel(
+        factory = InspectionManualRegistrationViewModel.Factory(
+            repository = appContainer.inspectionRepository,
+            loggedInUserId = user.id,
         ),
     )
     val inspectionUtilizationViewModel: InspectionUtilizationViewModel = viewModel(
@@ -355,6 +363,13 @@ fun MainShellScreen(
         ),
     )
 
+    val productionDataManagementViewModel: ProductionDataManagementViewModel = viewModel(
+        factory = ProductionDataManagementViewModel.Factory(
+            repository = appContainer.productionSummaryRepository,
+            masterRepository = appContainer.masterRepository,
+        ),
+    )
+
     val userListViewModel: UserListViewModel = viewModel(
         factory = UserListViewModel.Factory(
             repository = appContainer.systemUserRepository,
@@ -415,6 +430,7 @@ fun MainShellScreen(
             tabs = tabs,
             dashboardViewModel = dashboardViewModel,
             inspectionViewModel = inspectionViewModel,
+            inspectionManualRegistrationViewModel = inspectionManualRegistrationViewModel,
             inspectionUtilizationViewModel = inspectionUtilizationViewModel,
             inspectionProductivityViewModel = inspectionProductivityViewModel,
             weldingProductivityViewModel = weldingProductivityViewModel,
@@ -451,6 +467,7 @@ fun MainShellScreen(
             planBaselineViewModel = planBaselineViewModel,
             planScheduleViewModel = planScheduleViewModel,
             processMachinePlanViewModel = processMachinePlanViewModel,
+            productionDataManagementViewModel = productionDataManagementViewModel,
             userListViewModel = userListViewModel,
             organizationListViewModel = organizationListViewModel,
             rolePermissionViewModel = rolePermissionViewModel,
@@ -469,6 +486,7 @@ private fun MainShellContent(
     tabs: List<ShellTab>,
     dashboardViewModel: DashboardViewModel,
     inspectionViewModel: InspectionActualViewModel,
+    inspectionManualRegistrationViewModel: InspectionManualRegistrationViewModel,
     inspectionUtilizationViewModel: InspectionUtilizationViewModel,
     inspectionProductivityViewModel: InspectionProductivityViewModel,
     weldingProductivityViewModel: WeldingProductivityViewModel,
@@ -505,6 +523,7 @@ private fun MainShellContent(
     planBaselineViewModel: PlanBaselineViewModel,
     planScheduleViewModel: PlanScheduleViewModel,
     processMachinePlanViewModel: ProcessMachinePlanViewModel,
+    productionDataManagementViewModel: ProductionDataManagementViewModel,
     userListViewModel: UserListViewModel,
     organizationListViewModel: OrganizationListViewModel,
     rolePermissionViewModel: RolePermissionViewModel,
@@ -594,6 +613,7 @@ private fun MainShellContent(
                         when (activePath) {
                             "/dashboard" -> dashboardViewModel.loadDashboard()
                             "/mes/actualDataCollection/inspection" -> inspectionViewModel.refreshAll()
+                            "/mes/actualCollectionRegistration/inspection" -> inspectionManualRegistrationViewModel.refreshAll()
                             "/mes/actualAnalysis/utilization/inspection" -> inspectionUtilizationViewModel.refreshAll()
                             "/mes/actualAnalysis/productivity/inspection" -> inspectionProductivityViewModel.refreshAll()
                             "/mes/actualAnalysis/productivity/welding" -> weldingProductivityViewModel.refreshAll()
@@ -640,7 +660,57 @@ private fun MainShellContent(
                     },
                     onCloseOthers = shellViewModel::closeOtherTabs,
                 )
-                Box(
+                val pageLoading = rememberShellPageLoading(
+                    activePath = activePath,
+                    dashboardViewModel = dashboardViewModel,
+                    inspectionViewModel = inspectionViewModel,
+                    inspectionManualRegistrationViewModel = inspectionManualRegistrationViewModel,
+                    inspectionUtilizationViewModel = inspectionUtilizationViewModel,
+                    inspectionProductivityViewModel = inspectionProductivityViewModel,
+                    weldingProductivityViewModel = weldingProductivityViewModel,
+                    weldingViewModel = weldingViewModel,
+                    cuttingViewModel = cuttingViewModel,
+                    chamferingViewModel = chamferingViewModel,
+                    orderMonthlyViewModel = orderMonthlyViewModel,
+                    orderDailyViewModel = orderDailyViewModel,
+                    orderDestinationHistoryViewModel = orderDestinationHistoryViewModel,
+                    materialReceivingHistoryViewModel = materialReceivingHistoryViewModel,
+                    materialReceivingInspectionViewModel = materialReceivingInspectionViewModel,
+                    materialForecastViewModel = materialForecastViewModel,
+                    materialOrderViewModel = materialOrderViewModel,
+                    partOrderViewModel = partOrderViewModel,
+                    masterViewModel = masterViewModel,
+                    productMasterViewModel = productMasterViewModel,
+                    materialMasterViewModel = materialMasterViewModel,
+                    materialInspectionMasterViewModel = materialInspectionMasterViewModel,
+                    partMasterViewModel = partMasterViewModel,
+                    supplierMasterViewModel = supplierMasterViewModel,
+                    customerMasterViewModel = customerMasterViewModel,
+                    carrierMasterViewModel = carrierMasterViewModel,
+                    processMasterViewModel = processMasterViewModel,
+                    processRouteMasterViewModel = processRouteMasterViewModel,
+                    productProcessRouteMasterViewModel = productProcessRouteMasterViewModel,
+                    productProcessBomMasterViewModel = productProcessBomMasterViewModel,
+                    productMachineConfigMasterViewModel = productMachineConfigMasterViewModel,
+                    equipmentEfficiencyMasterViewModel = equipmentEfficiencyMasterViewModel,
+                    companyWorkCalendarViewModel = companyWorkCalendarViewModel,
+                    cuttingInstructionViewModel = cuttingInstructionViewModel,
+                    formingInstructionViewModel = formingInstructionViewModel,
+                    weldingInstructionViewModel = weldingInstructionViewModel,
+                    schedulingViewModel = schedulingViewModel,
+                    planBaselineViewModel = planBaselineViewModel,
+                    planScheduleViewModel = planScheduleViewModel,
+                    processMachinePlanViewModel = processMachinePlanViewModel,
+                    productionDataManagementViewModel = productionDataManagementViewModel,
+                    userListViewModel = userListViewModel,
+                    organizationListViewModel = organizationListViewModel,
+                    rolePermissionViewModel = rolePermissionViewModel,
+                )
+                ShellRouteLoadingHost(
+                    activePath = activePath,
+                    isRouteLoading = shellState.isRouteLoading,
+                    pageLoading = pageLoading,
+                    onRouteReady = shellViewModel::finishRouteTransition,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
@@ -648,9 +718,10 @@ private fun MainShellContent(
                     key(activePath) {
                         ShellRouteContent(
                             path = activePath,
-                            appContainer = appContainer,
+                            user = user,
                             dashboardViewModel = dashboardViewModel,
                             inspectionViewModel = inspectionViewModel,
+                            inspectionManualRegistrationViewModel = inspectionManualRegistrationViewModel,
                             inspectionUtilizationViewModel = inspectionUtilizationViewModel,
                             inspectionProductivityViewModel = inspectionProductivityViewModel,
                             weldingProductivityViewModel = weldingProductivityViewModel,
@@ -687,6 +758,7 @@ private fun MainShellContent(
                             planBaselineViewModel = planBaselineViewModel,
                             planScheduleViewModel = planScheduleViewModel,
                             processMachinePlanViewModel = processMachinePlanViewModel,
+                            productionDataManagementViewModel = productionDataManagementViewModel,
                             userListViewModel = userListViewModel,
                             organizationListViewModel = organizationListViewModel,
                             rolePermissionViewModel = rolePermissionViewModel,
@@ -702,9 +774,10 @@ private fun MainShellContent(
 @Composable
 private fun ShellRouteContent(
     path: String,
-    appContainer: SmartEmapAppContainer,
+    user: UserDto,
     dashboardViewModel: DashboardViewModel,
     inspectionViewModel: InspectionActualViewModel,
+    inspectionManualRegistrationViewModel: InspectionManualRegistrationViewModel,
     inspectionUtilizationViewModel: InspectionUtilizationViewModel,
     inspectionProductivityViewModel: InspectionProductivityViewModel,
     weldingProductivityViewModel: WeldingProductivityViewModel,
@@ -741,6 +814,7 @@ private fun ShellRouteContent(
     planBaselineViewModel: PlanBaselineViewModel,
     planScheduleViewModel: PlanScheduleViewModel,
     processMachinePlanViewModel: ProcessMachinePlanViewModel,
+    productionDataManagementViewModel: ProductionDataManagementViewModel,
     userListViewModel: UserListViewModel,
     organizationListViewModel: OrganizationListViewModel,
     rolePermissionViewModel: RolePermissionViewModel,
@@ -784,6 +858,16 @@ private fun ShellRouteContent(
         "/erp/purchase/part" -> PartHomeScreen(onNavigate = onNavigate)
         "/erp/purchase/part/order" -> PartOrderScreen(viewModel = partOrderViewModel)
         "/mes/actualDataCollection/inspection" -> InspectionActualScreen(viewModel = inspectionViewModel)
+        "/mes/actualCollectionRegistration/inspection" -> InspectionManualRegistrationScreen(
+            viewModel = inspectionManualRegistrationViewModel,
+            user = user,
+        )
+        "/mes/actualCollectionRegistration/cutting",
+        "/mes/actualCollectionRegistration/chamfering",
+        "/mes/actualCollectionRegistration/forming",
+        "/mes/actualCollectionRegistration/plating",
+        "/mes/actualCollectionRegistration/welding",
+        -> PlaceholderScreen(path = path)
         "/mes/actualAnalysis/utilization/inspection" -> InspectionUtilizationScreen(
             viewModel = inspectionUtilizationViewModel,
             onNavigate = onNavigate,
@@ -801,15 +885,9 @@ private fun ShellRouteContent(
         "/mes/productionInstruction/forming" -> PlanInstructionScreen(viewModel = formingInstructionViewModel)
         "/mes/productionInstruction/welding" -> PlanInstructionScreen(viewModel = weldingInstructionViewModel)
         "/aps/scheduling" -> SchedulingScreen(viewModel = schedulingViewModel)
-        "/erp/production/data-management" -> {
-            val vm: ProductionDataManagementViewModel = viewModel(
-                factory = ProductionDataManagementViewModel.Factory(
-                    repository = appContainer.productionSummaryRepository,
-                    masterRepository = appContainer.masterRepository,
-                ),
-            )
-            ProductionDataManagementScreen(viewModel = vm)
-        }
+        "/erp/production/data-management" -> ProductionDataManagementScreen(
+            viewModel = productionDataManagementViewModel,
+        )
         "/erp/production/plan-baseline" -> PlanBaselineScreen(viewModel = planBaselineViewModel)
         "/erp/production/plan-schedules" -> PlanScheduleScreen(viewModel = planScheduleViewModel)
         "/erp/production/process-machine-plan" -> ProcessMachinePlanScreen(viewModel = processMachinePlanViewModel)

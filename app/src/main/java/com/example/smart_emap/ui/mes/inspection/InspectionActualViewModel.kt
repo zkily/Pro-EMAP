@@ -32,6 +32,10 @@ import java.util.Locale
 
 enum class MesLockOwner { Unclaimed, Mine, Other }
 
+enum class EndDialogQtyInputSource { Box, Piece }
+
+data class EndDialogQtyMismatch(val piece: Int, val upb: Int)
+
 enum class InspRetryAction {
     RefreshAll,
     ReloadProducts,
@@ -78,18 +82,29 @@ data class InspectionUiState(
     val snackbarMessage: String? = null,
     val scanDialogVisible: Boolean = false,
     val endDialogVisible: Boolean = false,
-    val endDialogQty: String = "",
+    val endDialogBoxes: String = "",
+    val endDialogPieceQty: String = "",
+    val endDialogUnitPerBox: Int = 0,
+    val endDialogQtyInputSource: EndDialogQtyInputSource? = null,
+    val endDialogQtyMismatch: EndDialogQtyMismatch? = null,
+    val endDialogQtyMismatchConfirm: EndDialogQtyMismatch? = null,
+    val endDialogCanSubmit: Boolean = false,
     val endDialogSubmitting: Boolean = false,
+    val endDialogWallEndDisplay: String = "—",
     val timerPhase: TimerPhase = TimerPhase.Idle,
     val timerPhaseLabel: String = "未開始",
-    val elapsedDisplay: String = "00:00",
-    val pausedDisplay: String = "00:00",
+    val elapsedDisplay: String = "00:00:00",
+    val pausedDisplay: String = "00:00:00",
+    val breakDisplay: String = "00:00:00",
     val wallStartDisplay: String = "—",
+    val wallStartClockDisplay: String = "—",
     val wallEndDisplay: String = "—",
     val defectTotal: Int = 0,
     val canStart: Boolean = false,
     val canPause: Boolean = false,
     val canResume: Boolean = false,
+    val canBreak: Boolean = false,
+    val canResumeBreak: Boolean = false,
     val canEnd: Boolean = false,
     val showPlanCard: Boolean = false,
     val productSelectionLocked: Boolean = false,
@@ -428,6 +443,8 @@ class InspectionActualViewModel(
                 session.activeAccumMs = 0
                 session.pausedAccumMs = 0
                 session.pauseSliceStart = null
+                session.breakAccumMs = 0
+                session.breakSliceStart = null
                 session.runningSliceStart = now
                 session.wallEnd = null
                 publishUi()
@@ -502,23 +519,145 @@ class InspectionActualViewModel(
         }
     }
 
+    fun onBreakProduction() {
+        val planId = _uiState.value.activePlanId ?: return
+        if (!locallyOperated.contains(planId)) return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isTimerRunning(session)) return
+        val now = System.currentTimeMillis()
+        InspectionSessionLogic.flushRunningSlice(session, now)
+        session.breakSliceStart = now
+        viewModelScope.launch {
+            persistTimerCheckpoint(planId, session)
+            publishUi()
+        }
+    }
+
+    fun onResumeBreakProduction() {
+        val planId = _uiState.value.activePlanId ?: return
+        if (!locallyOperated.contains(planId)) return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isTimerOnBreak(session)) return
+        val now = System.currentTimeMillis()
+        InspectionSessionLogic.flushBreakSlice(session, now)
+        session.runningSliceStart = now
+        session.breakSliceStart = null
+        viewModelScope.launch {
+            persistTimerCheckpoint(planId, session)
+            publishUi()
+        }
+    }
+
     fun openEndDialog() {
         val planId = _uiState.value.activePlanId ?: return
-        val session = sessions[planId] ?: return
+        if (sessions[planId] == null) return
         if (!_uiState.value.canEnd) return
         val now = System.currentTimeMillis()
-        if (InspectionSessionLogic.isTimerRunning(session)) InspectionSessionLogic.flushRunningSlice(session, now)
-        if (InspectionSessionLogic.isTimerPaused(session)) InspectionSessionLogic.flushPauseSlice(session, now)
-        _uiState.update { it.copy(endDialogVisible = true, endDialogQty = "") }
-        publishUi()
+        _uiState.update {
+            it.copy(
+                endDialogVisible = true,
+                endDialogBoxes = "",
+                endDialogPieceQty = "",
+                endDialogQtyInputSource = null,
+                endDialogQtyMismatch = null,
+                endDialogQtyMismatchConfirm = null,
+                endDialogWallEndDisplay = formatWall(now),
+            )
+        }
+        publishEndDialogQtyState()
     }
 
     fun closeEndDialog() {
-        _uiState.update { it.copy(endDialogVisible = false) }
+        resumeProductionAfterEndDialogCancel()
+        _uiState.update {
+            it.copy(
+                endDialogVisible = false,
+                endDialogQtyMismatchConfirm = null,
+            )
+        }
+        publishUi()
     }
 
-    fun onEndDialogQtyChange(value: String) {
-        _uiState.update { it.copy(endDialogQty = value.filter { it.isDigit() }) }
+    private fun resumeProductionAfterEndDialogCancel() {
+        val planId = _uiState.value.activePlanId ?: return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isProductionInProgress(session)) return
+        if (InspectionSessionLogic.isTimerPaused(session) ||
+            InspectionSessionLogic.isTimerOnBreak(session) ||
+            InspectionSessionLogic.isTimerRunning(session)
+        ) {
+            return
+        }
+        session.runningSliceStart = System.currentTimeMillis()
+        viewModelScope.launch { persistTimerCheckpoint(planId, session) }
+    }
+
+    fun onEndDialogBoxesChange(value: String) {
+        val filtered = value.filter { it.isDigit() }
+        val state = _uiState.value
+        val upb = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val syncedPiece = when {
+            filtered.isEmpty() -> ""
+            upb > 0 -> {
+                val boxes = filtered.toIntOrNull()
+                if (boxes != null && boxes >= 0) pieceQtyFromBoxes(boxes, upb).toString() else state.endDialogPieceQty
+            }
+            else -> state.endDialogPieceQty
+        }
+        _uiState.update {
+            it.copy(
+                endDialogBoxes = filtered,
+                endDialogPieceQty = syncedPiece,
+                endDialogQtyInputSource = EndDialogQtyInputSource.Box,
+            )
+        }
+        publishEndDialogQtyState()
+    }
+
+    fun onEndDialogPieceQtyChange(value: String) {
+        val filtered = value.filter { it.isDigit() }
+        val state = _uiState.value
+        val upb = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val syncedBoxes = when {
+            filtered.isEmpty() -> ""
+            upb > 0 -> {
+                val piece = filtered.toIntOrNull()
+                if (piece != null && piece >= 0) boxQtyFromPieces(piece, upb).toString() else state.endDialogBoxes
+            }
+            else -> state.endDialogBoxes
+        }
+        _uiState.update {
+            it.copy(
+                endDialogPieceQty = filtered,
+                endDialogBoxes = syncedBoxes,
+                endDialogQtyInputSource = EndDialogQtyInputSource.Piece,
+            )
+        }
+        publishEndDialogQtyState()
+    }
+
+    private fun publishEndDialogQtyState() {
+        val state = _uiState.value
+        val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val mismatch = resolveEndDialogQtyMismatch(state.endDialogPieceQty, unitPerBox)
+        val canSubmit = endDialogCanSubmit(state.endDialogBoxes, state.endDialogPieceQty, unitPerBox)
+        _uiState.update {
+            it.copy(
+                endDialogUnitPerBox = unitPerBox,
+                endDialogQtyMismatch = mismatch,
+                endDialogCanSubmit = canSubmit,
+            )
+        }
+    }
+
+    fun dismissProductionEndQtyMismatch() {
+        _uiState.update { it.copy(endDialogQtyMismatchConfirm = null) }
+    }
+
+    fun confirmProductionEndQtyMismatch() {
+        val confirm = _uiState.value.endDialogQtyMismatchConfirm ?: return
+        _uiState.update { it.copy(endDialogQtyMismatchConfirm = null) }
+        performProductionEnd(confirm.piece)
     }
 
     fun canEditConfirmedHistoryRow(row: InspectionManagementRowDto): Boolean {
@@ -726,27 +865,51 @@ class InspectionActualViewModel(
 
     fun submitProductionEnd() {
         val planId = _uiState.value.activePlanId ?: return
-        val session = sessions[planId] ?: return
-        val qty = _uiState.value.endDialogQty.toIntOrNull() ?: -1
+        if (sessions[planId] == null) return
+        val state = _uiState.value
+        val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val s = inspStringsFor(state.locale)
+        val qty = if (unitPerBox > 0) {
+            state.endDialogPieceQty.trim().toIntOrNull() ?: -1
+        } else {
+            state.endDialogPieceQty.trim().toIntOrNull() ?: -1
+        }
         if (qty < 0) {
-            _uiState.update { it.copy(snackbarMessage = "生産数を正しく入力してください") }
+            _uiState.update { it.copy(snackbarMessage = s.qtyInvalid) }
             return
         }
+        if (unitPerBox > 0 && hasPieceBoxQtyMismatch(qty, unitPerBox)) {
+            _uiState.update {
+                it.copy(endDialogQtyMismatchConfirm = EndDialogQtyMismatch(qty, unitPerBox))
+            }
+            return
+        }
+        performProductionEnd(qty)
+    }
+
+    private fun performProductionEnd(qty: Int) {
+        val planId = _uiState.value.activePlanId ?: return
+        val session = sessions[planId] ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(endDialogSubmitting = true) }
             try {
                 val now = System.currentTimeMillis()
                 if (InspectionSessionLogic.isTimerRunning(session)) InspectionSessionLogic.flushRunningSlice(session, now)
                 if (InspectionSessionLogic.isTimerPaused(session)) InspectionSessionLogic.flushPauseSlice(session, now)
+                if (InspectionSessionLogic.isTimerOnBreak(session)) InspectionSessionLogic.flushBreakSlice(session, now)
                 session.wallEnd = now
                 val defectTotal = session.defects.values.sum()
+                val breakSec = (InspectionSessionLogic.readBreakAccumMs(session, now) / 1000).toInt()
+                val stopSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt()
                 val ok = patchWithConflictHandling(
                     planId,
                     PatchInspectionBody(
                         productionDay = productionDayFromMillis(session.wallStart ?: now),
                         mesProductionEndedAt = Instant.ofEpochMilli(now).toString(),
                         mesNetProductionSec = (InspectionSessionLogic.readNetProductionMs(session, now) / 1000).toInt(),
-                        mesPausedAccumSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt(),
+                        mesBreakSec = breakSec,
+                        mesStopSec = stopSec,
+                        mesPausedAccumSec = breakSec + stopSec,
                         mesProductionIsPaused = 0,
                         mesInspectorUserId = userId,
                         mesDefectByItem = session.defects.filter { it.value > 0 },
@@ -973,7 +1136,8 @@ class InspectionActualViewModel(
         val startIso = session.wallStart?.let { Instant.ofEpochMilli(it).toString() }
         val endIso = Instant.ofEpochMilli(endMs).toString()
         val netSec = (InspectionSessionLogic.readNetProductionMs(session, endMs) / 1000).toInt()
-        val pauseSec = (InspectionSessionLogic.readPausedAccumMs(session, endMs) / 1000).toInt()
+        val breakSec = (InspectionSessionLogic.readBreakAccumMs(session, endMs) / 1000).toInt()
+        val stopSec = (InspectionSessionLogic.readPausedAccumMs(session, endMs) / 1000).toInt()
         managementRows = managementRows.map { row ->
             if (row.id != planId) {
                 row
@@ -986,7 +1150,9 @@ class InspectionActualViewModel(
                     mesProductionStartedAt = startIso ?: row.mesProductionStartedAt,
                     mesProductionEndedAt = endIso,
                     mesNetProductionSec = netSec,
-                    mesPausedAccumSec = pauseSec,
+                    mesBreakSec = breakSec,
+                    mesStopSec = stopSec,
+                    mesPausedAccumSec = breakSec + stopSec,
                     mesProductionIsPaused = 0,
                 )
             }
@@ -1045,6 +1211,7 @@ class InspectionActualViewModel(
                     )
                 }
                 offlineStore.saveProducts(list)
+                publishEndDialogQtyState()
             }
             .onFailure { e ->
                 val msg = formatNetworkError(e, s.loadProductsFailed)
@@ -1231,6 +1398,8 @@ class InspectionActualViewModel(
                 mesProductionEndedAt = r.mesProductionEndedAt,
                 mesNetProductionSec = r.mesNetProductionSec,
                 mesPausedAccumSec = r.mesPausedAccumSec,
+                mesBreakSec = r.mesBreakSec,
+                mesStopSec = r.mesStopSec,
                 mesProductionIsPaused = r.mesProductionIsPaused,
                 mesDefectByItem = r.mesDefectByItem,
             ),
@@ -1349,12 +1518,23 @@ class InspectionActualViewModel(
     private suspend fun persistTimerCheckpoint(planId: Int, session: PlanSession): Boolean {
         if (!locallyOperated.contains(planId) && !canServerPatchPlan(planId)) return false
         val now = System.currentTimeMillis()
+        val breakSec = (InspectionSessionLogic.readBreakAccumMs(session, now) / 1000).toInt()
+        val stopSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt()
         return patchWithConflictHandling(
             planId,
             PatchInspectionBody(
                 mesNetProductionSec = (InspectionSessionLogic.readNetProductionMs(session, now) / 1000).toInt(),
-                mesPausedAccumSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt(),
-                mesProductionIsPaused = if (InspectionSessionLogic.isTimerPaused(session)) 1 else 0,
+                mesBreakSec = breakSec,
+                mesStopSec = stopSec,
+                mesPausedAccumSec = breakSec + stopSec,
+                mesProductionIsPaused = if (
+                    InspectionSessionLogic.isTimerPaused(session) ||
+                    InspectionSessionLogic.isTimerOnBreak(session)
+                ) {
+                    1
+                } else {
+                    0
+                },
             ),
         )
     }
@@ -1385,6 +1565,7 @@ class InspectionActualViewModel(
             activeCode != state.selectedProductCode ||
                 (activeId != null && !locallyOperated.contains(activeId))
         } == true
+        val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
 
         val next = state.copy(
             inProgressRows = inProgress,
@@ -1402,7 +1583,11 @@ class InspectionActualViewModel(
             pausedDisplay = InspectionSessionLogic.formatDurationMs(
                 session?.let { s -> InspectionSessionLogic.readPausedAccumMs(s, now) } ?: 0,
             ),
+            breakDisplay = InspectionSessionLogic.formatDurationMs(
+                session?.let { s -> InspectionSessionLogic.readBreakAccumMs(s, now) } ?: 0,
+            ),
             wallStartDisplay = formatWall(session?.wallStart),
+            wallStartClockDisplay = formatWallClock(session?.wallStart),
             wallEndDisplay = formatWall(session?.wallEnd),
             defectTotal = session?.defects?.values?.sum() ?: 0,
             canStart = state.selectedProductCode != null && run {
@@ -1416,9 +1601,12 @@ class InspectionActualViewModel(
             },
             canPause = editableSession?.let { InspectionSessionLogic.isTimerRunning(it) } == true,
             canResume = editableSession?.let { InspectionSessionLogic.isTimerPaused(it) } == true,
+            canBreak = editableSession?.let { InspectionSessionLogic.isTimerRunning(it) } == true,
+            canResumeBreak = editableSession?.let { InspectionSessionLogic.isTimerOnBreak(it) } == true,
             canEnd = editableSession?.let {
                 InspectionSessionLogic.isProductionInProgress(it) &&
-                    !InspectionSessionLogic.isTimerPaused(it)
+                    !InspectionSessionLogic.isTimerPaused(it) &&
+                    !InspectionSessionLogic.isTimerOnBreak(it)
             } == true,
             showPlanCard = state.selectedProductCode != null,
             productSelectionLocked = locked,
@@ -1430,6 +1618,13 @@ class InspectionActualViewModel(
             } == true,
             showActiveProductionSwitchBanner = showActiveProductionSwitchBanner,
             activeProductionSwitchLabel = myActiveRow?.let { rowShortLabel(it) }.orEmpty(),
+            endDialogUnitPerBox = unitPerBox,
+            endDialogCanSubmit = endDialogCanSubmit(
+                state.endDialogBoxes,
+                state.endDialogPieceQty,
+                unitPerBox,
+            ),
+            endDialogQtyMismatch = resolveEndDialogQtyMismatch(state.endDialogPieceQty, unitPerBox),
         )
         if (next != state) {
             _uiState.value = next
@@ -1459,9 +1654,13 @@ class InspectionActualViewModel(
         val paused = InspectionSessionLogic.formatDurationMs(
             InspectionSessionLogic.readPausedAccumMs(session, now),
         )
+        val breakTime = InspectionSessionLogic.formatDurationMs(
+            InspectionSessionLogic.readBreakAccumMs(session, now),
+        )
         val phaseLabel = timerPhaseLabel(phase)
         if (elapsed == state.elapsedDisplay &&
             paused == state.pausedDisplay &&
+            breakTime == state.breakDisplay &&
             phase == state.timerPhase
         ) {
             return
@@ -1470,6 +1669,7 @@ class InspectionActualViewModel(
             it.copy(
                 elapsedDisplay = elapsed,
                 pausedDisplay = paused,
+                breakDisplay = breakTime,
                 timerPhase = phase,
                 timerPhaseLabel = phaseLabel,
             )
@@ -1495,6 +1695,7 @@ class InspectionActualViewModel(
         TimerPhase.Idle -> "未開始"
         TimerPhase.Running -> "計測中"
         TimerPhase.Paused -> "一時停止中"
+        TimerPhase.Break -> "休憩中"
         TimerPhase.Ended -> "終了済"
     }
 
@@ -1502,6 +1703,47 @@ class InspectionActualViewModel(
         if (ts == null) return "—"
         val fmt = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm", Locale.JAPAN)
         return Instant.ofEpochMilli(ts).atZone(ZoneId.of("Asia/Tokyo")).format(fmt)
+    }
+
+    private fun formatWallClock(ts: Long?): String {
+        if (ts == null) return "—"
+        val fmt = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.JAPAN)
+        return Instant.ofEpochMilli(ts).atZone(ZoneId.of("Asia/Tokyo")).format(fmt)
+    }
+
+    private fun resolveUnitPerBox(code: String?, products: List<ErpProductDto>): Int {
+        val hit = products.find { it.productCode == code } ?: return 0
+        return (hit.unitPerBox ?: 0).coerceAtLeast(0)
+    }
+
+    private fun pieceQtyFromBoxes(boxes: Int, unitPerBox: Int): Int = boxes * unitPerBox
+
+    private fun boxQtyFromPieces(pieces: Int, unitPerBox: Int): Int =
+        kotlin.math.round(pieces.toDouble() / unitPerBox).toInt()
+
+    private fun hasPieceBoxQtyMismatch(pieceQty: Int, unitPerBox: Int): Boolean =
+        unitPerBox > 0 && pieceQty % unitPerBox != 0
+
+    private fun resolveEndDialogQtyMismatch(pieceQtyRaw: String, unitPerBox: Int): EndDialogQtyMismatch? {
+        if (unitPerBox <= 0) return null
+        val trimmed = pieceQtyRaw.trim()
+        if (trimmed.isEmpty()) return null
+        val piece = trimmed.toIntOrNull() ?: return null
+        if (piece < 0) return null
+        if (!hasPieceBoxQtyMismatch(piece, unitPerBox)) return null
+        return EndDialogQtyMismatch(piece, unitPerBox)
+    }
+
+    private fun endDialogCanSubmit(boxesRaw: String, pieceQtyRaw: String, unitPerBox: Int): Boolean {
+        if (unitPerBox > 0) {
+            val piece = pieceQtyRaw.trim().toIntOrNull() ?: return false
+            if (piece < 0) return false
+            return boxesRaw.trim().isNotEmpty() || pieceQtyRaw.trim().isNotEmpty()
+        }
+        val raw = pieceQtyRaw.trim()
+        if (raw.isEmpty()) return false
+        val qty = raw.toIntOrNull() ?: return false
+        return qty >= 0
     }
 
     companion object {

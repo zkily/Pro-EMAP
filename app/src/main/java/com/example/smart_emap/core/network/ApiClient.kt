@@ -51,8 +51,17 @@ class ApiClient(
         .add(KotlinJsonAdapterFactory())
         .build()
 
+    private val commonOkHttpClient: OkHttpClient by lazy {
+        createOkHttpClient(longTimeout = false)
+    }
+
+    private val longTimeoutOkHttpClient: OkHttpClient by lazy {
+        createOkHttpClient(longTimeout = true)
+    }
+
     private var cachedBaseUrl: String? = null
     private var cachedRetrofit: Retrofit? = null
+    private var cachedLongRetrofit: Retrofit? = null
 
     suspend fun retrofit(): Retrofit {
         val baseUrl = sessionStore.getApiBaseUrl(ApiDefaults.displayBaseUrl)
@@ -60,95 +69,121 @@ class ApiClient(
             return cachedRetrofit!!
         }
         cachedBaseUrl = baseUrl
-        cachedRetrofit = createRetrofit(baseUrl)
+        cachedRetrofit = createRetrofit(baseUrl, commonOkHttpClient)
+        cachedLongRetrofit = createRetrofit(baseUrl, longTimeoutOkHttpClient)
         return cachedRetrofit!!
     }
 
-    suspend fun authApi(): AuthApiService = retrofit().create(AuthApiService::class.java)
+    suspend fun <T> createService(serviceClass: Class<T>, longTimeout: Boolean = false): T {
+        val retrofit = if (longTimeout) {
+            val baseUrl = sessionStore.getApiBaseUrl(ApiDefaults.displayBaseUrl)
+            if (cachedLongRetrofit == null || cachedBaseUrl != baseUrl) {
+                retrofit()
+            }
+            cachedLongRetrofit!!
+        } else {
+            retrofit()
+        }
+        return retrofit.create(serviceClass)
+    }
+
+    suspend fun authApi(): AuthApiService = createService(AuthApiService::class.java)
 
     /** 登录时使用文本框传入的地址，避免与已缓存 Retrofit 或本地旧地址不一致。 */
     fun authApiForBaseUrl(baseUrl: String): AuthApiService {
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-        return createRetrofit(normalized).create(AuthApiService::class.java)
+        return Retrofit.Builder()
+            .baseUrl(normalized)
+            .client(commonOkHttpClient)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+            .create(AuthApiService::class.java)
     }
 
-    suspend fun dashboardApi(): DashboardApiService = retrofit().create(DashboardApiService::class.java)
+    suspend fun dashboardApi(): DashboardApiService = createService(DashboardApiService::class.java)
 
-    suspend fun inspectionApi(): InspectionApiService = retrofit().create(InspectionApiService::class.java)
+    suspend fun inspectionApi(): InspectionApiService = createService(InspectionApiService::class.java)
 
     suspend fun inspectionApiLong(): InspectionApiService =
-        retrofitWithLongTimeout().create(InspectionApiService::class.java)
+        createService(InspectionApiService::class.java, longTimeout = true)
 
-    suspend fun cuttingApi(): CuttingApiService = retrofit().create(CuttingApiService::class.java)
+    suspend fun cuttingApi(): CuttingApiService = createService(CuttingApiService::class.java)
 
-    suspend fun chamferingApi(): ChamferingApiService = retrofit().create(ChamferingApiService::class.java)
+    suspend fun chamferingApi(): ChamferingApiService = createService(ChamferingApiService::class.java)
 
     suspend fun cuttingInstructionApi(): CuttingInstructionApiService =
-        retrofit().create(CuttingInstructionApiService::class.java)
+        createService(CuttingInstructionApiService::class.java)
 
-    suspend fun databaseApi(): DatabaseApiService =
-        retrofit().create(DatabaseApiService::class.java)
+    suspend fun databaseApi(): DatabaseApiService = createService(DatabaseApiService::class.java)
 
     suspend fun cuttingPlanningApi(): CuttingPlanningApiService =
-        retrofit().create(CuttingPlanningApiService::class.java)
+        createService(CuttingPlanningApiService::class.java)
 
-    suspend fun systemApi(): SystemApiService = retrofit().create(SystemApiService::class.java)
+    suspend fun systemApi(): SystemApiService = createService(SystemApiService::class.java)
 
     suspend fun systemUsersApi(): SystemUsersApiService = systemApi()
 
-    suspend fun weldingApi(): WeldingApiService = retrofit().create(WeldingApiService::class.java)
+    suspend fun weldingApi(): WeldingApiService = createService(WeldingApiService::class.java)
 
-    suspend fun masterApi(): MasterApiService = retrofit().create(MasterApiService::class.java)
+    suspend fun masterApi(): MasterApiService = createService(MasterApiService::class.java)
 
-    suspend fun masterApiLong(): MasterApiService = retrofitWithLongTimeout().create(MasterApiService::class.java)
+    suspend fun masterApiLong(): MasterApiService =
+        createService(MasterApiService::class.java, longTimeout = true)
 
-    suspend fun apsApi(): ApsApiService = retrofit().create(ApsApiService::class.java)
+    suspend fun apsApi(): ApsApiService = createService(ApsApiService::class.java)
 
-    suspend fun apsApiLong(): ApsApiService = retrofitWithLongTimeout().create(ApsApiService::class.java)
+    suspend fun apsApiLong(): ApsApiService = createService(ApsApiService::class.java, longTimeout = true)
 
-    suspend fun erpOptionsApi(): ErpOptionsApiService = retrofit().create(ErpOptionsApiService::class.java)
+    suspend fun erpOptionsApi(): ErpOptionsApiService = createService(ErpOptionsApiService::class.java)
 
-    suspend fun processDefectApi(): ProcessDefectApiService = retrofit().create(ProcessDefectApiService::class.java)
+    suspend fun processDefectApi(): ProcessDefectApiService =
+        createService(ProcessDefectApiService::class.java)
 
-    suspend fun orderMonthlyApi(): OrderMonthlyApiService = retrofit().create(OrderMonthlyApiService::class.java)
+    suspend fun orderMonthlyApi(): OrderMonthlyApiService = createService(OrderMonthlyApiService::class.java)
 
-    suspend fun orderBatchApi(): OrderBatchApiService = retrofitWithLongTimeout().create(OrderBatchApiService::class.java)
+    suspend fun orderBatchApi(): OrderBatchApiService =
+        createService(OrderBatchApiService::class.java, longTimeout = true)
 
-    suspend fun orderDailyApi(): OrderDailyApiService = retrofit().create(OrderDailyApiService::class.java)
+    suspend fun orderDailyApi(): OrderDailyApiService = createService(OrderDailyApiService::class.java)
 
-    suspend fun materialApi(): MaterialApiService = retrofit().create(MaterialApiService::class.java)
+    suspend fun materialApi(): MaterialApiService = createService(MaterialApiService::class.java)
 
     suspend fun materialApiLong(): MaterialApiService =
-        retrofitWithLongTimeout().create(MaterialApiService::class.java)
+        createService(MaterialApiService::class.java, longTimeout = true)
 
-    suspend fun partApi(): PartApiService = retrofit().create(PartApiService::class.java)
+    suspend fun partApi(): PartApiService = createService(PartApiService::class.java)
 
-    suspend fun partApiLong(): PartApiService = retrofitWithLongTimeout().create(PartApiService::class.java)
+    suspend fun partApiLong(): PartApiService = createService(PartApiService::class.java, longTimeout = true)
 
     suspend fun planInstructionApi(): PlanInstructionApiService =
-        retrofit().create(PlanInstructionApiService::class.java)
+        createService(PlanInstructionApiService::class.java)
 
     suspend fun productionSummaryApi(): ProductionSummaryApiService =
-        retrofit().create(ProductionSummaryApiService::class.java)
+        createService(ProductionSummaryApiService::class.java)
 
     suspend fun productionSummaryApiLong(): ProductionSummaryApiService =
-        retrofitWithLongTimeout().create(ProductionSummaryApiService::class.java)
+        createService(ProductionSummaryApiService::class.java, longTimeout = true)
 
     suspend fun stockTransactionLogApi(): StockTransactionLogApiService =
-        retrofit().create(StockTransactionLogApiService::class.java)
+        createService(StockTransactionLogApiService::class.java)
 
     suspend fun stockTransactionLogApiLong(): StockTransactionLogApiService =
-        retrofitWithLongTimeout().create(StockTransactionLogApiService::class.java)
+        createService(StockTransactionLogApiService::class.java, longTimeout = true)
 
-    suspend fun planBaselineApi(): PlanBaselineApiService =
-        retrofit().create(PlanBaselineApiService::class.java)
+    suspend fun planBaselineApi(): PlanBaselineApiService = createService(PlanBaselineApiService::class.java)
 
-    suspend fun planDataApi(): PlanDataApiService =
-        retrofit().create(PlanDataApiService::class.java)
+    suspend fun planDataApi(): PlanDataApiService = createService(PlanDataApiService::class.java)
 
-    private suspend fun retrofitWithLongTimeout(): Retrofit {
-        val baseUrl = sessionStore.getApiBaseUrl(ApiDefaults.displayBaseUrl)
+    private fun createRetrofit(baseUrl: String, client: OkHttpClient): Retrofit {
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        return Retrofit.Builder()
+            .baseUrl(normalized)
+            .client(client)
+            .addConverterFactory(MoshiConverterFactory.create(moshi))
+            .build()
+    }
+
+    private fun createOkHttpClient(longTimeout: Boolean): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.HEADERS
@@ -156,12 +191,19 @@ class ApiClient(
                 HttpLoggingInterceptor.Level.NONE
             }
         }
+
+        val timeout = if (longTimeout) 120L else 60L
+
         val clientBuilder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(timeout, TimeUnit.SECONDS)
+            .writeTimeout(timeout, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .addInterceptor(AuthInterceptor(sessionStore))
+            .addInterceptor(UnauthorizedInterceptor(sessionEvents))
+            .addInterceptor(logging)
             .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
+
         if (BuildConfig.DEBUG) {
             clientBuilder.protocols(listOf(Protocol.HTTP_1_1))
             val trustManager = trustAllX509TrustManager()
@@ -169,62 +211,14 @@ class ApiClient(
             clientBuilder.sslSocketFactory(sslSocketFactory, trustManager)
             clientBuilder.hostnameVerifier { _, _ -> true }
         }
-        val client = clientBuilder
-            .addInterceptor(AuthInterceptor(sessionStore))
-            .addInterceptor(UnauthorizedInterceptor(sessionEvents))
-            .addInterceptor(logging)
-            .build()
-        return Retrofit.Builder()
-            .baseUrl(normalized)
-            .client(client)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
+
+        return clientBuilder.build()
     }
 
     fun invalidate() {
         cachedBaseUrl = null
         cachedRetrofit = null
-    }
-
-    private fun createRetrofit(baseUrl: String): Retrofit {
-        val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
-        val logging = HttpLoggingInterceptor().apply {
-            level = if (BuildConfig.DEBUG) {
-                HttpLoggingInterceptor.Level.HEADERS
-            } else {
-                HttpLoggingInterceptor.Level.NONE
-            }
-        }
-
-        val clientBuilder = OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.CLEARTEXT))
-
-        // 仅开发环境放开证书校验，避免自签名/私有 CA 造成的 SSLHandshakeException
-        // 生产环境请改用正确受信任证书，或通过 network_security_config 配置 trust-anchors。
-        if (BuildConfig.DEBUG) {
-            // HTTP/1.1：避免经 Vite/自签名 HTTPS 代理时出现 BAD_DECRYPT
-            clientBuilder.protocols(listOf(Protocol.HTTP_1_1))
-            val trustManager = trustAllX509TrustManager()
-            val sslSocketFactory = createSslSocketFactory(trustManager)
-            clientBuilder.sslSocketFactory(sslSocketFactory, trustManager)
-            clientBuilder.hostnameVerifier { _, _ -> true }
-        }
-
-        val client = clientBuilder
-            .addInterceptor(AuthInterceptor(sessionStore))
-            .addInterceptor(UnauthorizedInterceptor(sessionEvents))
-            .addInterceptor(logging)
-            .build()
-
-        return Retrofit.Builder()
-            .baseUrl(normalized)
-            .client(client)
-            .addConverterFactory(MoshiConverterFactory.create(moshi))
-            .build()
+        cachedLongRetrofit = null
     }
 
     private fun trustAllX509TrustManager(): X509TrustManager = object : X509TrustManager {

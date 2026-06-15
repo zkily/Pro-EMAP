@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,7 +45,9 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FreeBreakfast
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -55,7 +58,8 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
@@ -76,6 +80,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -146,9 +151,30 @@ fun InspectionActualScreen(
         EndProductionDialog(
             uiState = uiState,
             s = s,
-            onQtyChange = viewModel::onEndDialogQtyChange,
+            onBoxesChange = viewModel::onEndDialogBoxesChange,
+            onPieceQtyChange = viewModel::onEndDialogPieceQtyChange,
             onDismiss = viewModel::closeEndDialog,
             onConfirm = viewModel::submitProductionEnd,
+        )
+    }
+
+    uiState.endDialogQtyMismatchConfirm?.let { mismatch ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissProductionEndQtyMismatch,
+            title = { Text(s.qtyMismatchTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(formatEndDialogQtyMismatchText(s.qtyMismatchConfirm, mismatch))
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmProductionEndQtyMismatch) {
+                    Text(s.qtyMismatchConfirmBtn, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissProductionEndQtyMismatch) {
+                    Text(s.cancel)
+                }
+            },
         )
     }
 
@@ -250,6 +276,8 @@ fun InspectionActualScreen(
                             onStart = viewModel::onStartProduction,
                             onPause = viewModel::onPauseProduction,
                             onResume = viewModel::onResumeProduction,
+                            onBreak = viewModel::onBreakProduction,
+                            onResumeBreak = viewModel::onResumeBreakProduction,
                             onEnd = viewModel::openEndDialog,
                             onBumpDefect = viewModel::bumpDefect,
                         )
@@ -601,12 +629,20 @@ private object ToolbarMetrics {
 private object PlanOpsMetrics {
     val BlockHeight = 84.dp
     val ButtonWidth = 100.dp
-    val TimerWidth = 248.dp
+    val TimerWidth = 292.dp
     val CornerRadius = 10.dp
     val Gap = 8.dp
 }
 
-private enum class PlanActionVariant { Start, Pause, Resume, End, Disabled }
+/** 稼働開始後は累積メトリクス行が増えるため、固定高さだと主計測が clip される */
+private fun timerPanelMinHeight(uiState: InspectionUiState): androidx.compose.ui.unit.Dp =
+    when {
+        uiState.wallEndDisplay != "—" -> 108.dp
+        uiState.wallStartClockDisplay != "—" -> 100.dp
+        else -> PlanOpsMetrics.BlockHeight
+    }
+
+private enum class PlanActionVariant { Start, Pause, Resume, Break, BreakResume, End, Disabled }
 
 private data class TimerPhaseStyle(
     val background: Brush,
@@ -642,6 +678,17 @@ private fun timerPhaseStyle(phase: TimerPhase): TimerPhaseStyle = when (phase) {
         phaseBorder = Color(0xFFFCD34D),
         phaseText = Color(0xFF92400E),
         wallsColor = Color(0xFFB45309).copy(alpha = 0.75f),
+    )
+    TimerPhase.Break -> TimerPhaseStyle(
+        background = Brush.linearGradient(listOf(Color(0xFFF5F3FF), Color(0xFFEDE9FE), Color(0xFFFAF5FF))),
+        borderColor = Color(0xFFA78BFA),
+        shadowColor = Color(0x338B5CF6),
+        labelColor = Color(0xFF6D28D9),
+        readoutColor = Color(0xFF6D28D9),
+        phaseBg = Color.White.copy(alpha = 0.82f),
+        phaseBorder = Color(0xFFC4B5FD),
+        phaseText = Color(0xFF5B21B6),
+        wallsColor = Color(0xFF6D28D9).copy(alpha = 0.75f),
     )
     TimerPhase.Ended -> TimerPhaseStyle(
         background = Brush.linearGradient(listOf(Color(0xFFEFF6FF), Color(0xFFDBEAFE), Color(0xFFF8FAFC))),
@@ -706,6 +753,20 @@ private fun planActionStyle(variant: PlanActionVariant, enabled: Boolean): PlanA
             border = Color(0xFF2563EB),
             content = Color.White,
             shadow = Color(0x403B82F6),
+        )
+        PlanActionVariant.Break -> PlanActionStyle(
+            top = Color(0xFFC4B5FD),
+            bottom = Color(0xFF8B5CF6),
+            border = Color(0xFF7C3AED),
+            content = Color.White,
+            shadow = Color(0x408B5CF6),
+        )
+        PlanActionVariant.BreakResume -> PlanActionStyle(
+            top = Color(0xFFA78BFA),
+            bottom = Color(0xFF7C3AED),
+            border = Color(0xFF6D28D9),
+            content = Color.White,
+            shadow = Color(0x407C3AED),
         )
         PlanActionVariant.End -> PlanActionStyle(
             top = Color(0xFFF89898),
@@ -1419,6 +1480,8 @@ private fun PlanProductionCard(
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onBreak: () -> Unit,
+    onResumeBreak: () -> Unit,
     onEnd: () -> Unit,
     onBumpDefect: (String, Int) -> Unit,
 ) {
@@ -1436,7 +1499,8 @@ private fun PlanProductionCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(rememberScrollState())
+                    .height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(PlanOpsMetrics.Gap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1478,6 +1542,29 @@ private fun PlanProductionCard(
                     enabled = uiState.canEnd,
                     onClick = onEnd,
                 )
+                when {
+                    uiState.canBreak -> GlassPlanActionButton(
+                        label = s.btnBreak,
+                        icon = Icons.Default.FreeBreakfast,
+                        variant = PlanActionVariant.Break,
+                        enabled = true,
+                        onClick = onBreak,
+                    )
+                    uiState.canResumeBreak -> GlassPlanActionButton(
+                        label = s.btnResumeBreak,
+                        icon = Icons.Default.PlayArrow,
+                        variant = PlanActionVariant.BreakResume,
+                        enabled = true,
+                        onClick = onResumeBreak,
+                    )
+                    else -> GlassPlanActionButton(
+                        label = s.btnBreak,
+                        icon = Icons.Default.FreeBreakfast,
+                        variant = PlanActionVariant.Disabled,
+                        enabled = false,
+                        onClick = {},
+                    )
+                }
             }
 
             HorizontalDivider(color = InspectionActualColors.Border)
@@ -1497,7 +1584,7 @@ private fun PlanProductionCard(
                 Text(s.defectItemsEmpty, fontSize = 12.sp, color = InspectionActualColors.TextMuted)
             } else {
                 uiState.defectGroups.forEach { group ->
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(DefectCardMetrics.gridVerticalGap)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 s.attributableProcess,
@@ -1513,7 +1600,7 @@ private fun PlanProductionCard(
                         }
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(DefectCardMetrics.gridVerticalGap),
                         ) {
                             group.items.forEach { item ->
                                 DefectCell(
@@ -1536,10 +1623,11 @@ private fun PlanProductionCard(
 @Composable
 private fun TimerPanel(uiState: InspectionUiState, s: InspStrings, phaseLabel: String) {
     val style = timerPhaseStyle(uiState.timerPhase)
+    val minHeight = timerPanelMinHeight(uiState)
     Box(
         modifier = Modifier
             .width(PlanOpsMetrics.TimerWidth)
-            .height(PlanOpsMetrics.BlockHeight)
+            .heightIn(min = minHeight)
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(PlanOpsMetrics.CornerRadius),
@@ -1564,8 +1652,8 @@ private fun TimerPanel(uiState: InspectionUiState, s: InspStrings, phaseLabel: S
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 7.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1600,38 +1688,120 @@ private fun TimerPanel(uiState: InspectionUiState, s: InspStrings, phaseLabel: S
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom,
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 28.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = uiState.elapsedDisplay,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = FontFamily.Monospace,
                     color = style.readoutColor,
                     maxLines = 1,
+                    letterSpacing = 0.5.sp,
                 )
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(Color.White.copy(alpha = 0.55f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
+            }
+            if (uiState.wallStartClockDisplay != "—") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text(s.pausedAccum, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = InspectionActualColors.TextMuted)
-                    Text(uiState.pausedDisplay, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = style.readoutColor)
+                    TimerMetricChip(
+                        label = s.productionStart,
+                        value = uiState.wallStartClockDisplay,
+                        valueColor = Color(0xFF1D4ED8),
+                        borderColor = Color(0xFF93C5FD),
+                        background = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.92f), Color(0xFFEFF6FF).copy(alpha = 0.85f)),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TimerMetricChip(
+                        label = s.pausedAccum,
+                        value = uiState.pausedDisplay,
+                        valueColor = Color(0xFFB45309),
+                        borderColor = Color(0xFFFCD34D),
+                        background = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.92f), Color(0xFFFFFBEB).copy(alpha = 0.85f)),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TimerMetricChip(
+                        label = s.breakAccum,
+                        value = uiState.breakDisplay,
+                        valueColor = Color(0xFF6D28D9),
+                        borderColor = Color(0xFFC4B5FD),
+                        background = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.92f), Color(0xFFF5F3FF).copy(alpha = 0.85f)),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
-            Text(
-                text = "${uiState.wallStartDisplay} → ${uiState.wallEndDisplay}",
-                fontSize = 8.sp,
-                color = style.wallsColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (uiState.wallEndDisplay != "—") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Color.White.copy(alpha = 0.45f))
+                        .border(0.5.dp, Color(0xFFCBD5E1), RoundedCornerShape(5.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(s.productionEnd, fontSize = 7.sp, fontWeight = FontWeight.Bold, color = InspectionActualColors.TextMuted)
+                    Text(
+                        uiState.wallEndDisplay,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = style.wallsColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun TimerMetricChip(
+    label: String,
+    value: String,
+    valueColor: Color,
+    borderColor: Color,
+    background: Brush,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(background)
+            .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
+            .padding(horizontal = 3.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            color = InspectionActualColors.TextMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            value,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Monospace,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1642,13 +1812,15 @@ private fun GlassPlanActionButton(
     variant: PlanActionVariant,
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val style = planActionStyle(variant, enabled)
     val shape = RoundedCornerShape(PlanOpsMetrics.CornerRadius)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(PlanOpsMetrics.ButtonWidth)
-            .height(PlanOpsMetrics.BlockHeight)
+            .fillMaxHeight()
+            .heightIn(min = PlanOpsMetrics.BlockHeight)
             .shadow(
                 elevation = if (enabled) 5.dp else 1.dp,
                 shape = shape,
@@ -1693,6 +1865,12 @@ private fun GlassPlanActionButton(
     }
 }
 
+private object DefectCardMetrics {
+    val cardPaddingVertical = 5.7.dp // 6.dp × 0.95
+    val labelStepperGap = 7.6.dp // 8.dp × 0.95
+    val gridVerticalGap = 7.6.dp // 8.dp × 0.95
+}
+
 @Composable
 private fun DefectCell(
     label: String,
@@ -1710,7 +1888,7 @@ private fun DefectCell(
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .border(1.dp, border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = DefectCardMetrics.cardPaddingVertical),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -1721,7 +1899,7 @@ private fun DefectCell(
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(DefectCardMetrics.labelStepperGap))
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -2759,34 +2937,193 @@ private fun ConfirmedEditDefectChip(
 }
 
 @Composable
+private fun EndDialogQtyInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    enabled: Boolean,
+    placeholder: String,
+    focusRequester: FocusRequester,
+    derived: Boolean,
+) {
+    val qtyRed = Color(0xFFF56C6C)
+    val qtyRedLight = Color(0xFFF89898)
+    val bgColor = if (derived) Color(0xFFF8FAFC) else Color(0xFFF56C6C).copy(alpha = 0.06f)
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        enabled = enabled,
+        placeholder = {
+            Text(placeholder, color = qtyRedLight, fontSize = 12.sp, maxLines = 1)
+        },
+        textStyle = TextStyle(
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = qtyRed,
+            fontFamily = FontFamily.Monospace,
+        ),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done,
+        ),
+        shape = RoundedCornerShape(7.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = qtyRed,
+            unfocusedBorderColor = qtyRed.copy(alpha = 0.35f),
+            disabledBorderColor = Color(0xFFE2E8F0),
+            focusedContainerColor = bgColor,
+            unfocusedContainerColor = bgColor,
+            disabledContainerColor = Color(0xFFF8FAFC),
+            cursorColor = qtyRed,
+            focusedTextColor = qtyRed,
+            unfocusedTextColor = qtyRed,
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 38.dp)
+            .focusRequester(focusRequester),
+    )
+}
+
+@Composable
+private fun EndDialogQtyCell(
+    label: String,
+    derived: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val borderColor = if (derived) {
+        Color(0xFF94A3B8).copy(alpha = 0.45f)
+    } else {
+        Color(0xFFF56C6C).copy(alpha = 0.22f)
+    }
+    val bgColor = if (derived) {
+        Color(0xFFF8FAFC).copy(alpha = 0.9f)
+    } else {
+        Color.White.copy(alpha = 0.75f)
+    }
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(bgColor)
+            .border(
+                width = 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(7.dp),
+            )
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (derived) InspectionActualColors.TextMuted else InspectionActualColors.TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        content()
+    }
+}
+
+@Composable
+private fun EndDialogQtyBridge(unitPerBox: Int) {
+    Row(
+        modifier = Modifier.padding(bottom = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text("×", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = InspectionActualColors.TextMuted)
+        Text(
+            unitPerBox.toString(),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            color = InspectionActualColors.TextPrimary,
+        )
+        Text("=", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = InspectionActualColors.TextMuted)
+    }
+}
+
+@Composable
+private fun EndDialogStat(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    accent: Boolean = false,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (accent) Color(0xFFFFFBEB) else Color(0xFFF5F7FA))
+            .border(
+                1.dp,
+                if (accent) Color(0xFFFCD34D) else Color(0xFFE4E7ED),
+                RoundedCornerShape(7.dp),
+            )
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = InspectionActualColors.TextMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            value,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (accent) Color(0xFFB45309) else InspectionActualColors.TextPrimary,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun formatEndDialogQtyMismatchText(template: String, mismatch: EndDialogQtyMismatch): String =
+    template
+        .replace("{piece}", mismatch.piece.toString())
+        .replace("{upb}", mismatch.upb.toString())
+
+@Composable
 private fun EndProductionDialog(
     uiState: InspectionUiState,
     s: InspStrings,
-    onQtyChange: (String) -> Unit,
+    onBoxesChange: (String) -> Unit,
+    onPieceQtyChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val qtyFocusRequester = remember { FocusRequester() }
-    val qtyBorderColor = Color(0xFFDC2626)
-    val qtyBorderMuted = Color(0xFFEF4444)
+    val boxMode = uiState.endDialogUnitPerBox > 0
+    val boxFocusRequester = remember { FocusRequester() }
+    val pieceFocusRequester = remember { FocusRequester() }
+    val qtyRed = Color(0xFFF56C6C)
     val submitting = uiState.endDialogSubmitting
+    val boxDerived = boxMode && uiState.endDialogQtyInputSource == EndDialogQtyInputSource.Piece
+    val pieceDerived = boxMode && uiState.endDialogQtyInputSource == EndDialogQtyInputSource.Box
+    val bodyScroll = rememberScrollState()
 
-    LaunchedEffect(Unit) {
-        qtyFocusRequester.requestFocus()
+    LaunchedEffect(boxMode) {
+        if (boxMode) boxFocusRequester.requestFocus() else pieceFocusRequester.requestFocus()
     }
 
     Dialog(onDismissRequest = { if (!submitting) onDismiss() }) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 420.dp)
+                .widthIn(max = 440.dp)
                 .shadow(
-                    elevation = 28.dp,
-                    shape = RoundedCornerShape(22.dp),
-                    ambientColor = Color(0x40EF4444),
-                    spotColor = Color(0x40EF4444),
+                    elevation = 24.dp,
+                    shape = RoundedCornerShape(12.dp),
+                    ambientColor = Color(0x330D9488),
+                    spotColor = Color(0x330D9488),
                 ),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
@@ -2797,230 +3134,310 @@ private fun EndProductionDialog(
                         .background(
                             Brush.linearGradient(
                                 colors = listOf(
-                                    Color(0xFFFFF1F2),
-                                    Color(0xFFFFF7ED),
-                                    Color.White,
+                                    Color(0xFF047857),
+                                    Color(0xFF059669),
+                                    Color(0xFF34D399),
                                 ),
                             ),
                         )
-                        .padding(horizontal = 22.dp, vertical = 20.dp),
+                        .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
                 ) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(46.dp)
-                                .shadow(6.dp, CircleShape, spotColor = Color(0x40EF4444))
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFFFECACA), Color(0xFFFEE2E2)),
-                                    ),
-                                )
-                                .border(1.dp, Color(0xFFFCA5A5), CircleShape),
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White.copy(alpha = 0.18f)),
                             contentAlignment = Alignment.Center,
                         ) {
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                modifier = Modifier.size(26.dp),
-                                tint = Color(0xFFDC2626),
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.White,
                             )
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
                             Text(
                                 s.endDialogTitle,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = InspectionActualColors.TextPrimary,
+                                fontSize = 15.sp,
+                                lineHeight = 19.sp,
+                                color = Color.White,
                             )
                             Text(
                                 s.endDialogIntro,
-                                fontSize = 12.sp,
-                                lineHeight = 17.sp,
-                                color = InspectionActualColors.TextMuted,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp,
+                                color = Color.White.copy(alpha = 0.92f),
+                            )
+                        }
+                        IconButton(
+                            onClick = onDismiss,
+                            enabled = !submitting,
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = s.cancel,
+                                tint = Color.White.copy(alpha = 0.9f),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
                 }
-
-                HorizontalDivider(color = InspectionActualColors.Border.copy(alpha = 0.6f))
 
                 Column(
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .verticalScroll(bodyScroll)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    EndDialogSummaryCard(
-                        icon = Icons.Default.Inventory2,
-                        iconTint = Color(0xFF0D9488),
-                        iconBg = InspectionActualColors.TealLight,
-                        label = s.productName,
-                        value = "${uiState.displayProductCd} · ${uiState.displayProductName}",
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(
+                                        Color(0xFFECFDF5),
+                                        Color(0xFFF0FDF4),
+                                        Color.White,
+                                    ),
+                                ),
+                            )
+                            .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        EndDialogSummaryCard(
-                            icon = Icons.Default.AccessTime,
-                            iconTint = Color(0xFF2563EB),
-                            iconBg = Color(0xFFEFF6FF),
-                            label = s.elapsed,
-                            value = uiState.elapsedDisplay,
-                            modifier = Modifier.weight(1f),
+                        Text(
+                            uiState.displayProductCd,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = Color(0xFF047857),
+                            fontFamily = FontFamily.Monospace,
                         )
-                        EndDialogSummaryCard(
-                            icon = Icons.Default.ErrorOutline,
-                            iconTint = Color(0xFFB45309),
-                            iconBg = InspectionActualColors.AmberLight,
-                            label = s.defectTotal,
-                            value = uiState.defectTotal.toString(),
-                            modifier = Modifier.weight(1f),
+                        Text(
+                            uiState.displayProductName,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 18.sp,
+                            color = InspectionActualColors.TextPrimary,
                         )
                     }
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(
-                            s.productionQty,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = qtyBorderColor,
-                        )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(2.dp, qtyBorderMuted, RoundedCornerShape(14.dp))
-                                .clip(RoundedCornerShape(14.dp)),
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            OutlinedTextField(
-                                value = uiState.endDialogQty,
-                                onValueChange = onQtyChange,
-                                singleLine = true,
-                                enabled = !submitting,
-                                placeholder = {
-                                    Text("0", color = Color(0xFFFCA5A5))
-                                },
-                                textStyle = TextStyle(
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    color = InspectionActualColors.TextPrimary,
-                                    fontFamily = FontFamily.Monospace,
-                                ),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Done,
-                                ),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    disabledBorderColor = Color.Transparent,
-                                    focusedContainerColor = Color(0xFFFFF5F5),
-                                    unfocusedContainerColor = Color(0xFFFFFBFB),
-                                    disabledContainerColor = Color(0xFFF8FAFC),
-                                    cursorColor = qtyBorderColor,
-                                    focusedTextColor = InspectionActualColors.TextPrimary,
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(qtyFocusRequester),
+                            EndDialogStat(
+                                label = s.inspector,
+                                value = uiState.inspectorLabel.ifBlank { "—" },
+                                modifier = Modifier.weight(1f),
                             )
+                            EndDialogStat(
+                                label = s.productionStart,
+                                value = uiState.wallStartDisplay,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            EndDialogStat(
+                                label = s.productionEnd,
+                                value = uiState.endDialogWallEndDisplay,
+                                modifier = Modifier.weight(1f),
+                            )
+                            EndDialogStat(
+                                label = s.elapsed,
+                                value = uiState.elapsedDisplay,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                        if (uiState.defectTotal > 0) {
+                            EndDialogStat(
+                                label = s.defectTotal,
+                                value = uiState.defectTotal.toString(),
+                                modifier = Modifier.fillMaxWidth(),
+                                accent = true,
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .border(1.dp, Color(0xFFE4E7ED), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                s.productionQty,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = qtyRed,
+                            )
+                            Text(
+                                if (boxMode) {
+                                    s.unitPerBoxHint.replace("{n}", uiState.endDialogUnitPerBox.toString())
+                                } else {
+                                    s.unitPerBoxUnset
+                                },
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (boxMode) InspectionActualColors.TextMuted else Color(0xFFB45309),
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.End,
+                            )
+                        }
+
+                        if (boxMode) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Bottom,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                EndDialogQtyCell(
+                                    label = s.boxQty,
+                                    derived = boxDerived,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    EndDialogQtyInput(
+                                        value = uiState.endDialogBoxes,
+                                        onValueChange = onBoxesChange,
+                                        enabled = !submitting,
+                                        placeholder = s.boxQtyPlaceholder,
+                                        focusRequester = boxFocusRequester,
+                                        derived = boxDerived,
+                                    )
+                                }
+                                EndDialogQtyBridge(uiState.endDialogUnitPerBox)
+                                EndDialogQtyCell(
+                                    label = s.productionQty,
+                                    derived = pieceDerived,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    EndDialogQtyInput(
+                                        value = uiState.endDialogPieceQty,
+                                        onValueChange = onPieceQtyChange,
+                                        enabled = !submitting,
+                                        placeholder = s.productionQtyPlaceholder,
+                                        focusRequester = pieceFocusRequester,
+                                        derived = pieceDerived,
+                                    )
+                                }
+                            }
+                            uiState.endDialogQtyMismatch?.let { mismatch ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.Top,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = Color(0xFFB45309),
+                                    )
+                                    Text(
+                                        formatEndDialogQtyMismatchText(s.qtyMismatchWarn, mismatch),
+                                        fontSize = 10.sp,
+                                        lineHeight = 14.sp,
+                                        color = Color(0xFFB45309),
+                                    )
+                                }
+                            }
+                        } else {
+                            EndDialogQtyCell(
+                                label = s.productionQty,
+                                derived = false,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                EndDialogQtyInput(
+                                    value = uiState.endDialogPieceQty,
+                                    onValueChange = onPieceQtyChange,
+                                    enabled = !submitting,
+                                    placeholder = s.productionQtyPlaceholder,
+                                    focusRequester = pieceFocusRequester,
+                                    derived = false,
+                                )
+                            }
                         }
                     }
                 }
 
-                HorizontalDivider(color = InspectionActualColors.Border.copy(alpha = 0.6f))
+                HorizontalDivider(color = Color(0xFFE4E7ED))
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 22.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
                         enabled = !submitting,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, InspectionActualColors.Border),
+                        modifier = Modifier.height(36.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFFE4E7ED)),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = InspectionActualColors.TextSecondary,
                         ),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
                     ) {
-                        Text(s.cancel, fontWeight = FontWeight.SemiBold)
+                        Text(s.cancel, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = onConfirm,
-                        enabled = !submitting && uiState.endDialogQty.isNotBlank(),
+                        enabled = !submitting && uiState.endDialogCanSubmit,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .shadow(8.dp, RoundedCornerShape(12.dp), spotColor = Color(0x40EF4444)),
-                        shape = RoundedCornerShape(12.dp),
+                            .height(36.dp)
+                            .shadow(4.dp, RoundedCornerShape(8.dp), spotColor = Color(0x59059669)),
+                        shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEF4444),
-                            disabledContainerColor = Color(0xFFFCA5A5),
+                            containerColor = Color(0xFF059669),
+                            disabledContainerColor = Color(0xFF6EE7B7),
                         ),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
                     ) {
                         if (submitting) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,
                                 color = Color.White,
                             )
                         } else {
-                            Text(s.btnConfirmEnd, fontWeight = FontWeight.Bold)
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = Color.White,
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(s.btnConfirmEnd, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun EndDialogSummaryCard(
-    icon: ImageVector,
-    iconTint: Color,
-    iconBg: Color,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFFF8FAFC))
-            .border(1.dp, InspectionActualColors.Border.copy(alpha = 0.8f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(iconBg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = iconTint)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label, fontSize = 11.sp, color = InspectionActualColors.TextMuted)
-            Text(
-                value,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = InspectionActualColors.TextPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
@@ -3046,5 +3463,6 @@ private fun phaseLabel(phase: TimerPhase, s: InspStrings): String = when (phase)
     TimerPhase.Idle -> s.timerIdle
     TimerPhase.Running -> s.timerRunning
     TimerPhase.Paused -> s.timerPaused
+    TimerPhase.Break -> s.timerBreak
     TimerPhase.Ended -> s.timerEnded
 }

@@ -351,11 +351,26 @@ class InspectionProductivityViewModel(
                         if (items.isEmpty()) throw IllegalStateException("印刷できる検査員別製品データがありません")
                         InspectionProductivityReportLogic.buildInspectorProductBatchPrintHtml(filters, items)
                     }
+                    InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS -> {
+                        val prepared = InspectionProductivityLogic.prepareInspectorMetricsForDisplay(
+                            data.byInspectorMetrics,
+                            state.inspectorOptions,
+                        ) ?: throw IllegalStateException("印刷できる検査員別指標データがありません")
+                        if (prepared.rows.isEmpty()) {
+                            throw IllegalStateException("印刷できる検査員別指標データがありません")
+                        }
+                        InspectionProductivityReportLogic.buildInspectorMetricsPrintHtml(
+                            filters,
+                            prepared,
+                            ctx.kpiCards,
+                        )
+                    }
                     else -> InspectionProductivityReportLogic.buildPrintHtml(command, data, ctx)
                 }
                 val layout = when (command) {
                     InspectionProductivityReportCommand.PRINT_DAILY,
                     InspectionProductivityReportCommand.PRINT_DAILY_BATCH,
+                    InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS,
                     -> PrintPageLayout.A4_LANDSCAPE_SINGLE
                     else -> PrintPageLayout.A4_PORTRAIT_SINGLE
                 }

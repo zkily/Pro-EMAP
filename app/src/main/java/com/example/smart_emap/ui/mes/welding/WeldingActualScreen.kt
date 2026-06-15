@@ -639,6 +639,17 @@ private fun timerPhaseStyle(phase: TimerPhase): TimerPhaseStyle = when (phase) {
         phaseText = Color(0xFF92400E),
         wallsColor = Color(0xFFB45309).copy(alpha = 0.75f),
     )
+    TimerPhase.Break -> TimerPhaseStyle(
+        background = Brush.linearGradient(listOf(Color(0xFFF5F3FF), Color(0xFFEDE9FE), Color(0xFFFAF5FF))),
+        borderColor = Color(0xFFA78BFA),
+        shadowColor = Color(0x338B5CF6),
+        labelColor = Color(0xFF6D28D9),
+        readoutColor = Color(0xFF6D28D9),
+        phaseBg = Color.White.copy(alpha = 0.82f),
+        phaseBorder = Color(0xFFC4B5FD),
+        phaseText = Color(0xFF5B21B6),
+        wallsColor = Color(0xFF6D28D9).copy(alpha = 0.75f),
+    )
     TimerPhase.Ended -> TimerPhaseStyle(
         background = Brush.linearGradient(listOf(Color(0xFFEFF6FF), Color(0xFFDBEAFE), Color(0xFFF8FAFC))),
         borderColor = Color(0xFF93C5FD),
@@ -3042,5 +3053,6 @@ private fun phaseLabel(phase: TimerPhase, s: WeldStrings): String = when (phase)
     TimerPhase.Idle -> s.timerIdle
     TimerPhase.Running -> s.timerRunning
     TimerPhase.Paused -> s.timerPaused
+    TimerPhase.Break -> s.timerPaused
     TimerPhase.Ended -> s.timerEnded
 }

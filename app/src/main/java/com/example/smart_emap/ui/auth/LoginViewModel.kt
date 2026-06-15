@@ -39,7 +39,6 @@ class LoginViewModel(
                     apiBaseUrl = savedUrl.trim().trimEnd('/'),
                     rememberMe = remembered.rememberMe,
                     username = remembered.username,
-                    password = remembered.password,
                 )
             }
         }

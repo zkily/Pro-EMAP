@@ -23,9 +23,14 @@ data class InspectionManagementRowDto(
     @Json(name = "mes_production_ended_at") val mesProductionEndedAt: String? = null,
     @Json(name = "mes_net_production_sec") val mesNetProductionSec: Int? = null,
     @Json(name = "mes_paused_accum_sec") val mesPausedAccumSec: Int? = null,
+    @Json(name = "mes_break_sec") val mesBreakSec: Int? = null,
+    @Json(name = "mes_stop_sec") val mesStopSec: Int? = null,
     @Json(name = "mes_production_is_paused") val mesProductionIsPaused: Int? = null,
     @Json(name = "mes_inspector_user_id") val mesInspectorUserId: Int? = null,
     @Json(name = "mes_client_instance_id") val mesClientInstanceId: String? = null,
+    @Json(name = "data_source") val dataSource: String? = null,
+    @Json(name = "external_sync_key") val externalSyncKey: String? = null,
+    @Json(name = "manual_registration_note") val manualRegistrationNote: String? = null,
     val remarks: String? = null,
     @Json(name = "created_at") val createdAt: String? = null,
     @Json(name = "updated_at") val updatedAt: String? = null,
@@ -37,6 +42,8 @@ data class CreateInspectionBody(
     @Json(name = "product_name") val productName: String,
     @Json(name = "mes_inspector_user_id") val mesInspectorUserId: Int? = null,
     val remarks: String? = null,
+    @Json(name = "manual_registration_note") val manualRegistrationNote: String? = null,
+    @Json(name = "manual_registration") val manualRegistration: Boolean? = null,
 )
 
 data class CreateInspectionResponse(
@@ -59,6 +66,8 @@ data class PatchInspectionBody(
     @Json(name = "mes_production_ended_at") val mesProductionEndedAt: String? = null,
     @Json(name = "mes_net_production_sec") val mesNetProductionSec: Int? = null,
     @Json(name = "mes_paused_accum_sec") val mesPausedAccumSec: Int? = null,
+    @Json(name = "mes_break_sec") val mesBreakSec: Int? = null,
+    @Json(name = "mes_stop_sec") val mesStopSec: Int? = null,
     @Json(name = "mes_production_is_paused") val mesProductionIsPaused: Int? = null,
     @Json(name = "mes_inspector_user_id") val mesInspectorUserId: Int? = null,
     @Json(name = "mes_defect_by_item") val mesDefectByItem: Map<String, Int>? = null,
@@ -66,6 +75,8 @@ data class PatchInspectionBody(
     @Json(name = "mes_claim_client_lock") val mesClaimClientLock: Boolean? = null,
     @Json(name = "mes_force_release") val mesForceRelease: Boolean? = null,
     val remarks: String? = null,
+    @Json(name = "manual_registration_note") val manualRegistrationNote: String? = null,
+    @Json(name = "manual_registration") val manualRegistration: Boolean? = null,
 )
 
 data class ApiMessageResponse(
@@ -80,6 +91,7 @@ data class ErpProductDto(
     @Json(name = "product_cd") val productCd: String? = null,
     @Json(name = "product_name") val productName: String = "",
     @Json(name = "is_active") val isActive: Boolean? = true,
+    @Json(name = "unit_per_box") val unitPerBox: Int? = null,
 ) {
     fun normalizedCode(): String = productCode.trim().ifEmpty { productCd?.trim().orEmpty() }
 

@@ -1,23 +1,20 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.symbol.processing)
 }
 
 /** 登录页默认 API 地址（可在登录画面手动修改） */
-val DEFAULT_API_HOST = "192.168.0.12"
+val DEFAULT_API_HOST = project.findProperty("default_api_host")?.toString() ?: "127.0.0.1"
 /** 后端 API 端口（startsub: 8010 / start.py: 8005）。勿用 3005/5010 等前端端口。 */
-val DEFAULT_API_PORT = 8010
+val DEFAULT_API_PORT = project.findProperty("default_api_port")?.toString() ?: "8010"
 
 val defaultDevApiBaseUrl = "http://$DEFAULT_API_HOST:$DEFAULT_API_PORT/"
 println("SmartEMAP DEFAULT_API_BASE_URL = $defaultDevApiBaseUrl")
 
 android {
     namespace = "com.example.smart_emap"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.smart_emap"
@@ -34,7 +31,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://your-server.example.com\"")
         }
         debug {
@@ -43,13 +45,20 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        // Moshi @Json on data-class ctor params (KT-73255)
+        freeCompilerArgs.add("-Xannotation-default-target=param-property")
     }
 }
 
@@ -81,6 +90,10 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.zxing.core)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

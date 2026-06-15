@@ -6,8 +6,10 @@ data class PlanSession(
     var wallEnd: Long? = null,
     var activeAccumMs: Long = 0,
     var pausedAccumMs: Long = 0,
+    var breakAccumMs: Long = 0,
     var runningSliceStart: Long? = null,
     var pauseSliceStart: Long? = null,
+    var breakSliceStart: Long? = null,
     val defects: MutableMap<String, Int> = mutableMapOf(),
 )
 
@@ -22,6 +24,9 @@ object InspectionSessionLogic {
     fun isTimerPaused(sess: PlanSession): Boolean =
         sess.wallStart != null && sess.wallEnd == null && sess.pauseSliceStart != null
 
+    fun isTimerOnBreak(sess: PlanSession): Boolean =
+        sess.wallStart != null && sess.wallEnd == null && sess.breakSliceStart != null
+
     fun isProductionInProgress(sess: PlanSession): Boolean =
         sess.wallStart != null && sess.wallEnd == null
 
@@ -29,6 +34,7 @@ object InspectionSessionLogic {
         if (sess.wallEnd != null) return TimerPhase.Ended
         if (sess.wallStart == null) return TimerPhase.Idle
         if (sess.pauseSliceStart != null) return TimerPhase.Paused
+        if (sess.breakSliceStart != null) return TimerPhase.Break
         if (sess.runningSliceStart != null) return TimerPhase.Running
         return TimerPhase.Idle
     }
@@ -47,6 +53,13 @@ object InspectionSessionLogic {
         return total.coerceAtLeast(0)
     }
 
+    fun readBreakAccumMs(sess: PlanSession, at: Long = System.currentTimeMillis()): Long {
+        var total = sess.breakAccumMs
+        val breakStart = sess.breakSliceStart
+        if (breakStart != null) total += (at - breakStart).coerceAtLeast(0)
+        return total.coerceAtLeast(0)
+    }
+
     fun flushRunningSlice(sess: PlanSession, now: Long) {
         val start = sess.runningSliceStart ?: return
         sess.activeAccumMs += (now - start).coerceAtLeast(0)
@@ -57,6 +70,12 @@ object InspectionSessionLogic {
         val start = sess.pauseSliceStart ?: return
         sess.pausedAccumMs += (now - start).coerceAtLeast(0)
         sess.pauseSliceStart = null
+    }
+
+    fun flushBreakSlice(sess: PlanSession, now: Long) {
+        val start = sess.breakSliceStart ?: return
+        sess.breakAccumMs += (now - start).coerceAtLeast(0)
+        sess.breakSliceStart = null
     }
 
     fun formatDurationMs(ms: Long): String {
@@ -73,7 +92,13 @@ object InspectionSessionLogic {
         sess.wallStart = started
         sess.wallEnd = ended
         sess.activeAccumMs = ((row.mesNetProductionSec ?: 0) * 1000L).coerceAtLeast(0)
-        sess.pausedAccumMs = ((row.mesPausedAccumSec ?: 0) * 1000L).coerceAtLeast(0)
+        sess.breakAccumMs = ((row.mesBreakSec ?: 0) * 1000L).coerceAtLeast(0)
+        sess.breakSliceStart = null
+        val stopSec = row.mesStopSec
+        sess.pausedAccumMs = when {
+            stopSec != null -> (stopSec * 1000L).coerceAtLeast(0)
+            else -> ((row.mesPausedAccumSec ?: 0) * 1000L).coerceAtLeast(0)
+        }
         sess.runningSliceStart = when {
             ended != null || started == null -> null
             row.mesProductionIsPaused == 1 -> null
@@ -90,11 +115,10 @@ object InspectionSessionLogic {
             if (k !in sess.defects) sess.defects[k] = v
         }
     }
-
 }
 
 enum class TimerPhase {
-    Idle, Running, Paused, Ended
+    Idle, Running, Paused, Break, Ended
 }
 
 data class InspectionRowSnapshot(
@@ -102,6 +126,8 @@ data class InspectionRowSnapshot(
     val mesProductionEndedAt: String?,
     val mesNetProductionSec: Int?,
     val mesPausedAccumSec: Int?,
+    val mesBreakSec: Int? = null,
+    val mesStopSec: Int? = null,
     val mesProductionIsPaused: Int?,
     val mesDefectByItem: Map<String, Int>?,
 )

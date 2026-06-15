@@ -35,7 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
@@ -100,13 +100,13 @@ fun ProductProcessBomFormDialog(
                     }
                 }
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    TabRow(
+                    SecondaryTabRow(
                         selectedTabIndex = tab,
                         containerColor = Color.Transparent,
                         divider = {},
-                        indicator = { positions ->
+                        indicator = {
                             TabRowDefaults.SecondaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(positions[tab]),
+                                modifier = Modifier.tabIndicatorOffset(tab),
                                 height = 2.dp,
                                 color = PpbTheme.Indigo500,
                             )

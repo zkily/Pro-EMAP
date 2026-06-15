@@ -417,7 +417,7 @@ private fun BrandLogoMark(
                 .background(Color.Black.copy(alpha = 0.32f)),
         )
         Image(
-            painter = painterResource(R.drawable.ic_launcher_foreground),
+            painter = painterResource(R.drawable.smart_logo_full),
             contentDescription = null,
             modifier = Modifier
                 .size(size)

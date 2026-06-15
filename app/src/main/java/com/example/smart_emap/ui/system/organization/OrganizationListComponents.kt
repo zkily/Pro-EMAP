@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
@@ -99,8 +99,8 @@ fun OrgListHeroBar(orgCount: Int, deptCount: Int) {
                         Icon(Icons.Default.Business, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                     Column {
-                        Text("組織・部門管理", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text("会社・拠点・部門・課・ライン階層構造", color = Color.White.copy(alpha = 0.82f), fontSize = 10.sp)
+                        Text("???????", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Text("??????????????????", color = Color.White.copy(alpha = 0.82f), fontSize = 10.sp)
                     }
                 }
                 Row(
@@ -110,9 +110,9 @@ fun OrgListHeroBar(orgCount: Int, deptCount: Int) {
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    OrgStat("$orgCount", "総組織数", Color.White)
+                    OrgStat("$orgCount", "????", Color.White)
                     Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.White.copy(alpha = 0.22f)))
-                    OrgStat("$deptCount", "部門", Color(0xFFA5F3FC))
+                    OrgStat("$deptCount", "??", Color(0xFFA5F3FC))
                 }
             }
         }
@@ -166,7 +166,7 @@ fun OrgTreePanel(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Icon(Icons.Default.Share, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(16.dp))
-                Text("組織ツリー", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OrganizationTheme.TextPrimary)
+                Text("?????", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = OrganizationTheme.TextPrimary)
             }
             if (canCreate) {
                 Surface(
@@ -183,7 +183,7 @@ fun OrgTreePanel(
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-                        Text("追加", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Text("??", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -197,7 +197,7 @@ fun OrgTreePanel(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(Icons.Default.Info, contentDescription = null, tint = OrganizationTheme.TreeHintText, modifier = Modifier.size(12.dp))
-            Text("タップで選択、長押しで編集", fontSize = 9.sp, color = OrganizationTheme.TreeHintText)
+            Text("?????????????", fontSize = 9.sp, color = OrganizationTheme.TreeHintText)
         }
         HorizontalDivider(color = OrganizationTheme.Border, thickness = 0.5.dp)
         Box(
@@ -211,7 +211,7 @@ fun OrgTreePanel(
                 isLoading -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF667EEA), strokeWidth = 2.dp, modifier = Modifier.size(24.dp))
                 }
-                orgTree.isEmpty() -> Text("組織がありません", fontSize = 11.sp, color = OrganizationTheme.TextMuted, modifier = Modifier.padding(12.dp))
+                orgTree.isEmpty() -> Text("????????", fontSize = 11.sp, color = OrganizationTheme.TextMuted, modifier = Modifier.padding(12.dp))
                 else -> Column {
                     orgTree.forEach { node ->
                         OrgTreeNodeItem(
@@ -267,7 +267,7 @@ private fun OrgTreeNodeItem(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                        if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = OrganizationTheme.TextMuted,
                         modifier = Modifier.size(14.dp),
@@ -354,7 +354,7 @@ fun OrgDetailPanel(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Icon(Icons.Default.TouchApp, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(14.dp))
                     Text(
-                        selectedOrg?.name ?: "組織を選択",
+                        selectedOrg?.name ?: "?????",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (selectedOrg != null) OrganizationTheme.TextPrimary else OrganizationTheme.TextMuted,
@@ -363,7 +363,7 @@ fun OrgDetailPanel(
                     )
                 }
                 if (selectedOrg != null) {
-                    Text("— 詳細情報", fontSize = 9.sp, color = OrganizationTheme.TextSecondary)
+                    Text("? ????", fontSize = 9.sp, color = OrganizationTheme.TextSecondary)
                 }
             }
             if (selectedOrg != null && canEdit) {
@@ -417,7 +417,7 @@ private fun OrgTypeInfoCard(type: String, modifier: Modifier = Modifier) {
                 Icon(orgTypeIcon(type), contentDescription = null, tint = Color(0xFF0EA5E9), modifier = Modifier.size(14.dp))
             }
             Column {
-                Text("種類", fontSize = 8.sp, color = OrganizationTheme.TextMuted)
+                Text("??", fontSize = 8.sp, color = OrganizationTheme.TextMuted)
                 Text(
                     orgTypeLabel(type),
                     modifier = Modifier
@@ -455,9 +455,9 @@ private fun OrgEmptyState() {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(Icons.Default.TouchApp, contentDescription = null, tint = OrganizationTheme.TextMuted, modifier = Modifier.size(40.dp))
-        Text("組織を選択してください", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OrganizationTheme.TextPrimary)
+        Text("???????????", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OrganizationTheme.TextPrimary)
         Text(
-            "左側のツリーから組織を選択すると、詳細情報が表示されます",
+            "????????????????????????????",
             fontSize = 10.sp,
             color = OrganizationTheme.TextSecondary,
         )
@@ -472,18 +472,18 @@ private fun OrgDetailContent(
 ) {
     Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OrgInfoCard(Icons.Default.TouchApp, "組織コード", org.code, Color(0xFF667EEA), Modifier.weight(1f))
+            OrgInfoCard(Icons.Default.TouchApp, "?????", org.code, Color(0xFF667EEA), Modifier.weight(1f))
             OrgTypeInfoCard(org.type, Modifier.weight(1f))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OrgInfoCard(Icons.Default.Share, "親組織", parentName ?: "—", Color(0xFF8B5CF6), Modifier.weight(1f))
-            OrgInfoCard(Icons.Default.Person, "責任者", org.managerName ?: "—", Color(0xFFF59E0B), Modifier.weight(1f))
+            OrgInfoCard(Icons.Default.Share, "???", parentName ?: "?", Color(0xFF8B5CF6), Modifier.weight(1f))
+            OrgInfoCard(Icons.Default.Person, "???", org.managerName ?: "?", Color(0xFFF59E0B), Modifier.weight(1f))
         }
-        OrgDetailRow(Icons.Default.LocationOn, "所在地", org.location)
-        OrgDetailRow(Icons.Default.Phone, "電話番号", org.phone)
-        OrgDetailRow(Icons.Default.Email, "メール", org.email)
+        OrgDetailRow(Icons.Default.LocationOn, "???", org.location)
+        OrgDetailRow(Icons.Default.Phone, "????", org.phone)
+        OrgDetailRow(Icons.Default.Email, "???", org.email)
         if (!org.description.isNullOrBlank()) {
-            OrgDetailRow(Icons.Default.Info, "説明", org.description)
+            OrgDetailRow(Icons.Default.Info, "??", org.description)
         }
         OrgMembersSection(orgUsers)
     }
@@ -539,7 +539,7 @@ private fun OrgDetailRow(icon: ImageVector, label: String, value: String?) {
     ) {
         Icon(icon, contentDescription = null, tint = OrganizationTheme.TextMuted, modifier = Modifier.size(14.dp))
         Text(label, fontSize = 9.sp, color = OrganizationTheme.TextSecondary, modifier = Modifier.width(52.dp))
-        Text(value.orEmpty().ifEmpty { "—" }, fontSize = 10.sp, color = OrganizationTheme.TextPrimary, modifier = Modifier.weight(1f))
+        Text(value.orEmpty().ifEmpty { "?" }, fontSize = 10.sp, color = OrganizationTheme.TextPrimary, modifier = Modifier.weight(1f))
     }
 }
 
@@ -556,9 +556,9 @@ private fun OrgMembersSection(users: List<UserListItemDto>) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Icon(Icons.Default.People, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(14.dp))
-            Text("所属ユーザー", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = OrganizationTheme.TextPrimary)
+            Text("??????", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = OrganizationTheme.TextPrimary)
             Text(
-                "${users.size}名",
+                "${users.size}?",
                 modifier = Modifier
                     .clip(OrganizationTheme.shapeChip)
                     .background(Color(0xFFE0E7FF))
@@ -573,7 +573,7 @@ private fun OrgMembersSection(users: List<UserListItemDto>) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Icon(Icons.Default.People, contentDescription = null, tint = OrganizationTheme.TextMuted, modifier = Modifier.size(28.dp))
-                Text("所属ユーザーはいません", fontSize = 10.sp, color = OrganizationTheme.TextMuted)
+                Text("???????????", fontSize = 10.sp, color = OrganizationTheme.TextMuted)
             }
         } else {
             users.forEach { user ->

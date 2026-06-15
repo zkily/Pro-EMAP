@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive Icon 安全区：108dp 画布内约 66dp 圆形可见，缩进避免裁切 -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_launcher_foreground_src"
+    android:inset="12%" />

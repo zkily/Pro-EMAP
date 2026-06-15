@@ -1053,6 +1053,7 @@ private data class TimerColorSet(val start: Color, val end: Color, val border: C
 private fun timerColors(phase: TimerPhase) = when (phase) {
     TimerPhase.Running -> TimerColorSet(CuttingActualColors.TimerRunningBgStart, CuttingActualColors.TimerRunningBgEnd, CuttingActualColors.TimerRunningBorder, CuttingActualColors.TimerRunningText)
     TimerPhase.Paused -> TimerColorSet(CuttingActualColors.TimerPausedBgStart, CuttingActualColors.TimerPausedBgEnd, CuttingActualColors.TimerPausedBorder, CuttingActualColors.TimerPausedText)
+    TimerPhase.Break -> TimerColorSet(CuttingActualColors.TimerPausedBgStart, CuttingActualColors.TimerPausedBgEnd, CuttingActualColors.TimerPausedBorder, CuttingActualColors.TimerPausedText)
     TimerPhase.Ended -> TimerColorSet(CuttingActualColors.TimerEndedBgStart, CuttingActualColors.TimerEndedBgEnd, CuttingActualColors.TimerEndedBorder, CuttingActualColors.TimerEndedText)
     TimerPhase.Idle -> TimerColorSet(CuttingActualColors.TimerIdleBgStart, CuttingActualColors.TimerIdleBgEnd, CuttingActualColors.TimerIdleBorder, CuttingActualColors.TextMuted)
 }

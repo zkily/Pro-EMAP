@@ -14,6 +14,7 @@ class SystemUserRepository(
     suspend fun getUsers(
         keyword: String? = null,
         departmentId: Int? = null,
+        sectionId: Int? = null,
         status: String? = null,
         page: Int = 1,
         pageSize: Int = 10,
@@ -21,6 +22,7 @@ class SystemUserRepository(
         apiClient.systemApi().getUsers(
             keyword = keyword?.trim()?.takeIf { it.isNotEmpty() },
             departmentId = departmentId,
+            sectionId = sectionId,
             status = status?.takeIf { it.isNotEmpty() },
             page = page,
             pageSize = pageSize,

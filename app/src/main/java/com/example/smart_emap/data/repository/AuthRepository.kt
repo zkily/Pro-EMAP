@@ -59,7 +59,7 @@ class AuthRepository(
     }
 
     suspend fun clearRememberedCredentials() {
-        sessionStore.saveRememberMe(remember = false, username = "", password = "")
+        sessionStore.saveRememberMe(remember = false, username = "")
     }
 
     suspend fun login(
@@ -84,7 +84,6 @@ class AuthRepository(
             sessionStore.saveRememberMe(
                 remember = rememberMe,
                 username = identifier,
-                password = if (rememberMe) password else "",
             )
             response.user
         }.recoverCatching { e ->

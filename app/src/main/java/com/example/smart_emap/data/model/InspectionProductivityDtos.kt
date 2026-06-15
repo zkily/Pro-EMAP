@@ -18,6 +18,7 @@ data class InspectionProductivityAnalysisDataDto(
     @Json(name = "by_product") val byProduct: List<InspectionProductivityProductRowDto>? = null,
     @Json(name = "by_product_inspector_ranking") val byProductInspectorRanking: List<InspectionProductivityProductRankingDto>? = null,
     @Json(name = "defect_by_item") val defectByItem: List<InspectionProductivityDefectRowDto>? = null,
+    @Json(name = "by_inspector_metrics") val byInspectorMetrics: InspectionProductivityInspectorMetricsDataDto? = null,
     val sessions: List<InspectionProductivitySessionRowDto>? = null,
 )
 
@@ -94,6 +95,28 @@ data class InspectionProductivityProductRankingDto(
 data class InspectionProductivityDefectRowDto(
     @Json(name = "defect_cd") val defectCd: String,
     val qty: Int? = null,
+)
+
+data class InspectionProductivityInspectorMetricsRowDto(
+    @Json(name = "inspector_user_id") val inspectorUserId: Int? = null,
+    @Json(name = "inspector_name") val inspectorName: String? = null,
+    val defects: Map<String, Int>? = null,
+    @Json(name = "shift_hours") val shiftHours: Double? = null,
+    @Json(name = "break_hours") val breakHours: Double? = null,
+    @Json(name = "stop_hours") val stopHours: Double? = null,
+    @Json(name = "target_work_hours") val targetWorkHours: Double? = null,
+    @Json(name = "work_hours") val workHours: Double? = null,
+    @Json(name = "work_rate_percent") val workRatePercent: Double? = null,
+    @Json(name = "sum_inspection_qty") val sumInspectionQty: Int? = null,
+    @Json(name = "efficiency_per_hour") val efficiencyPerHour: Double? = null,
+    @Json(name = "operating_rate_percent") val operatingRatePercent: Double? = null,
+)
+
+data class InspectionProductivityInspectorMetricsDataDto(
+    val rows: List<InspectionProductivityInspectorMetricsRowDto>? = null,
+    @Json(name = "support_row") val supportRow: InspectionProductivityInspectorMetricsRowDto? = null,
+    @Json(name = "total_row") val totalRow: InspectionProductivityInspectorMetricsRowDto? = null,
+    @Json(name = "defect_headers") val defectHeaders: List<String>? = null,
 )
 
 data class InspectionProductivitySessionRowDto(

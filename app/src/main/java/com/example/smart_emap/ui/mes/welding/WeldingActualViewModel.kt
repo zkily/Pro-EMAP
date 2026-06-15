@@ -1487,6 +1487,7 @@ class WeldingActualViewModel(
         TimerPhase.Idle -> "未開始"
         TimerPhase.Running -> "計測中"
         TimerPhase.Paused -> "一時停止中"
+        TimerPhase.Break -> "休憩中"
         TimerPhase.Ended -> "終了済"
     }
 

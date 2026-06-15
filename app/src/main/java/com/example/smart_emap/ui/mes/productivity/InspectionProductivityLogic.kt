@@ -3,9 +3,12 @@ package com.example.smart_emap.ui.mes.productivity
 import com.example.smart_emap.core.mes.MesCalendarUtils
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionProductivityBucketDto
+import com.example.smart_emap.data.model.InspectionProductivityInspectorMetricsDataDto
+import com.example.smart_emap.data.model.InspectionProductivityInspectorMetricsRowDto
 import com.example.smart_emap.data.model.InspectionProductivityInspectorRowDto
 import com.example.smart_emap.data.model.InspectionProductivityProductRankingDto
 import com.example.smart_emap.data.model.InspectionProductivitySessionRowDto
+import com.example.smart_emap.data.model.UserListItemDto
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -60,6 +63,7 @@ enum class InspectionProductivityReportCommand {
     PRINT_DAILY,
     PRINT_DAILY_BATCH,
     PRINT_INSPECTOR,
+    PRINT_INSPECTOR_METRICS,
     PRINT_INSPECTOR_PRODUCT_BATCH,
     PRINT_PRODUCT,
     PRINT_WELD_RANK,
@@ -82,6 +86,13 @@ data class IpaReportMenuItem(
     val hint: String,
     val tone: IpaReportMenuTone,
     val divided: Boolean = false,
+)
+
+data class InspectorMetricsPrepared(
+    val defectHeaders: List<String>,
+    val rows: List<InspectionProductivityInspectorMetricsRowDto>,
+    val supportRow: InspectionProductivityInspectorMetricsRowDto,
+    val totalRow: InspectionProductivityInspectorMetricsRowDto,
 )
 
 object InspectionProductivityLogic {
@@ -118,6 +129,12 @@ object InspectionProductivityLogic {
             label = "検査員別（印刷）",
             hint = "検査員別サマリー",
             tone = IpaReportMenuTone.VIOLET,
+        ),
+        IpaReportMenuItem(
+            command = InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS,
+            label = "検査員別指標表（印刷）",
+            hint = "不良内訳 · 時間 · 能率",
+            tone = IpaReportMenuTone.EMERALD,
         ),
         IpaReportMenuItem(
             command = InspectionProductivityReportCommand.PRINT_INSPECTOR_PRODUCT_BATCH,
@@ -506,6 +523,145 @@ object InspectionProductivityLogic {
 
     fun sessionsCsvFilename(filters: InspectionProductivityReportFilters): String =
         "検査生産性分析_${filters.startDate}_${filters.endDate}_セッション.csv"
+
+    private val defaultInspectorMetricsDefectHeaders = listOf(
+        "加工キズ",
+        "油タレ",
+        "曲げ不良",
+        "カ他",
+        "メッキ後キズ",
+        "モヤ/カブリ",
+        "ニッケル",
+        "接触",
+        "メ他",
+        "溶接不良",
+        "サビ",
+        "生地不良",
+        "外注メッキ不良",
+        "外注溶接不良",
+        "W検査　廃棄",
+    )
+
+    fun resolveInspectorMetricsDefectHeaders(
+        metrics: InspectionProductivityInspectorMetricsDataDto?,
+    ): List<String> = metrics?.defectHeaders?.takeIf { it.isNotEmpty() } ?: defaultInspectorMetricsDefectHeaders
+
+    fun metricsDefectHeaderLabel(header: String): String = when (header) {
+        "W検査　廃棄" -> "W検査"
+        "モヤ/カブリ" -> "モヤ・カブリ"
+        else -> header
+    }
+
+    fun sumInspectorMetricsDefectQty(
+        row: InspectionProductivityInspectorMetricsRowDto,
+        defectHeaders: List<String>,
+    ): Int = defectHeaders.sumOf { header -> row.defects?.get(header) ?: 0 }
+
+    fun inspectorMetricsRowHasActivity(
+        row: InspectionProductivityInspectorMetricsRowDto?,
+        defectHeaders: List<String>,
+    ): Boolean {
+        if (row == null) return false
+        if ((row.sumInspectionQty ?: 0) > 0) return true
+        if ((row.shiftHours ?: 0.0) > 0.0 || (row.workHours ?: 0.0) > 0.0) return true
+        return sumInspectorMetricsDefectQty(row, defectHeaders) > 0
+    }
+
+    fun formatInspectorOptionLabel(user: UserListItemDto): String =
+        user.fullName?.trim().orEmpty()
+
+    fun prepareInspectorMetricsForDisplay(
+        metrics: InspectionProductivityInspectorMetricsDataDto?,
+        inspectorOptions: List<UserListItemDto>,
+    ): InspectorMetricsPrepared? {
+        if (metrics == null) return null
+        val defectHeaders = resolveInspectorMetricsDefectHeaders(metrics)
+        val labelById = inspectorOptions.mapNotNull { user ->
+            val id = user.id ?: return@mapNotNull null
+            id to formatInspectorOptionLabel(user)
+        }.toMap()
+
+        val rows = metrics.rows.orEmpty()
+            .mapNotNull { row ->
+                val userId = row.inspectorUserId ?: return@mapNotNull null
+                val label = labelById[userId]?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                row.copy(inspectorName = label)
+            }
+            .sortedBy { it.inspectorName.orEmpty() }
+
+        val supportRow = metrics.supportRow
+        val supportVisible = inspectorMetricsRowHasActivity(supportRow, defectHeaders)
+        val emptySupport = InspectionProductivityInspectorMetricsRowDto(inspectorName = "応援")
+
+        return InspectorMetricsPrepared(
+            defectHeaders = defectHeaders,
+            rows = rows,
+            supportRow = if (supportVisible) supportRow ?: emptySupport else emptySupport,
+            totalRow = finalizeInspectorMetricsTotals(rows, defectHeaders),
+        )
+    }
+
+    fun fmtMetricHours(value: Double?): String {
+        if (value == null || value.isNaN()) return "—"
+        return String.format("%.2f", value)
+    }
+
+    fun fmtMetricEfficiencyDecimal(value: Double?): String {
+        if (value == null || value.isNaN()) return "—"
+        return String.format("%.1f", value)
+    }
+
+    fun fmtMetricQtyDisplay(value: Int?): String {
+        val n = value ?: 0
+        if (n <= 0) return "—"
+        return fmtInt(n)
+    }
+
+    private fun finalizeInspectorMetricsTotals(
+        rows: List<InspectionProductivityInspectorMetricsRowDto>,
+        defectHeaders: List<String>,
+    ): InspectionProductivityInspectorMetricsRowDto {
+        val defects = defectHeaders.associateWith { header ->
+            rows.sumOf { it.defects?.get(header) ?: 0 }
+        }
+        val shiftHours = roundMetricHours(rows.sumOf { it.shiftHours ?: 0.0 })
+        val breakHours = roundMetricHours(rows.sumOf { it.breakHours ?: 0.0 })
+        val stopHours = roundMetricHours(rows.sumOf { it.stopHours ?: 0.0 })
+        val targetWorkHours = roundMetricHours(shiftHours - breakHours)
+        val workHours = roundMetricHours(rows.sumOf { it.workHours ?: 0.0 })
+        val sumInspectionQty = rows.sumOf { it.sumInspectionQty ?: 0 }
+        val workRatePercent = if (targetWorkHours > 0.0) {
+            kotlin.math.round(workHours / targetWorkHours * 1000.0) / 10.0
+        } else {
+            null
+        }
+        val efficiencyPerHour = if (workHours > 0.0 && sumInspectionQty > 0) {
+            kotlin.math.round(sumInspectionQty / workHours * 10.0) / 10.0
+        } else {
+            null
+        }
+        val operatingRatePercent = if (shiftHours > 0.0) {
+            kotlin.math.round(workHours / shiftHours * 1000.0) / 10.0
+        } else {
+            null
+        }
+        return InspectionProductivityInspectorMetricsRowDto(
+            inspectorName = "合計",
+            defects = defects,
+            shiftHours = shiftHours,
+            breakHours = breakHours,
+            stopHours = stopHours,
+            targetWorkHours = targetWorkHours,
+            workHours = workHours,
+            workRatePercent = workRatePercent,
+            sumInspectionQty = sumInspectionQty,
+            efficiencyPerHour = efficiencyPerHour,
+            operatingRatePercent = operatingRatePercent,
+        )
+    }
+
+    private fun roundMetricHours(value: Double): Double =
+        kotlin.math.round(value * 100.0) / 100.0
 
     private fun metaCsvLines(filters: InspectionProductivityReportFilters): List<String> {
         val printedAt = java.time.LocalDateTime.now().format(

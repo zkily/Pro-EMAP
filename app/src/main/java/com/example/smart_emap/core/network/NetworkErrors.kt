@@ -112,11 +112,16 @@ object NetworkErrors {
             detail.contains("Network is unreachable", ignoreCase = true) ||
             detail.contains("No address associated with hostname", ignoreCase = true) ||
             detail.contains("unexpected end of stream", ignoreCase = true) ||
-            detail.contains("stream was reset", ignoreCase = true)
+            detail.contains("stream was reset", ignoreCase = true) ||
+            detail.contains("Cleartext", ignoreCase = true) ||
+            detail.contains("not permitted", ignoreCase = true)
         ) {
             return ErrorKind.Connection
         }
-        if (throwable is IOException && detail.contains("network", ignoreCase = true)) {
+        if (throwable is IOException &&
+            detail.contains("network", ignoreCase = true) &&
+            !detail.contains("Cleartext", ignoreCase = true)
+        ) {
             return ErrorKind.NoConnection
         }
         return ErrorKind.Unknown

@@ -31,8 +31,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -48,7 +48,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
@@ -105,8 +105,8 @@ fun RoleHeroBar(roleCount: Int, totalUsers: Int) {
                         Icon(Icons.Default.Key, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                     }
                     Column {
-                        Text("権限・ロール管理", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        Text("ロール別メニュー・操作・データ範囲の設定", color = Color.White.copy(alpha = 0.82f), fontSize = 10.sp)
+                        Text("????????", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                        Text("????????????????????", color = Color.White.copy(alpha = 0.82f), fontSize = 10.sp)
                     }
                 }
                 Row(
@@ -116,9 +116,9 @@ fun RoleHeroBar(roleCount: Int, totalUsers: Int) {
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    RoleStat("$roleCount", "ロール数", Color.White)
+                    RoleStat("$roleCount", "????", Color.White)
                     Box(Modifier.size(width = 1.dp, height = 24.dp).background(Color.White.copy(alpha = 0.22f)))
-                    RoleStat("$totalUsers", "総ユーザー", Color(0xFFA5F3FC))
+                    RoleStat("$totalUsers", "?????", Color(0xFFA5F3FC))
                 }
             }
         }
@@ -186,8 +186,8 @@ fun RoleListPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Icon(Icons.Default.List, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(16.dp))
-                Text("ロール一覧", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextPrimary)
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(16.dp))
+                Text("?????", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextPrimary)
             }
             if (canCreate) {
                 Surface(
@@ -204,7 +204,7 @@ fun RoleListPanel(
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-                        Text("追加", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Text("??", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -267,7 +267,7 @@ private fun RoleListRow(
         ) {
             Text(role.name, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (role.isSystem) {
-                Text("システム", fontSize = 9.sp, color = Color(0xFF7C3AED))
+                Text("????", fontSize = 9.sp, color = Color(0xFF7C3AED))
             }
         }
         Box(
@@ -280,7 +280,7 @@ private fun RoleListRow(
         }
         if (canEdit) {
             IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Edit, contentDescription = "編集", tint = Color(0xFF667EEA), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Edit, contentDescription = "??", tint = Color(0xFF667EEA), modifier = Modifier.size(14.dp))
             }
         }
         if (canDelete) {
@@ -291,7 +291,7 @@ private fun RoleListRow(
             ) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "削除",
+                    contentDescription = "??",
                     tint = if (role.isSystem) Color(0xFFCBD5E1) else Color(0xFFEF4444),
                     modifier = Modifier.size(14.dp),
                 )
@@ -336,14 +336,14 @@ fun RolePermissionPanel(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     Icon(Icons.Default.Settings, contentDescription = null, tint = Color(0xFF667EEA), modifier = Modifier.size(16.dp))
                     Text(
-                        selectedRole?.name ?: "ロールを選択",
+                        selectedRole?.name ?: "??????",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (selectedRole != null) RolePermissionTheme.TextPrimary else RolePermissionTheme.TextMuted,
                     )
                 }
                 if (selectedRole != null) {
-                    Text("権限設定", fontSize = 9.sp, color = RolePermissionTheme.TextMuted)
+                    Text("????", fontSize = 9.sp, color = RolePermissionTheme.TextMuted)
                 }
             }
             if (selectedRole != null && canEdit) {
@@ -366,7 +366,7 @@ fun RolePermissionPanel(
                         } else {
                             Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                         }
-                        Text("保存", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Text("??", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -379,20 +379,18 @@ fun RolePermissionPanel(
             }
             selectedRole == null -> RoleEmptyState()
             else -> {
-                val tabs = listOf("メニュー権限", "操作権限", "データ範囲")
+                val tabs = listOf("??????", "????", "?????")
                 Column(modifier = Modifier.fillMaxSize()) {
-                    TabRow(
+                    SecondaryTabRow(
                         selectedTabIndex = activeTab,
                         containerColor = Color.White,
                         contentColor = Color(0xFF667EEA),
-                        indicator = { positions ->
-                            if (activeTab < positions.size) {
-                                TabRowDefaults.SecondaryIndicator(
-                                    modifier = Modifier.tabIndicatorOffset(positions[activeTab]),
-                                    color = Color(0xFF667EEA),
-                                    height = 2.dp,
-                                )
-                            }
+                        indicator = {
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(activeTab),
+                                color = Color(0xFF667EEA),
+                                height = 2.dp,
+                            )
                         },
                         divider = { HorizontalDivider(color = RolePermissionTheme.BorderLight) },
                     ) {
@@ -459,8 +457,8 @@ private fun RoleEmptyState() {
             Icon(Icons.Default.TouchApp, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(32.dp))
         }
         Spacer(Modifier.height(12.dp))
-        Text("ロールを選択してください", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextPrimary)
-        Text("左の一覧からロールを選び、権限を設定します", fontSize = 10.sp, color = RolePermissionTheme.TextMuted)
+        Text("????????????", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextPrimary)
+        Text("?????????????????????", fontSize = 10.sp, color = RolePermissionTheme.TextMuted)
     }
 }
 
@@ -521,7 +519,7 @@ private fun MenuTreeNodeRow(
         if (hasChildren) {
             IconButton(onClick = { onToggleExpand(node.code) }, modifier = Modifier.size(24.dp)) {
                 Icon(
-                    if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                    if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
                     tint = RolePermissionTheme.TextMuted,
@@ -573,7 +571,7 @@ private fun OperationPermissionTab(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Icon(Icons.Default.Info, contentDescription = null, tint = RolePermissionTheme.HintText, modifier = Modifier.size(12.dp))
-            Text("各モジュールの新規・編集・削除・出力・承認権限を設定", fontSize = 9.sp, color = RolePermissionTheme.HintText)
+            Text("??????????????????????????", fontSize = 9.sp, color = RolePermissionTheme.HintText)
         }
         Spacer(Modifier.height(6.dp))
         Row(
@@ -600,12 +598,12 @@ private fun OperationTableHeader() {
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        OpHeaderCell("モジュール", 100.dp)
-        OpHeaderCell("新規", 52.dp)
-        OpHeaderCell("編集", 52.dp)
-        OpHeaderCell("削除", 52.dp)
-        OpHeaderCell("出力", 52.dp)
-        OpHeaderCell("承認", 52.dp)
+        OpHeaderCell("?????", 100.dp)
+        OpHeaderCell("??", 52.dp)
+        OpHeaderCell("??", 52.dp)
+        OpHeaderCell("??", 52.dp)
+        OpHeaderCell("??", 52.dp)
+        OpHeaderCell("??", 52.dp)
     }
 }
 
@@ -667,11 +665,11 @@ private fun DataScopeTab(
     onToggleDept: (String) -> Unit,
 ) {
     val options = listOf(
-        DataScopeOption("self", "本人のみ", "自分のデータのみ", Icons.Default.Person),
-        DataScopeOption("department", "所属部門", "同じ部門のデータ", Icons.Default.GridView),
-        DataScopeOption("department_below", "部門以下", "配下部門を含む", Icons.Default.Home),
-        DataScopeOption("all", "全社", "すべてのデータ", Icons.Default.Tune),
-        DataScopeOption("custom", "カスタム", "部門を指定", Icons.Default.Settings),
+        DataScopeOption("self", "????", "????????", Icons.Default.Person),
+        DataScopeOption("department", "????", "????????", Icons.Default.GridView),
+        DataScopeOption("department_below", "????", "???????", Icons.Default.Home),
+        DataScopeOption("all", "??", "???????", Icons.Default.Tune),
+        DataScopeOption("custom", "????", "?????", Icons.Default.Settings),
     )
     Column(
         modifier = Modifier
@@ -679,7 +677,7 @@ private fun DataScopeTab(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("データ参照範囲", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextSecondary)
+        Text("???????", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextSecondary)
         options.forEach { opt ->
             val active = dataScope == opt.value
             Surface(
@@ -707,7 +705,7 @@ private fun DataScopeTab(
             }
         }
         if (dataScope == "custom") {
-            Text("カスタム部門", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextSecondary)
+            Text("??????", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = RolePermissionTheme.TextSecondary)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -717,7 +715,7 @@ private fun DataScopeTab(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (departmentOptions.isEmpty()) {
-                    Text("部門データがありません", fontSize = 10.sp, color = RolePermissionTheme.TextMuted)
+                    Text("???????????", fontSize = 10.sp, color = RolePermissionTheme.TextMuted)
                 } else {
                     departmentOptions.forEach { (_, name) ->
                         Row(

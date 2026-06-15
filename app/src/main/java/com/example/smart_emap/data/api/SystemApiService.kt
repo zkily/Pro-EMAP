@@ -29,6 +29,7 @@ interface SystemApiService {
     suspend fun getUsers(
         @Query("keyword") keyword: String? = null,
         @Query("department_id") departmentId: Int? = null,
+        @Query("section_id") sectionId: Int? = null,
         @Query("status") status: String? = null,
         @Query("page") page: Int? = null,
         @Query("page_size") pageSize: Int? = null,

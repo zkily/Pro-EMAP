@@ -1354,6 +1354,7 @@ class CuttingActualViewModel(
         TimerPhase.Idle -> s.timerIdle
         TimerPhase.Running -> s.timerRunning
         TimerPhase.Paused -> s.timerPaused
+        TimerPhase.Break -> s.timerPaused
         TimerPhase.Ended -> s.timerEnded
     }
 

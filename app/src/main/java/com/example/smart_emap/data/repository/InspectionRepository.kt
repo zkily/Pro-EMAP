@@ -4,18 +4,18 @@ import com.example.smart_emap.core.mes.MesClientIdStore
 import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.ErpProductDto
-import com.example.smart_emap.data.model.ErpProductsEnvelope
 import com.example.smart_emap.data.model.InspectionManagementRowDto
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisDataDto
 import com.example.smart_emap.data.model.PatchInspectionBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.example.smart_emap.data.model.ProductProcessBomRowDto
+import com.example.smart_emap.data.model.UserListItemDto
+import com.example.smart_emap.ui.mes.inspectionregistration.InspectionManualRegistrationLogic
 import com.example.smart_emap.ui.mes.productivity.InspectionProductivityLogic
 import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.JsonEncodingException
 import com.squareup.moshi.Moshi
-import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
@@ -28,6 +28,7 @@ private val INSPECTION_PRODUCT_NAME_EXCLUDES = listOf("加工", "アーチ")
 class InspectionRepository(
     private val apiClient: ApiClient,
     private val mesClientIdStore: MesClientIdStore,
+    private val systemUserRepository: SystemUserRepository? = null,
 ) {
     private val moshi = Moshi.Builder()
         .add(KotlinJsonAdapterFactory())
@@ -35,43 +36,27 @@ class InspectionRepository(
 
     private val errorAdapter = moshi.adapter(com.example.smart_emap.data.model.ApiMessageResponse::class.java)
 
-    private val productsListAdapter = moshi.adapter<List<ErpProductDto>>(
-        Types.newParameterizedType(List::class.java, ErpProductDto::class.java),
-    )
-
-    private val productsEnvelopeAdapter = moshi.adapter(ErpProductsEnvelope::class.java)
-
     suspend fun getClientInstanceId(): String = mesClientIdStore.getClientInstanceId()
 
     suspend fun loadProducts(): List<ErpProductDto> {
-        val body = apiClient.erpOptionsApi().getProductsRaw().string()
-        val list = parseProductsJson(body)
+        val list = apiClient.masterApi().listProducts(pageSize = 9999, status = "active").items()
         return list
             .map { p ->
                 ErpProductDto(
                     id = p.id,
-                    productCode = p.normalizedCode(),
-                    productName = p.normalizedName(),
-                    isActive = p.isActive,
+                    productCode = p.productCd?.trim().orEmpty(),
+                    productName = p.productName?.trim().orEmpty(),
+                    isActive = (p.status ?: "").equals("active", ignoreCase = true),
+                    unitPerBox = (p.unitPerBox ?: 0).coerceAtLeast(0),
                 )
             }
             .filter { p ->
-                if (p.isActive == false) return@filter false
+                if (p.isActive != true) return@filter false
                 val code = p.productCode
                 if (code.isEmpty() || !code.endsWith("1")) return@filter false
                 INSPECTION_PRODUCT_NAME_EXCLUDES.none { p.productName.contains(it) }
             }
             .sortedBy { it.productName }
-    }
-
-    /** Web getProducts と同様：配列または { data: [...] } の両方に対応 */
-    private fun parseProductsJson(body: String): List<ErpProductDto> {
-        val trimmed = body.trim()
-        if (trimmed.isEmpty() || trimmed == "null") return emptyList()
-        if (trimmed.startsWith("[")) {
-            return productsListAdapter.fromJson(trimmed).orEmpty()
-        }
-        return productsEnvelopeAdapter.fromJson(trimmed)?.data.orEmpty()
     }
 
     suspend fun loadDefectItems(): List<ProcessDefectItemDto> {
@@ -89,6 +74,8 @@ class InspectionRepository(
         productCd: String,
         productName: String,
         inspectorUserId: Int,
+        manualRegistrationNote: String? = null,
+        manualRegistration: Boolean = false,
     ): Int {
         val res = apiClient.inspectionApi().create(
             CreateInspectionBody(
@@ -96,10 +83,36 @@ class InspectionRepository(
                 productCd = productCd,
                 productName = productName,
                 mesInspectorUserId = inspectorUserId,
+                manualRegistrationNote = manualRegistrationNote,
+                manualRegistration = if (manualRegistration) true else null,
             ),
         )
         val id = res.data?.id ?: throw IllegalStateException(res.message ?: "作成に失敗しました")
         return id
+    }
+
+    suspend fun deletePlan(id: Int) {
+        val res = apiClient.inspectionApi().delete(id)
+        if (res.success == false) {
+            throw IllegalStateException(res.message ?: res.detail ?: "削除に失敗しました")
+        }
+    }
+
+    suspend fun loadShiageSectionInspectors(): List<UserListItemDto> {
+        val repo = systemUserRepository ?: return emptyList()
+        val sectionId = repo.getOrganizations().getOrNull()
+            ?.firstOrNull { it.type == "section" && it.name == InspectionManualRegistrationLogic.SHIAGE_SECTION_NAME }
+            ?.id
+        val users = repo.getUsers(
+            status = "active",
+            sectionId = sectionId,
+            page = 1,
+            pageSize = 500,
+        ).getOrNull()?.items.orEmpty()
+        return users.filter { user ->
+            user.id != null &&
+                (user.section?.trim() == InspectionManualRegistrationLogic.SHIAGE_SECTION_NAME)
+        }.sortedBy { it.displayLabel() }
     }
 
     suspend fun patchPlan(id: Int, body: PatchInspectionBody) {

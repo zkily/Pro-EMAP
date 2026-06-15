@@ -7,9 +7,9 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
 
-    <!-- 系统启动页仅黑色过渡；全屏品牌图由 Compose SplashScreenContent 展示 -->
+    <!-- 系统启动页与 Compose 品牌页同色过渡 -->
     <style name="Theme.SmartEMAP.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_empty_icon</item>
         <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <item name="postSplashScreenTheme">@style/Theme.SmartEMAP</item>

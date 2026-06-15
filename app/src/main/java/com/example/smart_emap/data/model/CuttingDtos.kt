@@ -87,6 +87,7 @@ data class UserListItemDto(
     @Json(name = "full_name") val fullName: String? = null,
     val email: String? = null,
     val department: String? = null,
+    val section: String? = null,
     val role: String? = null,
     val status: String? = null,
     @Json(name = "two_factor") val twoFactor: Boolean? = null,

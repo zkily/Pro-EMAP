@@ -14,15 +14,18 @@ class AuthInterceptor(
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
         val path = request.url.encodedPath
-        val isLogin = path.endsWith("/api/auth/login")
-
-        if (isLogin) {
+        
+        // 不需要 Token 的路径白名单
+        if (path.endsWith("/api/auth/login") || path.endsWith("/api/auth/logout")) {
             return chain.proceed(request)
         }
 
-        val token = runBlocking { sessionStore.getToken() }
+        // 优先从内存缓存中获取 Token，避免 runBlocking 阻塞线程池
+        val token = sessionStore.cachedToken ?: runBlocking { sessionStore.getToken() }
+        
         if (token.isNullOrBlank()) {
-            val body = """{"detail":"Not authenticated"}"""
+            // 如果本地没有 Token，直接返回 401 拦截请求
+            val body = """{"detail":"Not authenticated (No local token)"}"""
                 .toResponseBody("application/json".toMediaType())
             return Response.Builder()
                 .request(request)
@@ -32,6 +35,7 @@ class AuthInterceptor(
                 .body(body)
                 .build()
         }
+
         val newRequest = request.newBuilder()
             .header("Authorization", "Bearer $token")
             .build()

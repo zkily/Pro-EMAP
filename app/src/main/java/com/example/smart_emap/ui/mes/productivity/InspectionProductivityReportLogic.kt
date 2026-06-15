@@ -2,6 +2,7 @@ package com.example.smart_emap.ui.mes.productivity
 
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionProductivityDailyRowDto
+import com.example.smart_emap.data.model.InspectionProductivityInspectorMetricsRowDto
 import com.example.smart_emap.data.model.InspectionProductivityInspectorRowDto
 import com.example.smart_emap.data.model.InspectionProductivityProductRankingDto
 import com.example.smart_emap.data.model.InspectionProductivityProductRowDto
@@ -61,6 +62,173 @@ object InspectionProductivityReportLogic {
         )
         InspectionProductivityReportCommand.PRINT_DAILY_BATCH -> buildDailyBatchHtml(data, ctx)
         InspectionProductivityReportCommand.PRINT_INSPECTOR_PRODUCT_BATCH -> buildInspectorProductBatchHtml(data, ctx)
+        InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS -> throw IllegalStateException("Use buildInspectorMetricsPrintHtml")
+    }
+
+    fun buildInspectorMetricsPrintHtml(
+        filters: InspectionProductivityReportFilters,
+        metrics: InspectorMetricsPrepared,
+        kpiCards: List<IpaKpiCard>,
+    ): String {
+        val body = buildString {
+            append(kpiHtml(kpiCards))
+            append(
+                sectionBlock(
+                    "検査員別指標 · 時間 / 生産",
+                    inspectorMetricsTimeTable(metrics),
+                ),
+            )
+            append(
+                sectionBlock(
+                    "検査員別指標 · 不良内訳",
+                    inspectorMetricsDefectTable(metrics),
+                ),
+            )
+        }
+        return inspectorMetricsDocumentShell(filters, body)
+    }
+
+    private fun inspectorMetricsDocumentShell(
+        filters: InspectionProductivityReportFilters,
+        body: String,
+    ): String {
+        val printedAt = LocalDateTime.now().format(printedAtFormatter)
+        val sectionTitle = "検査員別指標表"
+        val metaHtml = metaLineHtml(filters, printedAt)
+        return """
+            <!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"/>
+            <title>検査工程 — 生産性分析 — $sectionTitle</title>
+            <style>
+            html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page { size: A4 landscape; margin: 8mm 10mm; }
+            body { margin:0; color:#0f172a; font:10px/1.4 sans-serif; }
+            .hd { border-bottom:2px solid #6366f1; padding-bottom:8px; margin-bottom:10px; }
+            .hd__title { font-size:16px; font-weight:800; }
+            .hd__section { font-size:12px; font-weight:700; color:#4338ca; }
+            .hd__section-row { display:flex; align-items:center; flex-wrap:wrap; gap:6px 14px; margin-top:4px; }
+            .hd__section-row .hd__section { margin-top:0; flex-shrink:0; }
+            .meta-line { display:flex; flex-wrap:wrap; align-items:center; font-size:8.5px; color:#475569; flex:1; justify-content:flex-end; }
+            .meta-line__sep { margin:0 8px; color:#cbd5e1; }
+            .panel { margin-top:8px; padding:8px; border:1px solid #e2e8f0; border-radius:8px; break-inside:avoid; }
+            .panel__title { font-size:11px; font-weight:800; margin-bottom:6px; color:#4338ca; }
+            table.data { width:100%; border-collapse:collapse; table-layout:fixed; }
+            table.data th, table.data td { border:1px solid #cbd5e1; padding:1.8px 2.7px; font-size:6.5px; word-break:break-word; vertical-align:middle; line-height:1.26; }
+            table.data th { background:linear-gradient(180deg,#ede9fe,#e0e7ff); color:#4338ca; font-weight:700; }
+            table.data td.name { font-weight:700; color:#334155; }
+            table.data tr.row-total td { font-weight:800; border-top:2px dashed rgba(99,102,241,.45); background:rgba(238,242,255,.55); }
+            table.data tr.row-support td { background:#fff; }
+            .num { text-align:right; font-variant-numeric:tabular-nums; }
+            .num--good { color:#047857; font-weight:700; }
+            .pill { display:inline-block; padding:1px 4px; border-radius:4px; font-size:6.5px; font-weight:700; color:#4338ca; background:rgba(99,102,241,.1); border:1px solid rgba(99,102,241,.15); }
+            .kpi-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:5px; margin-bottom:8px; }
+            .kpi-card { border:1px solid #e2e8f0; border-radius:8px; padding:6px; }
+            .kpi-card__label { font-size:7px; font-weight:700; color:#64748b; }
+            .kpi-card__value { font-size:14px; font-weight:800; margin-top:2px; }
+            .kpi-card__hint { font-size:7px; color:#94a3b8; margin-top:2px; }
+            .empty { color:#94a3b8; font-size:8px; }
+            </style></head><body>
+            <header class="hd">
+              <div class="hd__title">検査工程 — 生産性分析</div>
+              <div class="hd__section-row">
+                <div class="hd__section">$sectionTitle</div>
+                $metaHtml
+              </div>
+            </header>
+            $body
+            <footer style="margin-top:10px;padding-top:6px;border-top:1px solid #e2e8f0;font-size:7.5px;color:#94a3b8;text-align:right;">Smart-EMAPs · 検査生産性分析 · $printedAt</footer>
+            </body></html>
+        """.trimIndent()
+    }
+
+    private fun metaLineHtml(filters: InspectionProductivityReportFilters, printedAt: String): String =
+        """<div class="meta-line">
+            <span><b>集計期間</b> ${esc(filters.startDate)} ～ ${esc(filters.endDate)}</span>
+            <span class="meta-line__sep">|</span>
+            <span><b>出力日時</b> ${esc(printedAt)}</span>
+            <span class="meta-line__sep">|</span>
+            <span><b>検査員</b> ${esc(filters.inspectorLabel)}</span>
+            <span class="meta-line__sep">|</span>
+            <span><b>製品</b> ${esc(filters.productLabel)}</span>
+            <span class="meta-line__sep">|</span>
+            <span><b>未確定を含む</b> ${if (filters.includeIncomplete) "はい" else "いいえ"}</span>
+        </div>"""
+
+    private fun inspectorMetricsTimeTable(metrics: InspectorMetricsPrepared): String {
+        if (metrics.rows.isEmpty()) return emptyNote()
+        val head = tableHead(
+            listOf("検査員", "シフト", "休憩", "ロス時間", "作業すべき時間", "作業時間", "作業率", "検査総数", "能率", "稼働率"),
+        )
+        val body = buildString {
+            metrics.rows.forEach { append(inspectorMetricsTimeRow(it)) }
+            if (InspectionProductivityLogic.inspectorMetricsRowHasActivity(metrics.supportRow, metrics.defectHeaders)) {
+                append(inspectorMetricsTimeRow(metrics.supportRow, support = true))
+            }
+            append(inspectorMetricsTimeRow(metrics.totalRow, total = true))
+        }
+        return """<table class="data"><thead>$head</thead><tbody>$body</tbody></table>"""
+    }
+
+    private fun inspectorMetricsDefectTable(metrics: InspectorMetricsPrepared): String {
+        if (metrics.rows.isEmpty()) return emptyNote()
+        val defectHead = metrics.defectHeaders.map { InspectionProductivityLogic.metricsDefectHeaderLabel(it) }
+        val head = tableHead(listOf("検査員") + defectHead + listOf("不良合計"))
+        val body = buildString {
+            metrics.rows.forEach { append(inspectorMetricsDefectRow(it, metrics.defectHeaders)) }
+            if (InspectionProductivityLogic.inspectorMetricsRowHasActivity(metrics.supportRow, metrics.defectHeaders)) {
+                append(inspectorMetricsDefectRow(metrics.supportRow, metrics.defectHeaders, support = true))
+            }
+            append(inspectorMetricsDefectRow(metrics.totalRow, metrics.defectHeaders, total = true))
+        }
+        return """<table class="data"><thead>$head</thead><tbody>$body</tbody></table>"""
+    }
+
+    private fun inspectorMetricsTimeRow(
+        row: InspectionProductivityInspectorMetricsRowDto,
+        total: Boolean = false,
+        support: Boolean = false,
+    ): String {
+        val cls = when {
+            total -> "row-total"
+            support -> "row-support"
+            else -> ""
+        }
+        val eff = InspectionProductivityLogic.fmtMetricEfficiencyDecimal(row.efficiencyPerHour)
+        val effHtml = if (eff == "—") esc(eff) else """<span class="pill">$eff</span>"""
+        return """<tr class="$cls">
+            <td class="name">${esc(row.inspectorName)}</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtMetricHours(row.shiftHours))}</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtMetricHours(row.breakHours))}</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtMetricHours(row.stopHours))}</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtMetricHours(row.targetWorkHours))}</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtMetricHours(row.workHours))}</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtPct(row.workRatePercent))}</td>
+            <td class="num num--good">${esc(InspectionProductivityLogic.fmtMetricQtyDisplay(row.sumInspectionQty))}</td>
+            <td class="num">$effHtml</td>
+            <td class="num">${esc(InspectionProductivityLogic.fmtPct(row.operatingRatePercent))}</td>
+        </tr>"""
+    }
+
+    private fun inspectorMetricsDefectRow(
+        row: InspectionProductivityInspectorMetricsRowDto,
+        defectHeaders: List<String>,
+        total: Boolean = false,
+        support: Boolean = false,
+    ): String {
+        val cls = when {
+            total -> "row-total"
+            support -> "row-support"
+            else -> ""
+        }
+        val defectCells = defectHeaders.joinToString("") { header ->
+            val qty = row.defects?.get(header) ?: 0
+            """<td class="num">${esc(InspectionProductivityLogic.fmtMetricQtyDisplay(qty))}</td>"""
+        }
+        val defectTotal = InspectionProductivityLogic.sumInspectorMetricsDefectQty(row, defectHeaders)
+        return """<tr class="$cls">
+            <td class="name">${esc(row.inspectorName)}</td>
+            $defectCells
+            <td class="num">${esc(InspectionProductivityLogic.fmtMetricQtyDisplay(defectTotal))}</td>
+        </tr>"""
     }
 
     private fun buildFullPrintHtml(

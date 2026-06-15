@@ -8,6 +8,7 @@ import com.example.smart_emap.data.model.InspectionProductivityAnalysisResponse
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisResponse
 import com.example.smart_emap.data.model.PatchInspectionBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -30,6 +31,9 @@ interface InspectionApiService {
         @Path("id") id: Int,
         @Body body: PatchInspectionBody,
     ): ApiMessageResponse
+
+    @DELETE("/api/plan/inspection-management/{id}")
+    suspend fun delete(@Path("id") id: Int): ApiMessageResponse
 
     @GET("/api/plan/inspection-management/productivity-analysis")
     suspend fun productivityAnalysis(

@@ -1783,6 +1783,7 @@ private fun ipaReportMenuIcon(command: InspectionProductivityReportCommand): Ima
     InspectionProductivityReportCommand.PRINT_DAILY -> Icons.AutoMirrored.Filled.ShowChart
     InspectionProductivityReportCommand.PRINT_DAILY_BATCH -> Icons.Default.Analytics
     InspectionProductivityReportCommand.PRINT_INSPECTOR -> Icons.Default.Person
+    InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS -> Icons.Default.Description
     InspectionProductivityReportCommand.PRINT_INSPECTOR_PRODUCT_BATCH -> Icons.Default.Inventory2
     InspectionProductivityReportCommand.PRINT_PRODUCT -> Icons.Default.Inventory2
     InspectionProductivityReportCommand.PRINT_WELD_RANK -> Icons.Default.Star

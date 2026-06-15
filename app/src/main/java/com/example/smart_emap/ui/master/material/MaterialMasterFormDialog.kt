@@ -47,7 +47,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -262,22 +262,20 @@ private fun MaterialFormDialogHeader(loading: Boolean, onDismiss: () -> Unit) {
 
 @Composable
 private fun MaterialFormTabBar(selectedTab: Int, onTabSelected: (Int) -> Unit) {
-    ScrollableTabRow(
+    SecondaryScrollableTabRow(
         selectedTabIndex = selectedTab,
         edgePadding = 10.dp,
         containerColor = materialTabBarBg,
         contentColor = materialPrimary,
-        indicator = { tabPositions ->
-            if (selectedTab < tabPositions.size) {
-                val accent = materialTabAccents.getOrElse(selectedTab) { materialPrimary }
-                TabRowDefaults.SecondaryIndicator(
-                    modifier = Modifier
-                        .tabIndicatorOffset(tabPositions[selectedTab])
-                        .shadow(3.dp, RoundedCornerShape(2.dp), spotColor = accent.copy(alpha = 0.4f)),
-                    height = 3.dp,
-                    color = accent,
-                )
-            }
+        indicator = {
+            val accent = materialTabAccents.getOrElse(selectedTab) { materialPrimary }
+            TabRowDefaults.SecondaryIndicator(
+                modifier = Modifier
+                    .tabIndicatorOffset(selectedTab)
+                    .shadow(3.dp, RoundedCornerShape(2.dp), spotColor = accent.copy(alpha = 0.4f)),
+                height = 3.dp,
+                color = accent,
+            )
         },
         divider = { HorizontalDivider(color = Color(0xFFEBEEF5)) },
     ) {

@@ -10,34 +10,22 @@ import com.example.smart_emap.core.mes.InspectionOfflineStore
 import com.example.smart_emap.core.mes.WeldingOfflineStore
 import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.core.network.NetworkMonitor
-import com.example.smart_emap.data.repository.ApsSchedulingRepository
-import com.example.smart_emap.data.repository.AuthRepository
-import com.example.smart_emap.data.repository.ChamferingRepository
-import com.example.smart_emap.data.repository.CuttingInstructionRepository
-import com.example.smart_emap.data.repository.CuttingRepository
-import com.example.smart_emap.data.repository.DashboardRepository
-import com.example.smart_emap.data.repository.InspectionRepository
-import com.example.smart_emap.data.repository.MaterialRepository
-import com.example.smart_emap.data.repository.OrderDailyRepository
-import com.example.smart_emap.data.repository.OrderMonthlyRepository
-import com.example.smart_emap.data.repository.MasterRepository
-import com.example.smart_emap.data.repository.PartRepository
-import com.example.smart_emap.data.repository.PlanBaselineRepository
-import com.example.smart_emap.data.repository.PlanInstructionRepository
-import com.example.smart_emap.data.repository.ProductionSummaryRepository
-import com.example.smart_emap.data.repository.SystemOrganizationRepository
-import com.example.smart_emap.data.repository.SystemRoleRepository
-import com.example.smart_emap.data.repository.SystemUserRepository
-import com.example.smart_emap.data.repository.WeldingRepository
+import com.example.smart_emap.data.local.AppDatabase
+import com.example.smart_emap.data.repository.*
 
 class SmartEmapAppContainer(context: Context) {
+    val database = AppDatabase.getDatabase(context)
+    val inspectionDao = database.inspectionDao()
+
     val sessionStore = SessionStore(context.applicationContext)
     val sessionEvents = SessionEvents()
     val mesClientIdStore = MesClientIdStore(context.applicationContext)
     val apiClient = ApiClient(sessionStore, sessionEvents)
+
     val authRepository = AuthRepository(sessionStore, apiClient)
     val dashboardRepository = DashboardRepository(apiClient)
-    val inspectionRepository = InspectionRepository(apiClient, mesClientIdStore)
+    val systemUserRepository = SystemUserRepository(apiClient)
+    val inspectionRepository = InspectionRepository(apiClient, mesClientIdStore, systemUserRepository)
     val inspectionOfflineStore = InspectionOfflineStore(context.applicationContext)
     val weldingRepository = WeldingRepository(apiClient, mesClientIdStore)
     val weldingOfflineStore = WeldingOfflineStore(context.applicationContext)
@@ -55,7 +43,6 @@ class SmartEmapAppContainer(context: Context) {
     val planInstructionRepository = PlanInstructionRepository(apiClient)
     val productionSummaryRepository = ProductionSummaryRepository(apiClient)
     val planBaselineRepository = PlanBaselineRepository(apiClient)
-    val systemUserRepository = SystemUserRepository(apiClient)
     val systemOrganizationRepository = SystemOrganizationRepository(apiClient)
     val systemRoleRepository = SystemRoleRepository(apiClient)
     val networkMonitor = NetworkMonitor(context.applicationContext)
