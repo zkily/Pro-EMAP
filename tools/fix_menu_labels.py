@@ -1,31 +1,62 @@
-#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Restore Japanese menu labels in AppMenuConfig.kt from Web menuConfig.ts."""
 import re
 from pathlib import Path
 
 TS = Path(r"C:\Users\arai-235\Desktop\Smart-EMAPs\frontend\src\router\menuConfig.ts")
 KT = Path(r"C:\Users\arai-235\Desktop\SmartEMAP\app\src\main\java\com\example\smart_emap\ui\shell\AppMenuConfig.kt")
 
-names = {}
+names: dict[str, str] = {}
 for m in re.finditer(r"\{ code: '([^']+)', name: '([^']+)'", TS.read_text(encoding="utf-8")):
     names[m.group(1)] = m.group(2)
+
 names["ERP_PRODUCTION_PROCESS_MACHINE_PLAN"] = "工程別設備別計画"
 
-content = KT.read_text(encoding="utf-8")
+text = KT.read_text(encoding="utf-8", errors="replace")
 
-content = re.sub(
-    r'AppMenuNode\.Leaf\("([^"]+)", "[^"]*",',
-    lambda m: f'AppMenuNode.Leaf("{m.group(1)}", "{names[m.group(1)]}",'
-    if m.group(1) in names
-    else m.group(0),
-    content,
+
+def leaf_repl(match: re.Match[str]) -> str:
+    code, _old, rest = match.group(1), match.group(2), match.group(3)
+    label = names.get(code, _old)
+    return f'AppMenuNode.Leaf("{code}", "{label}", {rest}'
+
+
+text = re.sub(
+    r'AppMenuNode\.Leaf\("([^"]+)", "([^"]*)", ([^\n]+)',
+    leaf_repl,
+    text,
 )
 
-content = re.sub(
-    r'code = "([^"]+)",\n\s+label = "[^"]*",',
-    lambda m: f'code = "{m.group(1)}",\n            label = "{names[m.group(1)]}",'
-    if m.group(1) in names
-    else m.group(0),
-    content,
+text = re.sub(
+    r'(\s+)code = "([^"]+)",\n\1label = "([^"]*)",',
+    lambda m: f'{m.group(1)}code = "{m.group(2)}",\n{m.group(1)}label = "{names.get(m.group(2), m.group(3))}",',
+    text,
+)
+
+text = text.replace(
+    "* Web Smart-EMAPs `src/router/menuConfig.ts` ???????????",
+    "* Web Smart-EMAPs `src/router/menuConfig.ts` と同等のメニュー定義。",
+)
+text = text.replace("* ??:", "* 方針:")
+text = text.replace(
+    "* - Android ???????? path + ??????????? Placeholder?",
+    "* - Android 実装済み画面のみ path + ラベルを登録（未実装は Placeholder）",
+)
+text = text.replace(
+    "* - ????????? menu_codes ?????",
+    "* - 表示権限はユーザー menu_codes でフィルタ",
+)
+text = text.replace(
+    "/** Web `menuConfig.ts` ???????? + ????? leaf ?????? */",
+    "/** Web `menuConfig.ts` の工程別分析 leaf（例: 切断生産性） */",
+)
+text = text.replace(
+    "/** 同一 path に複数 menu code がある場合は leaf 以外の path 一致も含める */",
+    "/** 同一 path に複数 menu code がある場合は leaf 以外の path 一致も含める */",
+)
+text = text.replace(
+    "/** ログインユーザーの menu_codes に基づき表示可能なメニューのみ返す */",
+    "/** ログインユーザーの menu_codes に基づき表示可能なメニューのみ返す */",
 )
 
 proc_map = {
@@ -36,50 +67,21 @@ proc_map = {
     "WELDING": "溶接",
     "INSPECTION": "検査",
 }
-for suffix, label in proc_map.items():
-    content = re.sub(
-        rf'MesActualAnalysisProcess\("{suffix}", "[^"]*",',
-        f'MesActualAnalysisProcess("{suffix}", "{label}",',
-        content,
+for code, label in proc_map.items():
+    text = re.sub(
+        rf'MesActualAnalysisProcess\("{code}", "[^"]*",',
+        f'MesActualAnalysisProcess("{code}", "{label}",',
+        text,
     )
 
-cat_map = {
-    "productivity": "生産性",
-    "utilization": "稼働率",
-    "progress": "進捗",
-    "quality": "品質",
-    "cost": "コスト",
-}
-for cat, label in cat_map.items():
-    content = re.sub(
-        rf'analysisCategory = "{cat}",\n\s+categoryLabel = "[^"]*",',
-        f'analysisCategory = "{cat}",\n                            categoryLabel = "{label}",',
-        content,
-    )
-
-header = (
-    "/**\n"
-    " * 与 Smart-EMAPs frontend `src/router/menuConfig.ts` 层级对齐。\n"
-    " *\n"
-    " * 说明：\n"
-    " * - Android 侧暂时只用「路由 path + 显示名称」来驱动左侧菜单与 Tab。\n"
-    " * - 图标映射为简化映射，不影响路由一致性。\n"
-    " */"
-)
-content = re.sub(r"/\*\*.*?\*/", header, content, count=1, flags=re.DOTALL)
-
-content = content.replace(
-    "/** ?? path ???? menu code??? leaf ??? path ?????? */",
-    "/** 指定 path に紐づく menu code（複数 leaf が同一 path の場合あり） */",
-)
-content = content.replace(
-    "/** ????? menu_codes ???????????????? */",
-    "/** ユーザーの menu_codes に基づき表示可能なメニューを返す */",
-)
-content = content.replace(
-    "/** Web `menuConfig.ts` ???????? + ????? leaf ?????? */",
-    "/** Web `menuConfig.ts` と同様に、工程名 + 分析種別で leaf ラベルを生成 */",
+text = re.sub(
+    r"/\*\* Web `menuConfig\.ts` .*? \*/",
+    "/** Web `menuConfig.ts` の工程別分析 leaf（例: 切断生産性） */",
+    text,
+    count=1,
 )
 
-KT.write_text(content, encoding="utf-8", newline="\n")
-print("OK", names.get("DASHBOARD"))
+KT.write_text(text, encoding="utf-8")
+print(f"Updated labels from {len(names)} menu entries")
+print("DASHBOARD:", names.get("DASHBOARD"))
+print("MES_ACTUAL_INSPECTION:", names.get("MES_ACTUAL_INSPECTION"))

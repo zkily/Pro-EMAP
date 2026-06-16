@@ -30,7 +30,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Save
@@ -450,7 +450,7 @@ private fun ProcessRouteTableRow(
             horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ProcessRouteActionChip("ステップ", Color(0xFF667EEA), Icons.Default.List) { onSteps(route) }
+            ProcessRouteActionChip("ステップ", Color(0xFF667EEA), Icons.AutoMirrored.Filled.List) { onSteps(route) }
             ProcessRouteActionChip("編集", Color(0xFFF59E0B), Icons.Default.Edit) { onEdit(route) }
             ProcessRouteActionChip("削除", Color(0xFFEF4444), Icons.Default.Delete) { onDelete(id) }
         }

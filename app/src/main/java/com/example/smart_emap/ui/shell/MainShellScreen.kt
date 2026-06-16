@@ -108,6 +108,10 @@ import com.example.smart_emap.ui.mes.productivity.InspectionProductivityScreen
 import com.example.smart_emap.ui.mes.productivity.InspectionProductivityViewModel
 import com.example.smart_emap.ui.mes.productivity.WeldingProductivityScreen
 import com.example.smart_emap.ui.mes.productivity.WeldingProductivityViewModel
+import com.example.smart_emap.ui.mes.monitoring.MonitorProcessKey
+import com.example.smart_emap.ui.mes.monitoring.InspectionMonitorScreen
+import com.example.smart_emap.ui.mes.monitoring.ProcessMonitorScreen
+import com.example.smart_emap.ui.mes.monitoring.ProcessMonitorViewModel
 import com.example.smart_emap.ui.mes.utilization.InspectionUtilizationScreen
 import com.example.smart_emap.ui.mes.utilization.InspectionUtilizationViewModel
 import com.example.smart_emap.ui.mes.welding.WeldingActualScreen
@@ -162,6 +166,24 @@ fun MainShellScreen(
         factory = WeldingProductivityViewModel.Factory(
             weldingRepository = appContainer.weldingRepository,
             userRepository = appContainer.systemUserRepository,
+        ),
+    )
+    val inspectionMonitorViewModel: ProcessMonitorViewModel = viewModel(
+        key = "monitor_inspection",
+        factory = ProcessMonitorViewModel.Factory(
+            processKey = MonitorProcessKey.INSPECTION,
+            inspectionRepository = appContainer.inspectionRepository,
+            weldingRepository = appContainer.weldingRepository,
+            systemUserRepository = appContainer.systemUserRepository,
+        ),
+    )
+    val weldingMonitorViewModel: ProcessMonitorViewModel = viewModel(
+        key = "monitor_welding",
+        factory = ProcessMonitorViewModel.Factory(
+            processKey = MonitorProcessKey.WELDING,
+            inspectionRepository = appContainer.inspectionRepository,
+            weldingRepository = appContainer.weldingRepository,
+            systemUserRepository = appContainer.systemUserRepository,
         ),
     )
     val weldingViewModel: WeldingActualViewModel = viewModel(
@@ -434,6 +456,8 @@ fun MainShellScreen(
             inspectionUtilizationViewModel = inspectionUtilizationViewModel,
             inspectionProductivityViewModel = inspectionProductivityViewModel,
             weldingProductivityViewModel = weldingProductivityViewModel,
+            inspectionMonitorViewModel = inspectionMonitorViewModel,
+            weldingMonitorViewModel = weldingMonitorViewModel,
             weldingViewModel = weldingViewModel,
             cuttingViewModel = cuttingViewModel,
             chamferingViewModel = chamferingViewModel,
@@ -490,6 +514,8 @@ private fun MainShellContent(
     inspectionUtilizationViewModel: InspectionUtilizationViewModel,
     inspectionProductivityViewModel: InspectionProductivityViewModel,
     weldingProductivityViewModel: WeldingProductivityViewModel,
+    inspectionMonitorViewModel: ProcessMonitorViewModel,
+    weldingMonitorViewModel: ProcessMonitorViewModel,
     weldingViewModel: WeldingActualViewModel,
     cuttingViewModel: CuttingActualViewModel,
     chamferingViewModel: ChamferingActualViewModel,
@@ -617,6 +643,8 @@ private fun MainShellContent(
                             "/mes/actualAnalysis/utilization/inspection" -> inspectionUtilizationViewModel.refreshAll()
                             "/mes/actualAnalysis/productivity/inspection" -> inspectionProductivityViewModel.refreshAll()
                             "/mes/actualAnalysis/productivity/welding" -> weldingProductivityViewModel.refreshAll()
+                            "/mes/monitoring/inspection" -> inspectionMonitorViewModel.refreshAll()
+                            "/mes/monitoring/welding" -> weldingMonitorViewModel.refreshAll()
                             "/mes/actualDataCollection/welding" -> weldingViewModel.refreshAll()
                             "/mes/actualDataCollection/cutting" -> cuttingViewModel.refreshAll()
                             "/mes/actualDataCollection/chamfering" -> chamferingViewModel.refreshAll()
@@ -668,6 +696,8 @@ private fun MainShellContent(
                     inspectionUtilizationViewModel = inspectionUtilizationViewModel,
                     inspectionProductivityViewModel = inspectionProductivityViewModel,
                     weldingProductivityViewModel = weldingProductivityViewModel,
+                    inspectionMonitorViewModel = inspectionMonitorViewModel,
+                    weldingMonitorViewModel = weldingMonitorViewModel,
                     weldingViewModel = weldingViewModel,
                     cuttingViewModel = cuttingViewModel,
                     chamferingViewModel = chamferingViewModel,
@@ -725,6 +755,8 @@ private fun MainShellContent(
                             inspectionUtilizationViewModel = inspectionUtilizationViewModel,
                             inspectionProductivityViewModel = inspectionProductivityViewModel,
                             weldingProductivityViewModel = weldingProductivityViewModel,
+                            inspectionMonitorViewModel = inspectionMonitorViewModel,
+                            weldingMonitorViewModel = weldingMonitorViewModel,
                             weldingViewModel = weldingViewModel,
                             cuttingViewModel = cuttingViewModel,
                             chamferingViewModel = chamferingViewModel,
@@ -781,6 +813,8 @@ private fun ShellRouteContent(
     inspectionUtilizationViewModel: InspectionUtilizationViewModel,
     inspectionProductivityViewModel: InspectionProductivityViewModel,
     weldingProductivityViewModel: WeldingProductivityViewModel,
+    inspectionMonitorViewModel: ProcessMonitorViewModel,
+    weldingMonitorViewModel: ProcessMonitorViewModel,
     weldingViewModel: WeldingActualViewModel,
     cuttingViewModel: CuttingActualViewModel,
     chamferingViewModel: ChamferingActualViewModel,
@@ -878,6 +912,11 @@ private fun ShellRouteContent(
         "/mes/actualAnalysis/productivity/welding" -> WeldingProductivityScreen(
             viewModel = weldingProductivityViewModel,
         )
+        "/mes/monitoring/inspection" -> InspectionMonitorScreen(
+            viewModel = inspectionMonitorViewModel,
+            onNavigate = onNavigate,
+        )
+        "/mes/monitoring/welding" -> ProcessMonitorScreen(viewModel = weldingMonitorViewModel)
         "/mes/actualDataCollection/welding" -> WeldingActualScreen(viewModel = weldingViewModel)
         "/mes/actualDataCollection/cutting" -> CuttingActualScreen(viewModel = cuttingViewModel)
         "/mes/actualDataCollection/chamfering" -> ChamferingActualScreen(viewModel = chamferingViewModel)

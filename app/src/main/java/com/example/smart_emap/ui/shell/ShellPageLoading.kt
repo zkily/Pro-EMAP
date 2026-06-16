@@ -48,6 +48,7 @@ import com.example.smart_emap.ui.mes.inspectionregistration.InspectionManualRegi
 import com.example.smart_emap.ui.mes.planinstruction.PlanInstructionViewModel
 import com.example.smart_emap.ui.mes.productivity.InspectionProductivityViewModel
 import com.example.smart_emap.ui.mes.productivity.WeldingProductivityViewModel
+import com.example.smart_emap.ui.mes.monitoring.ProcessMonitorViewModel
 import com.example.smart_emap.ui.mes.utilization.InspectionUtilizationViewModel
 import com.example.smart_emap.ui.mes.welding.WeldingActualViewModel
 import com.example.smart_emap.ui.mes.welding.WeldingUiState
@@ -91,6 +92,8 @@ fun rememberShellPageLoading(
     inspectionUtilizationViewModel: InspectionUtilizationViewModel,
     inspectionProductivityViewModel: InspectionProductivityViewModel,
     weldingProductivityViewModel: WeldingProductivityViewModel,
+    inspectionMonitorViewModel: ProcessMonitorViewModel,
+    weldingMonitorViewModel: ProcessMonitorViewModel,
     weldingViewModel: WeldingActualViewModel,
     cuttingViewModel: CuttingActualViewModel,
     chamferingViewModel: ChamferingActualViewModel,
@@ -135,6 +138,8 @@ fun rememberShellPageLoading(
     val inspectionUtilization by inspectionUtilizationViewModel.uiState.collectAsState()
     val inspectionProductivity by inspectionProductivityViewModel.uiState.collectAsState()
     val weldingProductivity by weldingProductivityViewModel.uiState.collectAsState()
+    val inspectionMonitor by inspectionMonitorViewModel.uiState.collectAsState()
+    val weldingMonitor by weldingMonitorViewModel.uiState.collectAsState()
     val welding by weldingViewModel.uiState.collectAsState()
     val cutting by cuttingViewModel.uiState.collectAsState()
     val chamfering by chamferingViewModel.uiState.collectAsState()
@@ -188,6 +193,8 @@ fun rememberShellPageLoading(
         inspectionProductivity.loadingProducts,
         weldingProductivity.isLoading,
         weldingProductivity.loadingProducts,
+        inspectionMonitor.isLoading,
+        weldingMonitor.isLoading,
         welding.isLoadingPlans,
         welding.isLoadingProducts,
         welding.isLoadingDefects,
@@ -245,6 +252,8 @@ fun rememberShellPageLoading(
                 inspectionProductivity.isLoading || inspectionProductivity.loadingProducts
             "/mes/actualAnalysis/productivity/welding" ->
                 weldingProductivity.isLoading || weldingProductivity.loadingProducts
+            "/mes/monitoring/inspection" -> inspectionMonitor.isLoading && !inspectionMonitor.hasInitialData
+            "/mes/monitoring/welding" -> weldingMonitor.isLoading && !weldingMonitor.hasInitialData
             "/mes/actualDataCollection/welding" -> mesWeldingLikeLoading(welding)
             "/mes/actualDataCollection/cutting" -> mesCuttingLikeLoading(cutting)
             "/mes/actualDataCollection/chamfering" -> mesChamferingLikeLoading(chamfering)

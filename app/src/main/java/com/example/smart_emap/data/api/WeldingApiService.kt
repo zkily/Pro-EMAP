@@ -17,6 +17,7 @@ interface WeldingApiService {
     @GET("/api/plan/welding-management/list")
     suspend fun list(
         @Query("production_day") productionDay: String? = null,
+        @Query("welding_machine") weldingMachine: String? = null,
         @Query("hide_completed") hideCompleted: Boolean? = null,
         @Query("limit") limit: Int? = null,
     ): WeldingListResponse

@@ -22,6 +22,7 @@ data class InspectionManualRegistrationUiState(
     val productionDay: String = MesCalendarUtils.jstToday(),
     val inspectorUserId: Int? = null,
     val inspectorFilterId: Int? = null,
+    val listPage: Int = 1,
     val productCd: String = "",
     val productName: String = "",
     val boxQtyText: String = "",
@@ -29,8 +30,8 @@ data class InspectionManualRegistrationUiState(
     val qtyInputSource: String? = null,
     val startedAtText: String = "",
     val endedAtText: String = "",
-    val breakMin: Int = 0,
-    val stopMin: Int = 0,
+    val breakMinText: String = "",
+    val stopMinText: String = "",
     val registrationNote: String = "",
     val defects: Map<String, Int> = emptyMap(),
     val editingRowId: Int? = null,
@@ -48,7 +49,12 @@ data class InspectionManualRegistrationUiState(
     val snackbarMessage: String? = null,
     val confirmDeleteRow: InspectionManagementRowDto? = null,
     val confirmQtyMismatch: Boolean = false,
+    val productionSequence: Int? = null,
 ) {
+    companion object {
+        const val LIST_PAGE_SIZE = 10
+    }
+
     val isEdit: Boolean get() = editingRowId != null
     val inspectorSelected: Boolean get() = (inspectorUserId ?: 0) > 0
     val productSelected: Boolean get() = isEdit || productCd.isNotBlank()
@@ -57,6 +63,17 @@ data class InspectionManualRegistrationUiState(
             val fid = inspectorFilterId ?: return rows
             return rows.filter { it.mesInspectorUserId == fid }
         }
+    val listTotalPages: Int
+        get() {
+            val total = filteredRows.size
+            return maxOf(1, (total + LIST_PAGE_SIZE - 1) / LIST_PAGE_SIZE)
+        }
+    val pagedFilteredRows: List<InspectionManagementRowDto>
+        get() {
+            val page = listPage.coerceIn(1, listTotalPages)
+            val start = (page - 1) * LIST_PAGE_SIZE
+            return filteredRows.drop(start).take(LIST_PAGE_SIZE)
+        }
     val unitPerBox: Int
         get() {
             val code = productCd.trim()
@@ -64,6 +81,20 @@ data class InspectionManualRegistrationUiState(
             return products.firstOrNull { it.normalizedCode() == code }?.unitPerBox?.coerceAtLeast(0) ?: 0
         }
     val totalDefects: Int get() = defects.values.sumOf { it.coerceAtLeast(0) }
+    val breakMin: Int
+        get() = InspectionManualRegistrationLogic.parseQtyInput(breakMinText)?.coerceIn(0, 999) ?: 0
+    val stopMin: Int
+        get() = InspectionManualRegistrationLogic.parseQtyInput(stopMinText)?.coerceIn(0, 999) ?: 0
+    val timeSummary: InspectionManualRegistrationLogic.TimeSummary
+        get() = InspectionManualRegistrationLogic.buildTimeSummary(
+            productionDay = productionDay,
+            startedAtText = startedAtText,
+            endedAtText = endedAtText,
+            breakMin = breakMin,
+            stopMin = stopMin,
+        )
+    val qtyMismatch: InspectionManualRegistrationLogic.QtyMismatchInfo?
+        get() = InspectionManualRegistrationLogic.buildQtyMismatch(pieceQtyText, unitPerBox)
 }
 
 class InspectionManualRegistrationViewModel(
@@ -92,7 +123,7 @@ class InspectionManualRegistrationViewModel(
 
     fun setProductionDay(day: String) {
         val normalized = day.trim().take(10)
-        _uiState.update { it.copy(productionDay = normalized) }
+        _uiState.update { it.copy(productionDay = normalized, listPage = 1) }
         loadRows()
     }
 
@@ -130,8 +161,19 @@ class InspectionManualRegistrationViewModel(
     }
 
     fun setInspectorFilterId(id: Int?) {
-        _uiState.update { it.copy(inspectorFilterId = id) }
+        _uiState.update { it.copy(inspectorFilterId = id, listPage = 1) }
     }
+
+    fun setListPage(page: Int) {
+        _uiState.update { state ->
+            val p = page.coerceIn(1, state.listTotalPages)
+            state.copy(listPage = p)
+        }
+    }
+
+    fun prevListPage() = setListPage(_uiState.value.listPage - 1)
+
+    fun nextListPage() = setListPage(_uiState.value.listPage + 1)
 
     fun onProductSelected(productCd: String) {
         val product = _uiState.value.products.firstOrNull { it.normalizedCode() == productCd.trim() }
@@ -200,16 +242,16 @@ class InspectionManualRegistrationViewModel(
         }
     }
 
-    fun setBreakMin(value: Int) {
-        _uiState.update { it.copy(breakMin = value.coerceAtLeast(0)) }
+    fun onBreakMinInput(raw: String) {
+        _uiState.update { it.copy(breakMinText = raw.filter { it.isDigit() }.take(3)) }
     }
 
-    fun setStopMin(value: Int) {
-        _uiState.update { it.copy(stopMin = value.coerceAtLeast(0)) }
+    fun onStopMinInput(raw: String) {
+        _uiState.update { it.copy(stopMinText = raw.filter { it.isDigit() }.take(3)) }
     }
 
     fun setRegistrationNote(value: String) {
-        _uiState.update { it.copy(registrationNote = value) }
+        _uiState.update { it.copy(registrationNote = value.take(500)) }
     }
 
     fun bumpDefect(defectCd: String, delta: Int) {
@@ -262,6 +304,7 @@ class InspectionManualRegistrationViewModel(
         _uiState.update {
             it.copy(
                 editingRowId = row.id,
+                productionSequence = row.productionSequence,
                 productionDay = day,
                 inspectorUserId = row.mesInspectorUserId,
                 productCd = productCd,
@@ -277,8 +320,8 @@ class InspectionManualRegistrationViewModel(
                 endedAtText = InspectionManualRegistrationLogic.formatTimeDisplay(
                     InspectionManualRegistrationLogic.timeOnlyFromIso(row.mesProductionEndedAt),
                 ),
-                breakMin = breakMin,
-                stopMin = stopMin,
+                breakMinText = if (breakMin > 0) breakMin.toString() else "",
+                stopMinText = if (stopMin > 0) stopMin.toString() else "",
             )
         }
         setProductionDay(day)
@@ -410,6 +453,7 @@ class InspectionManualRegistrationViewModel(
                     rowId,
                     PatchInspectionBody(
                         productionDay = day,
+                        productionSequence = state.productionSequence?.takeIf { state.isEdit },
                         mesInspectorUserId = state.inspectorUserId,
                         productionCompletedCheck = true,
                         manualRegistration = true,
@@ -444,7 +488,11 @@ class InspectionManualRegistrationViewModel(
             _uiState.update { it.copy(isLoadingRows = true) }
             runCatching { repository.loadPlans(_uiState.value.productionDay) }
                 .onSuccess { list ->
-                    _uiState.update { it.copy(isLoadingRows = false, rows = list.sortedWith(rowCompare)) }
+                    _uiState.update { state ->
+                        val sorted = list.sortedWith(rowCompare)
+                        val withRows = state.copy(isLoadingRows = false, rows = sorted)
+                        withRows.copy(listPage = withRows.listPage.coerceIn(1, withRows.listTotalPages))
+                    }
                 }
                 .onFailure {
                     _uiState.update { it.copy(isLoadingRows = false) }
@@ -488,15 +536,29 @@ class InspectionManualRegistrationViewModel(
         }
     }
 
+    fun inspectorLabel(userId: Int?): String {
+        if (userId == null) return "未選択"
+        return _uiState.value.inspectors.find { it.id == userId }?.displayLabel().orEmpty().ifBlank { userId.toString() }
+    }
+
+    fun canEditRow(row: InspectionManagementRowDto): Boolean =
+        !InspectionManualRegistrationLogic.isRowMesInProgress(row)
+
+    fun canDeleteRow(row: InspectionManagementRowDto): Boolean =
+        !InspectionManualRegistrationLogic.isRowMesInProgress(row)
+
     private fun showMessage(message: String) {
         _uiState.update { it.copy(snackbarMessage = message) }
     }
 
     private val rowCompare =
         Comparator<InspectionManagementRowDto> { a, b ->
-            val seqA = a.productionSequence ?: 0
-            val seqB = b.productionSequence ?: 0
-            if (seqA != seqB) seqA.compareTo(seqB) else (a.id ?: 0).compareTo(b.id ?: 0)
+            val idA = a.id ?: 0
+            val idB = b.id ?: 0
+            when {
+                idA != idB -> idB.compareTo(idA)
+                else -> (b.updatedAt.orEmpty()).compareTo(a.updatedAt.orEmpty())
+            }
         }
 
     class Factory(

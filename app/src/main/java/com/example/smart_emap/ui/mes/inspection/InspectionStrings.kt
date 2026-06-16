@@ -125,6 +125,14 @@ data class InspStrings(
     val editPauseTooLong: String,
     val qtyInvalid: String,
     val remarks: String,
+    val nextAssignmentStripTitle: String,
+    val nextAssignmentApplySelect: String,
+    val nextAssignmentApplySelectShort: String,
+    val nextAssignmentProductNotFound: String,
+    val inProgressPanelOpen: String,
+    val inspectorMissing: String,
+    val helpDialogTitle: String,
+    val helpDialogBody: String,
 )
 
 private val JA = InspStrings(
@@ -242,6 +250,14 @@ private val JA = InspStrings(
     editPauseTooLong = "一時停止累計は開始〜終了の時間以内にしてください",
     qtyInvalid = "生産数を正しく入力してください",
     remarks = "備考",
+    nextAssignmentStripTitle = "次の製品（参考）",
+    nextAssignmentApplySelect = "検査製品にこの製品を選ぶ",
+    nextAssignmentApplySelectShort = "選ぶ",
+    nextAssignmentProductNotFound = "参考製品が検査製品一覧に見つかりません",
+    inProgressPanelOpen = "検査生産中一覧を表示",
+    inspectorMissing = "未選択",
+    helpDialogTitle = "操作説明",
+    helpDialogBody = "1. 生産日・検査製品を選び「生産開始」で計測を開始します。\n2. 一時停止・休憩・再開で稼働時間を記録します。\n3. 不良は項目別に +/- で入力します（生産中のみ）。\n4. 「生産終了」で箱数/本数を確定し実績を保存します。\n5. 班長が指定した「次の製品（参考）」は「選ぶ」で検査製品に反映できます。\n6. オフライン時は端末に保存され、接続復旧後に自動同期されます。",
 )
 
 private val EN = InspStrings(
@@ -359,6 +375,14 @@ private val EN = InspStrings(
     editPauseTooLong = "Pause total must not exceed the start–end window",
     qtyInvalid = "Enter a valid production quantity",
     remarks = "Remarks",
+    nextAssignmentStripTitle = "Next product (reference)",
+    nextAssignmentApplySelect = "Select this product for inspection",
+    nextAssignmentApplySelectShort = "Select",
+    nextAssignmentProductNotFound = "Reference product not found in the inspection product list",
+    inProgressPanelOpen = "Show in-progress inspections",
+    inspectorMissing = "Not set",
+    helpDialogTitle = "Operation guide",
+    helpDialogBody = "1. Choose production date and product, then tap Start production.\n2. Use Pause, Break, and Resume to record time.\n3. Enter defects by item with +/- while in production.\n4. Tap End production to confirm quantity and save.\n5. Use Select on Next product (reference) if assigned by supervisor.\n6. Offline changes are stored on device and sync when online.",
 )
 
 private val ZH = InspStrings(
@@ -476,6 +500,14 @@ private val ZH = InspStrings(
     editPauseTooLong = "暂停累计不能超过开始至结束的时间范围",
     qtyInvalid = "请输入正确的生产数量",
     remarks = "备注",
+    nextAssignmentStripTitle = "下一产品（参考）",
+    nextAssignmentApplySelect = "在检查产品中选择此产品",
+    nextAssignmentApplySelectShort = "选择",
+    nextAssignmentProductNotFound = "参考产品在检查产品列表中未找到",
+    inProgressPanelOpen = "显示检查生产中一览",
+    inspectorMissing = "未选择",
+    helpDialogTitle = "操作说明",
+    helpDialogBody = "1. 选择生产日期与检查产品后，点击「开始生产」开始计时。\n2. 使用暂停、休息、再开记录时间。\n3. 生产中可用 +/- 按项目录入不良。\n4. 「结束生产」确认箱数/本数并保存实绩。\n5. 班长指定的「下一产品（参考）」可点「选择」填入检查产品。\n6. 离线时保存在本机，联网后自动同步。",
 )
 
 private val VI = InspStrings(
@@ -593,6 +625,14 @@ private val VI = InspStrings(
     editPauseTooLong = "Tổng tạm dừng không được vượt quá khoảng bắt đầu–kết thúc",
     qtyInvalid = "Nhập số lượng sản xuất hợp lệ",
     remarks = "Ghi chú",
+    nextAssignmentStripTitle = "Sản phẩm tiếp theo (tham khảo)",
+    nextAssignmentApplySelect = "Chọn sản phẩm này cho kiểm tra",
+    nextAssignmentApplySelectShort = "Chọn",
+    nextAssignmentProductNotFound = "Không tìm thấy sản phẩm tham khảo trong danh sách",
+    inProgressPanelOpen = "Hiển thị danh sách đang sản xuất",
+    inspectorMissing = "Chưa chọn",
+    helpDialogTitle = "Hướng dẫn vận hành",
+    helpDialogBody = "1. Chọn ngày sản xuất và sản phẩm, nhấn Bắt đầu sản xuất.\n2. Tạm dừng, nghỉ và tiếp tục để ghi thời gian.\n3. Nhập lỗi theo hạng mục bằng +/- khi đang sản xuất.\n4. Kết thúc sản xuất để xác nhận số lượng và lưu.\n5. Sản phẩm tiếp theo (tham khảo) do tổ trưởng chỉ định có thể nhấn Chọn.\n6. Ngoại tuyến: lưu trên thiết bị, đồng bộ khi có mạng.",
 )
 
 fun inspStringsFor(locale: InspLocale): InspStrings = when (locale) {

@@ -20,3 +20,6 @@
 
 # 项目数据模型 (Dto)
 -keep class com.example.smart_emap.data.model.** { *; }
+-keep @interface com.example.smart_emap.data.model.MesDefectByItem
+-keep class com.example.smart_emap.data.model.MesDefectByItemAdapterFactory { *; }
+-keep class com.example.smart_emap.data.model.MesDefectByItemMapAdapter { *; }

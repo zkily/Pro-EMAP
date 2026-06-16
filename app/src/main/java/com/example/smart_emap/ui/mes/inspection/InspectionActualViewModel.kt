@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.smart_emap.core.mes.InspectionOfflineStore
 import com.example.smart_emap.core.mes.InspectionRowSnapshot
 import com.example.smart_emap.core.mes.InspectionSessionLogic
+import com.example.smart_emap.core.mes.MesDateTime
 import com.example.smart_emap.core.mes.PendingCreatePlan
 import com.example.smart_emap.core.mes.PlanSession
 import com.example.smart_emap.core.mes.TimerPhase
@@ -13,6 +14,7 @@ import com.example.smart_emap.core.network.NetworkErrors
 import com.example.smart_emap.core.network.NetworkMonitor
 import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.InspectionManagementRowDto
+import com.example.smart_emap.data.model.InspectionNextAssignmentDto
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.example.smart_emap.data.model.PatchInspectionBody
 import com.example.smart_emap.data.repository.InspectionPatchException
@@ -25,6 +27,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -43,6 +47,8 @@ enum class InspRetryAction {
     ReloadDefects,
     ReloadSync,
 }
+
+private const val RECONNECT_SYNC_DELAY_MS = 500L
 
 private fun jstToday(): String {
     val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd")
@@ -126,6 +132,12 @@ data class InspectionUiState(
     val isOfflineMode: Boolean = false,
     val showActiveProductionSwitchBanner: Boolean = false,
     val activeProductionSwitchLabel: String = "",
+    val showNextAssignmentStrip: Boolean = false,
+    val nextAssignmentProductLabel: String = "",
+    val nextAssignmentProductTitle: String = "",
+    val canApplyNextAssignmentProduct: Boolean = false,
+    val inProgressPanelVisible: Boolean = false,
+    val helpDialogVisible: Boolean = false,
 )
 
 class InspectionActualViewModel(
@@ -141,8 +153,10 @@ class InspectionActualViewModel(
     private var defectItems = listOf<ProcessDefectItemDto>()
     private var tickJob: Job? = null
     private var syncJob: Job? = null
-    private var syncInFlight = false
+    private var checkpointJob: Job? = null
+    private val planSyncMutex = Mutex()
     private var flushInFlight = false
+    private var reconnectSyncJob: Job? = null
     private var clientInstanceId: String = ""
     private var confirmedEditSnapshot: ConfirmedEditSnapshot? = null
 
@@ -159,6 +173,12 @@ class InspectionActualViewModel(
 
     private var started = false
     private var networkJob: Job? = null
+    /** loadInitial の初回一覧取得完了前はネットワーク復帰同期を走らせない */
+    private var initialPlansLoadCompleted = false
+    /** 直近の成功同期以降にオフラインになった場合のみ stale バナーを許可 */
+    private var wasOfflineSinceLastSuccessfulSync = false
+    private var myNextAssignment: InspectionNextAssignmentDto? = null
+    private var nextAssignmentAutoClearInFlight = false
 
     /** 进入検査画面后再拉取计划与轮询，避免主界面挂载时触发 /api/plan/inspection-management/list。 */
     fun ensureStarted() {
@@ -171,6 +191,7 @@ class InspectionActualViewModel(
             loadInitial()
             startTickLoop()
             startSyncLoop()
+            startCheckpointLoop()
             if (networkMonitor.currentOnline()) {
                 flushOfflineQueue()
             }
@@ -179,8 +200,10 @@ class InspectionActualViewModel(
             networkMonitor.isOnline.collect { online ->
                 _uiState.update { it.copy(isNetworkOnline = online, isOfflineMode = !online || it.pendingSyncCount > 0) }
                 if (online) {
-                    flushOfflineQueue()
-                    syncPlansFromServer(force = true)
+                    scheduleReconnectSync()
+                } else {
+                    wasOfflineSinceLastSuccessfulSync = true
+                    reconnectSyncJob?.cancel()
                 }
             }
         }
@@ -189,7 +212,9 @@ class InspectionActualViewModel(
     override fun onCleared() {
         tickJob?.cancel()
         syncJob?.cancel()
+        checkpointJob?.cancel()
         networkJob?.cancel()
+        reconnectSyncJob?.cancel()
         super.onCleared()
     }
 
@@ -258,10 +283,7 @@ class InspectionActualViewModel(
                 InspRetryAction.ReloadProducts -> fetchProducts(showSnackbarOnError = false)
                 InspRetryAction.ReloadPlans -> loadPlans(showLoading = true)
                 InspRetryAction.ReloadDefects -> loadDefectItems(showLoading = true)
-                InspRetryAction.ReloadSync -> {
-                    flushOfflineQueue()
-                    syncPlansFromServer(force = true)
-                }
+                InspRetryAction.ReloadSync -> recoverServerSync(userInitiated = true)
             }
         }
     }
@@ -301,6 +323,71 @@ class InspectionActualViewModel(
         _uiState.update { it.copy(selectedProductCode = code) }
         bindActivePlanFromSelection()
         publishUi()
+        code?.let { selected ->
+            viewModelScope.launch {
+                clearMyNextAssignmentIfSelectedProductMatches(selected)
+                publishUi()
+            }
+        }
+    }
+
+    fun applyNextAssignmentProductSelection() {
+        val s = inspStringsFor(_uiState.value.locale)
+        if (_uiState.value.productSelectionLocked) {
+            _uiState.update { it.copy(snackbarMessage = s.switchProductBlocked) }
+            return
+        }
+        val code = resolveProductCodeFromNextAssignment(_uiState.value.products) ?: run {
+            _uiState.update { it.copy(snackbarMessage = s.nextAssignmentProductNotFound) }
+            return
+        }
+        onProductSelected(code)
+    }
+
+    fun openInProgressPanel() {
+        _uiState.update { it.copy(inProgressPanelVisible = true) }
+    }
+
+    fun closeInProgressPanel() {
+        _uiState.update { it.copy(inProgressPanelVisible = false) }
+    }
+
+    fun onInProgressPanelRowClick(row: InspectionManagementRowDto) {
+        focusInProgressRow(row)
+        closeInProgressPanel()
+    }
+
+    fun onInProgressPanelResume(row: InspectionManagementRowDto) {
+        viewModelScope.launch {
+            resumeInProgressSession(row)
+            closeInProgressPanel()
+        }
+    }
+
+    fun openHelpDialog() {
+        _uiState.update { it.copy(helpDialogVisible = true) }
+    }
+
+    fun closeHelpDialog() {
+        _uiState.update { it.copy(helpDialogVisible = false) }
+    }
+
+    fun inspectorNameForInProgressRow(row: InspectionManagementRowDto): String {
+        val s = inspStringsFor(_uiState.value.locale)
+        return row.mesInspectorName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: row.mesInspectorUsername?.trim()?.takeIf { it.isNotEmpty() }
+            ?: if (row.mesInspectorUserId == userId) inspectorLabel
+            else row.mesInspectorUserId?.toString() ?: s.inspectorMissing
+    }
+
+    fun inProgressRowStatusLabel(row: InspectionManagementRowDto): String {
+        val s = inspStringsFor(_uiState.value.locale)
+        if (rowMesLockOwner(row) == MesLockOwner.Other) return s.sessionLockedByOtherTerminalShort
+        return when (row.mesProductionIsPaused) {
+            1 -> s.timerPaused
+            2 -> s.timerBreak
+            else -> s.timerRunning
+        }
     }
 
     fun focusInProgressRow(row: InspectionManagementRowDto) {
@@ -370,6 +457,7 @@ class InspectionActualViewModel(
                 _uiState.update { it.copy(selectedProductCode = code, activePlanId = planId) }
             }
             syncSessionFromRow(planId)
+            alignSessionElapsedFromWallClock(planId, row)
             publishUi()
             _uiState.update { it.copy(snackbarMessage = s.sessionResumed) }
         }
@@ -403,7 +491,13 @@ class InspectionActualViewModel(
                         productName = product.productName.trim().ifEmpty { code },
                     )
                     if (planId > 0) {
-                        loadPlans(rebindSelection = false)
+                        upsertLocalPlanRow(
+                            planId = planId,
+                            productionDay = state.productionDay,
+                            productCd = code,
+                            productName = product.productName.trim().ifEmpty { code },
+                            startedAt = null,
+                        )
                     }
                 }
                 findOtherActiveRowForInspector(userId, planId)?.let { other ->
@@ -462,9 +556,6 @@ class InspectionActualViewModel(
                     session.wallStart = null
                     session.runningSliceStart = null
                     publishUi()
-                    if (networkMonitor.currentOnline()) {
-                        applyPlansFromServer(showLoading = false, rebindSelection = false)
-                    }
                     return@launch
                 }
                 upsertLocalPlanRow(
@@ -474,13 +565,11 @@ class InspectionActualViewModel(
                     productName = product.productName.trim().ifEmpty { code },
                     startedAt = iso,
                 )
+                updateLocalRowAfterMesStart(planId, iso)
                 _uiState.update {
                     it.copy(snackbarMessage = inspStringsFor(it.locale).started)
                 }
                 publishUi()
-                if (networkMonitor.currentOnline()) {
-                    applyPlansFromServer(showLoading = false, rebindSelection = false)
-                }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(snackbarMessage = formatNetworkError(e, inspStringsFor(it.locale).saveFailed))
@@ -511,8 +600,13 @@ class InspectionActualViewModel(
         if (!InspectionSessionLogic.isTimerPaused(session)) return
         val now = System.currentTimeMillis()
         InspectionSessionLogic.flushPauseSlice(session, now)
-        session.runningSliceStart = now
-        session.pauseSliceStart = null
+        val ws = resolveSessionWallStartMs(session, planId)
+        if (ws != null) {
+            InspectionSessionLogic.correctNetProductionFromWallClock(session, ws, now)
+        } else {
+            session.runningSliceStart = now
+            session.pauseSliceStart = null
+        }
         viewModelScope.launch {
             persistTimerCheckpoint(planId, session)
             publishUi()
@@ -540,8 +634,13 @@ class InspectionActualViewModel(
         if (!InspectionSessionLogic.isTimerOnBreak(session)) return
         val now = System.currentTimeMillis()
         InspectionSessionLogic.flushBreakSlice(session, now)
-        session.runningSliceStart = now
-        session.breakSliceStart = null
+        val ws = resolveSessionWallStartMs(session, planId)
+        if (ws != null) {
+            InspectionSessionLogic.correctNetProductionFromWallClock(session, ws, now)
+        } else {
+            session.runningSliceStart = now
+            session.breakSliceStart = null
+        }
         viewModelScope.launch {
             persistTimerCheckpoint(planId, session)
             publishUi()
@@ -931,16 +1030,15 @@ class InspectionActualViewModel(
                 _uiState.update {
                     it.copy(
                         activePlanId = null,
+                        selectedProductCode = null,
                         endDialogVisible = false,
                         endDialogSubmitting = false,
                         snackbarMessage = savedMsg,
                     )
                 }
-                if (networkMonitor.currentOnline()) {
-                    loadPlans()
-                } else {
-                    publishUi()
-                }
+                loadPlans(showLoading = false, rebindSelection = false)
+                syncMyNextAssignment()
+                publishUi()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -1007,7 +1105,7 @@ class InspectionActualViewModel(
     }
 
     private suspend fun flushOfflineQueue() {
-        if (!networkMonitor.currentOnline()) return
+        if (!networkMonitor.checkOnline()) return
         if (flushInFlight) return
         if (offlineStore.pendingCount() == 0) return
         flushInFlight = true
@@ -1230,10 +1328,15 @@ class InspectionActualViewModel(
     }
 
     private suspend fun loadInitial() {
+        initialPlansLoadCompleted = false
         _uiState.update { it.copy(isLoadingDefects = true) }
-        fetchProducts(showSnackbarOnError = false)
-        loadDefectItems(showLoading = true)
-        loadPlans(showLoading = true)
+        try {
+            fetchProducts(showSnackbarOnError = false)
+            loadDefectItems(showLoading = true)
+            loadPlans(showLoading = true)
+        } finally {
+            initialPlansLoadCompleted = true
+        }
     }
 
     private suspend fun loadDefectItems(showLoading: Boolean = false) {
@@ -1264,38 +1367,79 @@ class InspectionActualViewModel(
             }
     }
 
-    private suspend fun loadPlans(showLoading: Boolean = false, rebindSelection: Boolean = true) {
-        applyPlansFromServer(showLoading = showLoading, rebindSelection = rebindSelection)
+    private suspend fun loadPlans(
+        showLoading: Boolean = false,
+        rebindSelection: Boolean = true,
+        allowStaleBanner: Boolean = false,
+    ) {
+        applyPlansFromServer(
+            showLoading = showLoading,
+            rebindSelection = rebindSelection,
+            allowStaleBanner = allowStaleBanner,
+        )
     }
 
-    /** Web の syncMesStateFromServer：バックグラウンド同期はローディング表示しない */
-    private suspend fun syncPlansFromServer(force: Boolean = false) {
-        if (!force && syncInFlight) return
-        syncInFlight = true
-        try {
-            applyPlansFromServer(showLoading = false, rebindSelection = false)
-        } finally {
-            syncInFlight = false
+    /** Web の syncMesStateFromServer：バックグラウンド同期は失敗しても stale バナーを出さない */
+    private suspend fun syncPlansFromServer() {
+        applyPlansFromServer(showLoading = false, rebindSelection = false, allowStaleBanner = false)
+    }
+
+    private fun scheduleReconnectSync() {
+        reconnectSyncJob?.cancel()
+        reconnectSyncJob = viewModelScope.launch {
+            delay(RECONNECT_SYNC_DELAY_MS)
+            if (!networkMonitor.checkOnline()) return@launch
+            if (!initialPlansLoadCompleted) return@launch
+            recoverServerSync(userInitiated = false)
         }
     }
 
-    private suspend fun applyPlansFromServer(showLoading: Boolean, rebindSelection: Boolean) {
+    /** オフライン復帰・「再読込」：キュー送信後にサーバー一覧を再取得 */
+    private suspend fun recoverServerSync(userInitiated: Boolean) {
+        if (userInitiated) {
+            _uiState.update { it.copy(syncStaleMessage = null) }
+        }
+        if (!networkMonitor.checkOnline()) {
+            if (userInitiated) {
+                val s = inspStringsFor(_uiState.value.locale)
+                _uiState.update {
+                    it.copy(syncStaleMessage = s.networkErrorHints().noConnection)
+                }
+            }
+            return
+        }
+        flushOfflineQueue()
+        val allowStaleBanner = userInitiated || wasOfflineSinceLastSuccessfulSync
+        applyPlansFromServer(
+            showLoading = false,
+            rebindSelection = true,
+            allowStaleBanner = allowStaleBanner,
+        )
+    }
+
+    private suspend fun applyPlansFromServer(
+        showLoading: Boolean,
+        rebindSelection: Boolean,
+        allowStaleBanner: Boolean = false,
+    ) {
+        planSyncMutex.withLock {
+            applyPlansFromServerLocked(showLoading, rebindSelection, allowStaleBanner)
+        }
+    }
+
+    private suspend fun applyPlansFromServerLocked(
+        showLoading: Boolean,
+        rebindSelection: Boolean,
+        allowStaleBanner: Boolean,
+    ) {
         if (showLoading) {
             _uiState.update { it.copy(isLoadingPlans = true) }
         }
         val s = inspStringsFor(_uiState.value.locale)
         runCatching { repository.loadPlans(_uiState.value.productionDay) }
             .onSuccess { rows ->
-                managementRows = rows
-                rows.forEach { row ->
-                    val id = row.id ?: return@forEach
-                    if (id !in sessions) {
-                        sessions[id] = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
-                    }
-                    if (shouldHydrateSessionFromServer(id)) {
-                        syncSessionFromRow(id, row)
-                    }
-                }
+                wasOfflineSinceLastSuccessfulSync = false
+                managementRows = mergeServerPlansPreservingLocalMes(rows)
                 val wasStale = _uiState.value.syncStaleMessage != null
                 _uiState.update { state ->
                     state.copy(
@@ -1305,13 +1449,25 @@ class InspectionActualViewModel(
                         snackbarMessage = if (wasStale && !showLoading) s.syncRecovered else state.snackbarMessage,
                     )
                 }
+                runCatching {
+                    rows.forEach { row ->
+                        val id = row.id ?: return@forEach
+                        if (id !in sessions) {
+                            sessions[id] = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+                        }
+                        if (shouldHydrateSessionFromServer(id)) {
+                            syncSessionFromRow(id, row)
+                        }
+                    }
+                }
                 if (rebindSelection) {
                     bindActivePlanFromSelection()
                 }
                 tryReclaimOperatedPlansOnLoad()
                 detachFromRemoteInProgressContext()
+                syncMyNextAssignment()
                 publishUi()
-                offlineStore.savePlans(_uiState.value.productionDay, managementRows)
+                runCatching { offlineStore.savePlans(_uiState.value.productionDay, managementRows) }
             }
             .onFailure { e ->
                 val msg = formatNetworkError(e, s.loadPlansFailed)
@@ -1323,7 +1479,7 @@ class InspectionActualViewModel(
                 }
                 if (showLoading) {
                     _uiState.update { it.copy(isLoadingPlans = false, plansLoadError = msg) }
-                } else {
+                } else if (allowStaleBanner) {
                     _uiState.update { it.copy(syncStaleMessage = msg) }
                 }
             }
@@ -1404,6 +1560,39 @@ class InspectionActualViewModel(
                 mesDefectByItem = r.mesDefectByItem,
             ),
         )
+        if (InspectionSessionLogic.isProductionInProgress(session)) {
+            InspectionSessionLogic.reconcileInProgressTimer(session)
+        }
+    }
+
+    /** 作業再開・サーバー同期後：稼働時間を生産開始時刻基準で補正（Web correctNetProductionFromWallClock） */
+    private fun alignSessionElapsedFromWallClock(planId: Int, row: InspectionManagementRowDto? = null) {
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isProductionInProgress(session)) return
+        val ws = resolveSessionWallStartMs(session, planId, row) ?: return
+        val now = System.currentTimeMillis()
+        when {
+            InspectionSessionLogic.isTimerPaused(session) || InspectionSessionLogic.isTimerOnBreak(session) -> {
+                val serverNet = row?.mesNetProductionSec ?: managementRows.find { it.id == planId }?.mesNetProductionSec
+                if ((serverNet ?: 0) == 0 && session.activeAccumMs == 0L) {
+                    val pauseMs = InspectionSessionLogic.readExplicitPausedAccumMs(session, now)
+                    val breakMs = InspectionSessionLogic.readExplicitBreakAccumMs(session, now)
+                    session.activeAccumMs = (now - ws - pauseMs - breakMs).coerceAtLeast(0)
+                }
+            }
+            else -> InspectionSessionLogic.correctNetProductionFromWallClock(session, ws, now)
+        }
+    }
+
+    private fun resolveSessionWallStartMs(
+        session: PlanSession,
+        planId: Int,
+        row: InspectionManagementRowDto? = null,
+    ): Long? {
+        session.wallStart?.let { return it }
+        val startedAt = row?.mesProductionStartedAt
+            ?: managementRows.find { it.id == planId }?.mesProductionStartedAt
+        return MesDateTime.parseToMillis(startedAt)
     }
 
     private fun rowMesLockOwner(row: InspectionManagementRowDto?): MesLockOwner {
@@ -1415,7 +1604,7 @@ class InspectionActualViewModel(
 
     private fun canServerPatchPlan(planId: Int): Boolean {
         if (offlineStore.isLocalPlanId(planId) && locallyOperated.contains(planId)) return true
-        if (!networkMonitor.currentOnline() && locallyOperated.contains(planId)) return true
+        if (!networkMonitor.checkOnline() && locallyOperated.contains(planId)) return true
         val row = managementRows.find { it.id == planId } ?: return locallyOperated.contains(planId)
         if (!isRowMesActive(row)) return false
         return when (rowMesLockOwner(row)) {
@@ -1428,7 +1617,7 @@ class InspectionActualViewModel(
     private suspend fun patchWithConflictHandling(planId: Int, body: PatchInspectionBody): Boolean {
         val s = inspStringsFor(_uiState.value.locale)
         val hints = s.networkErrorHints()
-        if (!networkMonitor.currentOnline()) {
+        if (!networkMonitor.checkOnline()) {
             queuePatch(planId, body)
             return true
         }
@@ -1448,7 +1637,7 @@ class InspectionActualViewModel(
             }
             if (e.statusCode == 409) {
                 _uiState.update { it.copy(snackbarMessage = msg) }
-                syncPlansFromServer(force = true)
+                syncPlansFromServer()
                 detachFromRemoteInProgressContext()
                 publishUi()
             } else if (NetworkErrors.isNetworkFailure(e)) {
@@ -1465,6 +1654,52 @@ class InspectionActualViewModel(
             }
             _uiState.update { it.copy(snackbarMessage = formatNetworkError(e, s.saveFailed)) }
             false
+        }
+    }
+
+    /** 本端末計測中はサーバー一覧でローカル MES 状態を上書きしない */
+    private fun mergeServerPlansPreservingLocalMes(
+        fresh: List<InspectionManagementRowDto>,
+    ): List<InspectionManagementRowDto> {
+        val localById = managementRows.associateBy { it.id }
+        return fresh.map { serverRow ->
+            val id = serverRow.id ?: return@map serverRow
+            if (!locallyOperated.contains(id)) return@map serverRow
+            val session = sessions[id] ?: return@map serverRow
+            if (!InspectionSessionLogic.isProductionInProgress(session)) return@map serverRow
+            val local = localById[id] ?: return@map serverRow
+            serverRow.copy(
+                mesProductionStartedAt = local.mesProductionStartedAt ?: serverRow.mesProductionStartedAt,
+                mesProductionEndedAt = local.mesProductionEndedAt,
+                mesProductionIsPaused = local.mesProductionIsPaused ?: serverRow.mesProductionIsPaused,
+                mesClientInstanceId = local.mesClientInstanceId ?: serverRow.mesClientInstanceId,
+                mesInspectorUserId = local.mesInspectorUserId ?: serverRow.mesInspectorUserId,
+                mesNetProductionSec = local.mesNetProductionSec ?: serverRow.mesNetProductionSec,
+                mesBreakSec = local.mesBreakSec ?: serverRow.mesBreakSec,
+                mesStopSec = local.mesStopSec ?: serverRow.mesStopSec,
+                mesPausedAccumSec = local.mesPausedAccumSec ?: serverRow.mesPausedAccumSec,
+                mesDefectByItem = local.mesDefectByItem ?: serverRow.mesDefectByItem,
+            )
+        }
+    }
+
+    /** Web onStartProduction 同様：一覧再取得せずローカル行を更新 */
+    private fun updateLocalRowAfterMesStart(planId: Int, startedAtIso: String) {
+        managementRows = managementRows.map { row ->
+            if (row.id != planId) {
+                row
+            } else {
+                row.copy(
+                    mesProductionStartedAt = startedAtIso,
+                    mesProductionEndedAt = null,
+                    mesProductionIsPaused = 0,
+                    mesInspectorUserId = userId,
+                    mesClientInstanceId = clientInstanceId,
+                )
+            }
+        }
+        viewModelScope.launch {
+            offlineStore.savePlans(_uiState.value.productionDay, managementRows)
         }
     }
 
@@ -1527,13 +1762,10 @@ class InspectionActualViewModel(
                 mesBreakSec = breakSec,
                 mesStopSec = stopSec,
                 mesPausedAccumSec = breakSec + stopSec,
-                mesProductionIsPaused = if (
-                    InspectionSessionLogic.isTimerPaused(session) ||
-                    InspectionSessionLogic.isTimerOnBreak(session)
-                ) {
-                    1
-                } else {
-                    0
+                mesProductionIsPaused = when {
+                    InspectionSessionLogic.isTimerOnBreak(session) -> 2
+                    InspectionSessionLogic.isTimerPaused(session) -> 1
+                    else -> 0
                 },
             ),
         )
@@ -1566,6 +1798,24 @@ class InspectionActualViewModel(
                 (activeId != null && !locallyOperated.contains(activeId))
         } == true
         val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val assignment = myNextAssignment
+        val showNextStrip = assignment?.let {
+            it.nextProductName?.trim()?.isNotEmpty() == true ||
+                it.nextProductCd?.trim()?.isNotEmpty() == true
+        } == true
+        val nextLabel = assignment?.let {
+            it.nextProductName?.trim()?.takeIf { name -> name.isNotEmpty() }
+                ?: it.nextProductCd?.trim().orEmpty()
+        }.orEmpty()
+        val nextTitle = assignment?.let {
+            val cd = it.nextProductCd?.trim().orEmpty()
+            val name = it.nextProductName?.trim().orEmpty()
+            when {
+                cd.isNotEmpty() && name.isNotEmpty() -> "$cd · $name"
+                name.isNotEmpty() -> name
+                else -> cd
+            }
+        }.orEmpty()
 
         val next = state.copy(
             inProgressRows = inProgress,
@@ -1618,6 +1868,10 @@ class InspectionActualViewModel(
             } == true,
             showActiveProductionSwitchBanner = showActiveProductionSwitchBanner,
             activeProductionSwitchLabel = myActiveRow?.let { rowShortLabel(it) }.orEmpty(),
+            showNextAssignmentStrip = showNextStrip,
+            nextAssignmentProductLabel = nextLabel,
+            nextAssignmentProductTitle = nextTitle,
+            canApplyNextAssignmentProduct = !locked && resolveProductCodeFromNextAssignment(state.products) != null,
             endDialogUnitPerBox = unitPerBox,
             endDialogCanSubmit = endDialogCanSubmit(
                 state.endDialogBoxes,
@@ -1685,6 +1939,42 @@ class InspectionActualViewModel(
         }
     }
 
+    /** Web の runningPersistTimer（5s）と同等：計測中はサーバーへ checkpoint を送信し updated_at を更新 */
+    private fun startCheckpointLoop() {
+        checkpointJob?.cancel()
+        checkpointJob = viewModelScope.launch {
+            while (isActive) {
+                delay(MES_CHECKPOINT_INTERVAL_MS)
+                flushInProgressTimerCheckpoints()
+            }
+        }
+    }
+
+    private suspend fun flushInProgressTimerCheckpoints() {
+        val now = System.currentTimeMillis()
+        for ((planId, session) in sessions) {
+            if (!InspectionSessionLogic.isProductionInProgress(session)) continue
+            if (!locallyOperated.contains(planId) && !canServerPatchPlan(planId)) continue
+            when {
+                InspectionSessionLogic.isTimerRunning(session) -> {
+                    InspectionSessionLogic.flushRunningSlice(session, now)
+                    if (session.wallEnd == null && session.pauseSliceStart == null && session.breakSliceStart == null) {
+                        session.runningSliceStart = now
+                    }
+                }
+                InspectionSessionLogic.isTimerPaused(session) -> {
+                    InspectionSessionLogic.flushPauseSlice(session, now)
+                    if (session.wallEnd == null) session.pauseSliceStart = now
+                }
+                InspectionSessionLogic.isTimerOnBreak(session) -> {
+                    InspectionSessionLogic.flushBreakSlice(session, now)
+                    if (session.wallEnd == null) session.breakSliceStart = now
+                }
+            }
+            persistTimerCheckpoint(planId, session)
+        }
+    }
+
     private fun rowProductionDay(row: InspectionManagementRowDto): String {
         val stored = row.productionDay?.trim()?.take(10).orEmpty()
         if (stored.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return stored
@@ -1714,6 +2004,69 @@ class InspectionActualViewModel(
     private fun resolveUnitPerBox(code: String?, products: List<ErpProductDto>): Int {
         val hit = products.find { it.productCode == code } ?: return 0
         return (hit.unitPerBox ?: 0).coerceAtLeast(0)
+    }
+
+    private suspend fun syncMyNextAssignment() {
+        val day = _uiState.value.productionDay.trim()
+        if (!day.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) {
+            myNextAssignment = null
+            return
+        }
+        if (!networkMonitor.checkOnline()) return
+        runCatching {
+            myNextAssignment = repository.loadMyNextAssignment(day)
+        }
+    }
+
+    private fun resolveSelectedProductName(code: String, products: List<ErpProductDto>): String {
+        val trimmed = code.trim()
+        if (trimmed.isEmpty()) return ""
+        val fromMaster = products.find { it.productCode == trimmed }?.productName?.trim()
+        if (!fromMaster.isNullOrEmpty()) return fromMaster
+        return managementRows.find { (it.productCd ?: "").trim() == trimmed }
+            ?.productName?.trim().orEmpty()
+    }
+
+    private suspend fun clearMyNextAssignmentIfSelectedProductMatches(code: String) {
+        val assignment = myNextAssignment ?: return
+        if (nextAssignmentAutoClearInFlight) return
+        val nextName = assignment.nextProductName?.trim().orEmpty()
+        if (nextName.isEmpty()) return
+        val selectedName = resolveSelectedProductName(code, _uiState.value.products)
+        if (selectedName.isEmpty() || selectedName != nextName) return
+        val day = _uiState.value.productionDay.trim()
+        if (!day.matches(Regex("^\\d{4}-\\d{2}-\\d{2}$"))) return
+        if (!networkMonitor.checkOnline()) return
+        nextAssignmentAutoClearInFlight = true
+        try {
+            runCatching {
+                repository.deleteNextAssignment(day, userId)
+                myNextAssignment = null
+            }
+        } finally {
+            nextAssignmentAutoClearInFlight = false
+        }
+    }
+
+    private fun resolveProductCodeFromNextAssignment(products: List<ErpProductDto>): String? {
+        val assignment = myNextAssignment ?: return null
+        val cd = assignment.nextProductCd?.trim().orEmpty()
+        val name = assignment.nextProductName?.trim().orEmpty()
+        if (cd.isNotEmpty()) {
+            val exact = products.find { (it.productCode ?: "").trim() == cd }
+            if (!exact?.productCode.isNullOrBlank()) return exact.productCode.trim()
+        }
+        if (name.isNotEmpty()) {
+            val byName = products.filter { (it.productName ?: "").trim() == name }
+            if (byName.size == 1 && !byName[0].productCode.isNullOrBlank()) {
+                return byName[0].productCode.trim()
+            }
+            if (byName.size > 1 && cd.isNotEmpty()) {
+                val withCd = byName.find { (it.productCode ?: "").trim() == cd }
+                if (!withCd?.productCode.isNullOrBlank()) return withCd.productCode.trim()
+            }
+        }
+        return null
     }
 
     private fun pieceQtyFromBoxes(boxes: Int, unitPerBox: Int): Int = boxes * unitPerBox
@@ -1747,6 +2100,7 @@ class InspectionActualViewModel(
     }
 
     companion object {
+        private const val MES_CHECKPOINT_INTERVAL_MS = 5_000L
         private val PROCESS_ORDER = listOf("KT01", "KT02", "KT04", "KT07", "KT05", "KT09")
 
         fun shiftDateYmd(ymd: String, deltaDays: Int): String {

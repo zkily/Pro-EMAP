@@ -5,6 +5,7 @@ import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.InspectionManagementRowDto
+import com.example.smart_emap.data.model.InspectionNextAssignmentDto
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisDataDto
 import com.example.smart_emap.data.model.PatchInspectionBody
@@ -31,6 +32,7 @@ class InspectionRepository(
     private val systemUserRepository: SystemUserRepository? = null,
 ) {
     private val moshi = Moshi.Builder()
+        .add(com.example.smart_emap.data.model.MesDefectByItemAdapterFactory)
         .add(KotlinJsonAdapterFactory())
         .build()
 
@@ -67,6 +69,50 @@ class InspectionRepository(
     suspend fun loadPlans(productionDay: String): List<InspectionManagementRowDto> {
         val res = apiClient.inspectionApi().list(productionDay = productionDay, limit = 2000)
         return res.data.orEmpty().filter { it.id != null }
+    }
+
+    /** 検査モニタ専用（MES のみ・検査員名 JOIN・メニュー権限） */
+    suspend fun loadMonitorSummary(productionDay: String): Pair<List<InspectionManagementRowDto>, String?> {
+        val res = apiClient.inspectionApi().monitorSummary(productionDay = productionDay, limit = 2000)
+        return res.data.orEmpty().filter { it.id != null } to res.fetchedAt
+    }
+
+    suspend fun loadNextAssignments(productionDay: String) =
+        apiClient.inspectionApi().nextAssignments(productionDay = productionDay).data.orEmpty()
+
+    suspend fun loadMyNextAssignment(productionDay: String): InspectionNextAssignmentDto? =
+        apiClient.inspectionApi().myNextAssignment(productionDay = productionDay).data
+
+    suspend fun upsertNextAssignment(
+        productionDay: String,
+        inspectorUserId: Int,
+        productCd: String,
+        productName: String,
+    ) {
+        val res = apiClient.inspectionApi().upsertNextAssignment(
+            com.example.smart_emap.data.model.UpsertInspectionNextAssignmentBody(
+                productionDay = productionDay,
+                inspectorUserId = inspectorUserId,
+                productCd = productCd,
+                productName = productName,
+                note = null,
+            ),
+        )
+        if (res.success == false) {
+            throw IllegalStateException(res.message ?: "次製品の指定に失敗しました")
+        }
+    }
+
+    suspend fun deleteNextAssignment(productionDay: String, inspectorUserId: Int) {
+        val res = apiClient.inspectionApi().deleteNextAssignment(
+            com.example.smart_emap.data.model.DeleteInspectionNextAssignmentBody(
+                productionDay = productionDay,
+                inspectorUserId = inspectorUserId,
+            ),
+        )
+        if (res.success == false) {
+            throw IllegalStateException(res.message ?: "指定解除に失敗しました")
+        }
     }
 
     suspend fun createPlan(

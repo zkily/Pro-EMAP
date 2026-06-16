@@ -23,6 +23,7 @@ class WeldingRepository(
     private val mesClientIdStore: MesClientIdStore,
 ) {
     private val moshi = Moshi.Builder()
+        .add(com.example.smart_emap.data.model.MesDefectByItemAdapterFactory)
         .add(KotlinJsonAdapterFactory())
         .build()
 
@@ -35,7 +36,7 @@ class WeldingRepository(
      * 溶接設備（名称が「溶接」+2 文字）の equipment_efficiency に登録された製品のみ。
      */
     suspend fun loadProducts(): List<ErpProductDto> {
-        val machines = loadWeldingMesMachines()
+        val machines = loadWeldingMesMachinesInternal()
         if (machines.isEmpty()) return emptyList()
 
         val seen = linkedSetOf<String>()
@@ -60,7 +61,7 @@ class WeldingRepository(
         return products.sortedBy { it.productName }
     }
 
-    private suspend fun loadWeldingMesMachines(): List<MachineDto> {
+    private suspend fun loadWeldingMesMachinesInternal(): List<MachineDto> {
         val res = apiClient.masterApi().listMachines(keyword = "溶接", pageSize = 500)
         val list = res.items().map { MachineDto(id = it.id, machineCd = it.machineCd, machineName = it.machineName, status = it.status) }
         return list
@@ -109,6 +110,24 @@ class WeldingRepository(
     suspend fun loadPlans(productionDay: String): List<WeldingManagementRowDto> {
         val res = apiClient.weldingApi().list(productionDay = productionDay, limit = 2000)
         return res.data.orEmpty().filter { it.id != null }
+    }
+
+    suspend fun loadWeldingMesMachines(): List<MachineDto> = loadWeldingMesMachinesInternal()
+
+    /** 溶接モニタ：設備別 list をマージして当日行を取得 */
+    suspend fun loadMonitorPlans(productionDay: String): List<WeldingManagementRowDto> {
+        val merged = linkedMapOf<Int, WeldingManagementRowDto>()
+        loadPlans(productionDay).forEach { row -> row.id?.let { merged[it] = row } }
+        for (machine in loadWeldingMesMachinesInternal()) {
+            val label = pickWeldingMesMachineLabel(machine) ?: continue
+            val res = apiClient.weldingApi().list(
+                productionDay = productionDay,
+                weldingMachine = label,
+                limit = 2000,
+            )
+            res.data.orEmpty().forEach { row -> row.id?.let { merged[it] = row } }
+        }
+        return merged.values.toList()
     }
 
     suspend fun createPlan(

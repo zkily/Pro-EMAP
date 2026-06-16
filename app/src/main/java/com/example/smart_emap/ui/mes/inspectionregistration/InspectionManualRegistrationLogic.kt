@@ -28,6 +28,19 @@ object InspectionManualRegistrationLogic {
         val endsNextDay: Boolean,
     )
 
+    data class TimeSummary(
+        val shiftMin: Int? = null,
+        val workMin: Int? = null,
+        val breakMin: Int = 0,
+        val stopMin: Int = 0,
+        val endsNextDay: Boolean = false,
+    )
+
+    data class QtyMismatchInfo(
+        val piece: Int,
+        val upb: Int,
+    )
+
     fun parseQtyInput(raw: String): Int? {
         val digits = raw.filter { it.isDigit() }
         if (digits.isEmpty()) return null
@@ -136,6 +149,22 @@ object InspectionManualRegistrationLogic {
             if (qty > 0) k to qty else null
         }.toMap()
 
+    /** 帰属工程の表示順（成型 → メッキ → 検査、Web loadProcessDefectItems と同順） */
+    private val ATTRIBUTABLE_PROCESS_DISPLAY_ORDER = listOf(
+        "KT01",
+        "KT02",
+        "KT04",
+        "KT07",
+        "KT05",
+        "KT09",
+    )
+
+    private fun attributableProcessSortIndex(processCd: String): Int {
+        val cd = processCd.trim().uppercase()
+        val idx = ATTRIBUTABLE_PROCESS_DISPLAY_ORDER.indexOf(cd)
+        return if (idx == -1) ATTRIBUTABLE_PROCESS_DISPLAY_ORDER.size else idx
+    }
+
     fun groupDefectItems(items: List<ProcessDefectItemDto>): List<DefectGroup> =
         items.groupBy { (it.attributableProcessCd ?: "").trim().ifEmpty { "—" } }
             .map { (cd, list) ->
@@ -145,6 +174,10 @@ object InspectionManualRegistrationLogic {
                     items = list,
                 )
             }
+            .sortedWith(
+                compareBy<DefectGroup> { attributableProcessSortIndex(it.processCd) }
+                    .thenBy { it.processCd },
+            )
 
     fun isRowMesInProgress(row: InspectionManagementRowDto): Boolean =
         !row.mesProductionStartedAt.isNullOrBlank() && row.mesProductionEndedAt.isNullOrBlank()
@@ -194,5 +227,41 @@ object InspectionManualRegistrationLogic {
         val h = m / 60
         val min = m % 60
         return if (h <= 0) "${min}分" else "${h}時間${min}分"
+    }
+
+    fun buildTimeSummary(
+        productionDay: String,
+        startedAtText: String,
+        endedAtText: String,
+        breakMin: Int,
+        stopMin: Int,
+    ): TimeSummary {
+        val started = parseTimeInput(startedAtText)
+        val ended = parseTimeInput(endedAtText)
+        val window = resolveProductionWindow(productionDay, started, ended)
+        val ws = window.startedMs
+        val we = window.endedMs
+        val br = breakMin.coerceAtLeast(0)
+        val st = stopMin.coerceAtLeast(0)
+        val pauseMin = br + st
+        if (ws == null || we == null) {
+            return TimeSummary(breakMin = br, stopMin = st)
+        }
+        val shiftMin = ((we - ws) / 60000.0).toInt()
+        val workMin = (shiftMin - pauseMin).coerceAtLeast(0)
+        return TimeSummary(
+            shiftMin = shiftMin,
+            workMin = workMin,
+            breakMin = br,
+            stopMin = st,
+            endsNextDay = window.endsNextDay,
+        )
+    }
+
+    fun buildQtyMismatch(pieceQtyText: String, unitPerBox: Int): QtyMismatchInfo? {
+        if (unitPerBox <= 0) return null
+        val piece = parseQtyInput(pieceQtyText) ?: return null
+        if (!hasPieceBoxQtyMismatch(piece, unitPerBox)) return null
+        return QtyMismatchInfo(piece = piece, upb = unitPerBox)
     }
 }

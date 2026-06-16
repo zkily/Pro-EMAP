@@ -18,7 +18,7 @@ class NetworkMonitor(context: Context) {
 
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            _isOnline.value = true
+            _isOnline.value = evaluateOnline(connectivity.getNetworkCapabilities(network))
         }
 
         override fun onLost(network: Network) {
@@ -26,8 +26,7 @@ class NetworkMonitor(context: Context) {
         }
 
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-            _isOnline.value = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            _isOnline.value = evaluateOnline(caps)
         }
     }
 
@@ -42,8 +41,13 @@ class NetworkMonitor(context: Context) {
 
     fun checkOnline(): Boolean {
         val network = connectivity.activeNetwork ?: return false
-        val caps = connectivity.getNetworkCapabilities(network) ?: return false
-        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return evaluateOnline(connectivity.getNetworkCapabilities(network))
+    }
+
+    private fun evaluateOnline(caps: NetworkCapabilities?): Boolean {
+        if (caps == null) return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     fun dispose() {

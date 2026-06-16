@@ -33,7 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
@@ -1129,7 +1129,7 @@ fun IuaDailyDetailCard(
     IuaPanel(
         title = "検査員 × 日別明細",
         badge = "${rows.size} 行",
-        titleIcon = Icons.Default.List,
+        titleIcon = Icons.AutoMirrored.Filled.List,
         theme = IuaPanelTheme.Daily,
         badgeTone = IuaBadgeTone.Daily,
         modifier = modifier,

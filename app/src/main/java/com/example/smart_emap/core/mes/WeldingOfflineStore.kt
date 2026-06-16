@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.smart_emap.data.model.ErpProductDto
+import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
 import com.example.smart_emap.data.model.PatchWeldingBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.example.smart_emap.data.model.WeldingManagementRowDto
@@ -48,6 +49,7 @@ class WeldingOfflineStore(context: Context) {
     private val mutex = Mutex()
 
     private val moshi = Moshi.Builder()
+        .add(MesDefectByItemAdapterFactory)
         .add(KotlinJsonAdapterFactory())
         .build()
 

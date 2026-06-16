@@ -4,6 +4,11 @@ import com.example.smart_emap.data.model.ApiMessageResponse
 import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.CreateInspectionResponse
 import com.example.smart_emap.data.model.InspectionListResponse
+import com.example.smart_emap.data.model.DeleteInspectionNextAssignmentBody
+import com.example.smart_emap.data.model.InspectionMonitorSummaryResponse
+import com.example.smart_emap.data.model.InspectionNextAssignmentResponse
+import com.example.smart_emap.data.model.InspectionNextAssignmentsResponse
+import com.example.smart_emap.data.model.UpsertInspectionNextAssignmentBody
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisResponse
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisResponse
 import com.example.smart_emap.data.model.PatchInspectionBody
@@ -12,6 +17,8 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.HTTP
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -22,6 +29,32 @@ interface InspectionApiService {
         @Query("hide_completed") hideCompleted: Boolean? = null,
         @Query("limit") limit: Int? = null,
     ): InspectionListResponse
+
+    @GET("/api/plan/inspection-management/monitor-summary")
+    suspend fun monitorSummary(
+        @Query("production_day") productionDay: String,
+        @Query("limit") limit: Int? = null,
+    ): InspectionMonitorSummaryResponse
+
+    @GET("/api/plan/inspection-management/next-assignments")
+    suspend fun nextAssignments(
+        @Query("production_day") productionDay: String,
+    ): InspectionNextAssignmentsResponse
+
+    @GET("/api/plan/inspection-management/next-assignment/me")
+    suspend fun myNextAssignment(
+        @Query("production_day") productionDay: String,
+    ): InspectionNextAssignmentResponse
+
+    @PUT("/api/plan/inspection-management/next-assignment")
+    suspend fun upsertNextAssignment(
+        @Body body: UpsertInspectionNextAssignmentBody,
+    ): InspectionNextAssignmentResponse
+
+    @HTTP(method = "DELETE", path = "/api/plan/inspection-management/next-assignment", hasBody = true)
+    suspend fun deleteNextAssignment(
+        @Body body: DeleteInspectionNextAssignmentBody,
+    ): ApiMessageResponse
 
     @POST("/api/plan/inspection-management")
     suspend fun create(@Body body: CreateInspectionBody): CreateInspectionResponse

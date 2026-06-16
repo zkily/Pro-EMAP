@@ -28,6 +28,7 @@ import com.example.smart_emap.data.api.ProcessDefectApiService
 import com.example.smart_emap.data.api.SystemApiService
 import com.example.smart_emap.data.api.SystemUsersApiService
 import com.example.smart_emap.data.api.WeldingApiService
+import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.ConnectionSpec
@@ -48,6 +49,7 @@ class ApiClient(
     private val sessionEvents: SessionEvents,
 ) {
     private val moshi = Moshi.Builder()
+        .add(MesDefectByItemAdapterFactory)
         .add(KotlinJsonAdapterFactory())
         .build()
 

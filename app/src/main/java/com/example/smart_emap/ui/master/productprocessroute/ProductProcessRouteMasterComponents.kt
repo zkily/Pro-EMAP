@@ -34,7 +34,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -157,7 +157,7 @@ fun ProductRouteProductListPanel(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Icon(Icons.Default.List, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                 Text("製品一覧", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
             BasicTextField(
@@ -297,7 +297,7 @@ fun ProductRouteEmptyState() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(Icons.Default.List, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(36.dp))
+            Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(36.dp))
             Text("製品を選択してください", fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color(0xFF475569))
             Text("左の一覧から製品を選ぶと、工程ルートを編集できます", fontSize = 11.sp, color = Color(0xFF94A3B8))
         }

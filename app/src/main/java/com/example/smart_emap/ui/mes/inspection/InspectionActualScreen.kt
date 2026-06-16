@@ -41,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -58,8 +59,13 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.input.ImeAction
@@ -178,6 +184,35 @@ fun InspectionActualScreen(
         )
     }
 
+    if (uiState.helpDialogVisible) {
+        AlertDialog(
+            onDismissRequest = viewModel::closeHelpDialog,
+            title = { Text(s.helpDialogTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(s.helpDialogBody, fontSize = 13.sp, lineHeight = 18.sp)
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::closeHelpDialog) {
+                    Text(s.btnDismiss)
+                }
+            },
+        )
+    }
+
+    if (uiState.inProgressPanelVisible) {
+        InProgressPanelSheet(
+            rows = uiState.inProgressRows,
+            activePlanId = uiState.activePlanId,
+            s = s,
+            inspectorName = viewModel::inspectorNameForInProgressRow,
+            statusLabel = viewModel::inProgressRowStatusLabel,
+            canResume = viewModel::canResumeSession,
+            onDismiss = viewModel::closeInProgressPanel,
+            onRowClick = viewModel::onInProgressPanelRowClick,
+            onResume = viewModel::onInProgressPanelResume,
+        )
+    }
+
     if (uiState.confirmedEditVisible) {
         ConfirmedHistoryEditDialog(
             uiState = uiState,
@@ -219,8 +254,10 @@ fun InspectionActualScreen(
                 PageHeader(
                     s = s,
                     locale = uiState.locale,
+                    inProgressCount = uiState.inProgressRows.size,
+                    onOpenInProgressPanel = viewModel::openInProgressPanel,
                     onLocale = viewModel::setLocale,
-                    onHelp = {},
+                    onHelp = viewModel::openHelpDialog,
                 )
                 InspectionNetworkBanners(
                     uiState = uiState,
@@ -260,7 +297,26 @@ fun InspectionActualScreen(
                         }
                     }
                     uiState.selectedProductCode.isNullOrBlank() -> {
-                        EmptyProductHint(s.emptySelectProduct)
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (uiState.showNextAssignmentStrip) {
+                                PlanMetaNextAssignmentChip(
+                                    s = s,
+                                    productLabel = uiState.nextAssignmentProductLabel,
+                                    productTitle = uiState.nextAssignmentProductTitle,
+                                    canApply = uiState.canApplyNextAssignmentProduct,
+                                    onApply = viewModel::applyNextAssignmentProductSelection,
+                                    height = 44.dp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .widthIn(max = 448.dp),
+                                )
+                            }
+                            EmptyProductHint(s.emptySelectProduct)
+                        }
                     }
                     uiState.showPlanCard -> {
                         if (uiState.showSessionRecoveryAlert) {
@@ -273,6 +329,7 @@ fun InspectionActualScreen(
                             uiState = uiState,
                             s = s,
                             defectCount = viewModel::defectCount,
+                            onApplyNextAssignment = viewModel::applyNextAssignmentProductSelection,
                             onStart = viewModel::onStartProduction,
                             onPause = viewModel::onPauseProduction,
                             onResume = viewModel::onResumeProduction,
@@ -328,7 +385,9 @@ private fun InspectionNetworkBanners(
                 title = s.syncStaleBanner,
                 detail = message,
                 retryLabel = s.btnRetry,
+                dismissLabel = s.btnDismiss,
                 onRetry = { onRetry(InspRetryAction.ReloadSync) },
+                onDismiss = { onDismiss(InspRetryAction.ReloadSync) },
             )
         }
         uiState.plansLoadError?.let { message ->
@@ -412,7 +471,9 @@ private fun SyncStaleBanner(
     title: String,
     detail: String,
     retryLabel: String,
+    dismissLabel: String,
     onRetry: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -450,6 +511,12 @@ private fun SyncStaleBanner(
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
         ) {
             Text(retryLabel, fontSize = 12.sp, color = Color(0xFFB45309))
+        }
+        TextButton(
+            onClick = onDismiss,
+            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+        ) {
+            Text(dismissLabel, fontSize = 12.sp, color = Color(0xFF92400E))
         }
     }
 }
@@ -540,6 +607,8 @@ private fun PageScrollbar(scrollState: ScrollState, modifier: Modifier = Modifie
 private fun PageHeader(
     s: InspStrings,
     locale: InspLocale,
+    inProgressCount: Int,
+    onOpenInProgressPanel: () -> Unit,
     onLocale: (InspLocale) -> Unit,
     onHelp: () -> Unit,
 ) {
@@ -568,7 +637,30 @@ private fun PageHeader(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            if (inProgressCount > 0) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(onClick = onOpenInProgressPanel, modifier = Modifier.size(28.dp)) {
+                    BadgedBox(
+                        badge = {
+                            Badge(containerColor = Color(0xFF10B981)) {
+                                Text(
+                                    inProgressCount.coerceAtMost(99).toString(),
+                                    fontSize = 9.sp,
+                                    color = Color.White,
+                                )
+                            }
+                        },
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.List,
+                            contentDescription = s.inProgressPanelOpen,
+                            tint = Color(0xFF059669),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(2.dp))
             IconButton(onClick = onHelp, modifier = Modifier.size(28.dp)) {
                 Icon(
                     Icons.AutoMirrored.Filled.HelpOutline,
@@ -1248,6 +1340,7 @@ private fun EmptyProductHint(text: String) {
 private fun PlanProductionMetaRow(
     uiState: InspectionUiState,
     s: InspStrings,
+    onApplyNextAssignment: () -> Unit,
 ) {
     val blockHeight = 44.dp
     Box(
@@ -1289,6 +1382,7 @@ private fun PlanProductionMetaRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 8.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1326,6 +1420,17 @@ private fun PlanProductionMetaRow(
                 leadingIcon = Icons.Default.Person,
                 modifier = Modifier.widthIn(min = 100.dp, max = 148.dp),
             )
+            if (uiState.showNextAssignmentStrip) {
+                PlanMetaNextAssignmentChip(
+                    s = s,
+                    productLabel = uiState.nextAssignmentProductLabel,
+                    productTitle = uiState.nextAssignmentProductTitle,
+                    canApply = uiState.canApplyNextAssignmentProduct,
+                    onApply = onApplyNextAssignment,
+                    height = blockHeight,
+                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp),
+                )
+            }
         }
     }
 }
@@ -1477,6 +1582,7 @@ private fun PlanProductionCard(
     uiState: InspectionUiState,
     s: InspStrings,
     defectCount: (String) -> Int,
+    onApplyNextAssignment: () -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
@@ -1493,7 +1599,7 @@ private fun PlanProductionCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            PlanProductionMetaRow(uiState = uiState, s = s)
+            PlanProductionMetaRow(uiState = uiState, s = s, onApplyNextAssignment = onApplyNextAssignment)
 
             // タイマー + 操作ボタン
             Row(
@@ -3457,6 +3563,150 @@ private fun StatusChip(text: String, bg: Color, fg: Color, outlined: Boolean = f
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+@Composable
+private fun PlanMetaNextAssignmentChip(
+    s: InspStrings,
+    productLabel: String,
+    productTitle: String,
+    canApply: Boolean,
+    onApply: () -> Unit,
+    height: Dp,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(height)
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(10.dp),
+                ambientColor = Color(0x330E7490),
+                spotColor = Color(0x220E7490),
+            )
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(Color(0xFFECFEFF), Color(0xFFCFFAFE)),
+                ),
+            )
+            .border(1.dp, Color(0xFF67E8F9).copy(alpha = 0.55f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    s.nextAssignmentStripTitle,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0E7490),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    productLabel,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = InspectionActualColors.TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            OutlinedButton(
+                onClick = onApply,
+                enabled = canApply,
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                modifier = Modifier.height(24.dp),
+                border = BorderStroke(1.dp, Color(0xFF38BDF8)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0284C7)),
+            ) {
+                Text(s.nextAssignmentApplySelectShort, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InProgressPanelSheet(
+    rows: List<InspectionManagementRowDto>,
+    activePlanId: Int?,
+    s: InspStrings,
+    inspectorName: (InspectionManagementRowDto) -> String,
+    statusLabel: (InspectionManagementRowDto) -> String,
+    canResume: (InspectionManagementRowDto) -> Boolean,
+    onDismiss: () -> Unit,
+    onRowClick: (InspectionManagementRowDto) -> Unit,
+    onResume: (InspectionManagementRowDto) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color.White,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(s.inProgressStripTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            rows.forEach { row ->
+                val active = row.id != null && row.id == activePlanId
+                val borderColor = if (active) Color(0xFF10B981) else Color(0xFFE2E8F0)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, borderColor, RoundedCornerShape(12.dp))
+                        .background(if (active) Color(0xFFF0FDF4) else Color(0xFFF8FAFC))
+                        .clickable { onRowClick(row) }
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            row.productName?.trim()?.takeIf { it.isNotEmpty() } ?: row.productCd ?: "—",
+                            modifier = Modifier.weight(1f),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        StatusChip(
+                            text = statusLabel(row),
+                            bg = Color(0xFFE2E8F0),
+                            fg = Color(0xFF475569),
+                        )
+                    }
+                    Text(
+                        inspectorName(row),
+                        fontSize = 12.sp,
+                        color = InspectionActualColors.TextMuted,
+                    )
+                    if (canResume(row)) {
+                        OutlinedButton(
+                            onClick = { onResume(row) },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        ) {
+                            Text(s.btnResume, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 private fun phaseLabel(phase: TimerPhase, s: InspStrings): String = when (phase) {

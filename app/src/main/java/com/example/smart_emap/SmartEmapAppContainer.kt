@@ -14,8 +14,9 @@ import com.example.smart_emap.data.local.AppDatabase
 import com.example.smart_emap.data.repository.*
 
 class SmartEmapAppContainer(context: Context) {
-    val database = AppDatabase.getDatabase(context)
-    val inspectionDao = database.inspectionDao()
+    /** Room 未使用前先不初始化，避免启动阶段主线程建库导致部分设备闪退 */
+    val database by lazy { AppDatabase.getDatabase(context.applicationContext) }
+    val inspectionDao by lazy { database.inspectionDao() }
 
     val sessionStore = SessionStore(context.applicationContext)
     val sessionEvents = SessionEvents()
