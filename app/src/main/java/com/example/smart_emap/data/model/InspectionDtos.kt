@@ -122,6 +122,7 @@ data class PatchInspectionBody(
     @Json(name = "mes_client_instance_id") val mesClientInstanceId: String? = null,
     @Json(name = "mes_claim_client_lock") val mesClaimClientLock: Boolean? = null,
     @Json(name = "mes_force_release") val mesForceRelease: Boolean? = null,
+    @Json(name = "mes_release_client_lock") val mesReleaseClientLock: Boolean? = null,
     val remarks: String? = null,
     @Json(name = "manual_registration_note") val manualRegistrationNote: String? = null,
     @Json(name = "manual_registration") val manualRegistration: Boolean? = null,

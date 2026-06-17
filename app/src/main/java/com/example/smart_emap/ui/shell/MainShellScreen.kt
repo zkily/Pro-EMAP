@@ -102,6 +102,9 @@ import com.example.smart_emap.ui.mes.cutting.CuttingActualViewModel
 import com.example.smart_emap.ui.mes.cutting.CuttingActualViewModelFactory
 import com.example.smart_emap.ui.mes.inspection.InspectionActualScreen
 import com.example.smart_emap.ui.mes.inspection.InspectionActualViewModel
+import com.example.smart_emap.core.auth.OperationModules
+import com.example.smart_emap.core.auth.canEdit
+import com.example.smart_emap.core.network.ApiDefaults
 import com.example.smart_emap.ui.mes.inspectionregistration.InspectionManualRegistrationScreen
 import com.example.smart_emap.ui.mes.inspectionregistration.InspectionManualRegistrationViewModel
 import com.example.smart_emap.ui.mes.productivity.InspectionProductivityScreen
@@ -141,6 +144,9 @@ fun MainShellScreen(
             repository = appContainer.inspectionRepository,
             offlineStore = appContainer.inspectionOfflineStore,
             networkMonitor = appContainer.networkMonitor,
+            sessionStore = appContainer.sessionStore,
+            defaultApiBaseUrl = ApiDefaults.displayBaseUrl,
+            canMesEdit = user.canEdit(OperationModules.MES),
             userId = user.id,
             inspectorLabel = user.fullName?.trim().orEmpty().ifEmpty { user.username },
         ),

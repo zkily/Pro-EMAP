@@ -38,7 +38,8 @@ class InspectionRepository(
 
     private val errorAdapter = moshi.adapter(com.example.smart_emap.data.model.ApiMessageResponse::class.java)
 
-    suspend fun getClientInstanceId(): String = mesClientIdStore.getClientInstanceId()
+    suspend fun getClientInstanceId(userId: Int? = null): String =
+        mesClientIdStore.getClientInstanceId(userId)
 
     suspend fun loadProducts(): List<ErpProductDto> {
         val list = apiClient.masterApi().listProducts(pageSize = 9999, status = "active").items()

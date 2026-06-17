@@ -207,9 +207,48 @@ fun InspectionActualScreen(
             inspectorName = viewModel::inspectorNameForInProgressRow,
             statusLabel = viewModel::inProgressRowStatusLabel,
             canResume = viewModel::canResumeSession,
+            canForceRelease = viewModel::canForceReleaseSession,
+            resumeButtonLabel = viewModel::resumeSessionButtonLabel,
             onDismiss = viewModel::closeInProgressPanel,
             onRowClick = viewModel::onInProgressPanelRowClick,
             onResume = viewModel::onInProgressPanelResume,
+            onForceRelease = viewModel::requestForceReleaseSession,
+        )
+    }
+
+    uiState.reclaimConfirmRowId?.let {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissReclaimConfirm,
+            title = { Text(s.reclaimSessionConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(s.reclaimSessionConfirm, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmReclaimSession) {
+                    Text(s.btnReclaimSession)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissReclaimConfirm) {
+                    Text(s.cancel)
+                }
+            },
+        )
+    }
+
+    uiState.forceReleaseConfirmRowId?.let {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissForceReleaseConfirm,
+            title = { Text(s.forceReleaseLockConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(s.forceReleaseLockConfirm, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmForceReleaseSession) {
+                    Text(s.btnForceReleaseLock)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissForceReleaseConfirm) {
+                    Text(s.cancel)
+                }
+            },
         )
     }
 
@@ -319,6 +358,15 @@ fun InspectionActualScreen(
                         }
                     }
                     uiState.showPlanCard -> {
+                        if (uiState.showOtherTerminalLockBanner) {
+                            OtherTerminalLockBanner(
+                                s = s,
+                                reclaimable = uiState.canReclaimFromOtherTerminal,
+                                canForceRelease = uiState.canForceReleaseLock,
+                                onReclaim = viewModel::resumeActiveSession,
+                                onForceRelease = viewModel::requestForceReleaseActiveRow,
+                            )
+                        }
                         if (uiState.showSessionRecoveryAlert) {
                             SessionRecoveryAlert(
                                 s = s,
@@ -1290,6 +1338,52 @@ private fun ActiveProductionSwitchBanner(
                 ),
             ) {
                 Text(s.btnResumeSession, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OtherTerminalLockBanner(
+    s: InspStrings,
+    reclaimable: Boolean,
+    canForceRelease: Boolean,
+    onReclaim: () -> Unit,
+    onForceRelease: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                if (reclaimable) s.otherTerminalLockBannerReclaimable else s.otherTerminalLockBanner,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = Color(0xFF9A3412),
+            )
+            when {
+                reclaimable -> {
+                    Button(
+                        onClick = onReclaim,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(s.btnReclaimSession, fontSize = 12.sp)
+                    }
+                }
+                canForceRelease -> {
+                    OutlinedButton(
+                        onClick = onForceRelease,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB45309)),
+                    ) {
+                        Text(s.btnForceReleaseLock, fontSize = 12.sp)
+                    }
+                }
             }
         }
     }
@@ -3640,9 +3734,12 @@ private fun InProgressPanelSheet(
     inspectorName: (InspectionManagementRowDto) -> String,
     statusLabel: (InspectionManagementRowDto) -> String,
     canResume: (InspectionManagementRowDto) -> Boolean,
+    canForceRelease: (InspectionManagementRowDto) -> Boolean,
+    resumeButtonLabel: (InspectionManagementRowDto) -> String,
     onDismiss: () -> Unit,
     onRowClick: (InspectionManagementRowDto) -> Unit,
     onResume: (InspectionManagementRowDto) -> Unit,
+    onForceRelease: (InspectionManagementRowDto) -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
@@ -3700,7 +3797,17 @@ private fun InProgressPanelSheet(
                             onClick = { onResume(row) },
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         ) {
-                            Text(s.btnResume, fontSize = 12.sp)
+                            Text(resumeButtonLabel(row), fontSize = 12.sp)
+                        }
+                    }
+                    if (canForceRelease(row)) {
+                        OutlinedButton(
+                            onClick = { onForceRelease(row) },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB45309)),
+                        ) {
+                            Text(s.btnForceReleaseLock, fontSize = 12.sp)
                         }
                     }
                 }

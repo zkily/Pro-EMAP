@@ -58,6 +58,15 @@ data class InspStrings(
     val sessionRecoveryTitle: String,
     val sessionRecoveryHint: String,
     val btnResumeSession: String,
+    val reclaimSessionConfirmTitle: String,
+    val reclaimSessionConfirm: String,
+    val btnReclaimSession: String,
+    val forceReleaseLockConfirmTitle: String,
+    val forceReleaseLockConfirm: String,
+    val btnForceReleaseLock: String,
+    val forceReleaseLockSuccess: String,
+    val otherTerminalLockBanner: String,
+    val otherTerminalLockBannerReclaimable: String,
     val emptySelectProduct: String,
     val inProgressStripTitle: String,
     val inProgressStripHint: String,
@@ -183,6 +192,18 @@ private val JA = InspStrings(
     sessionRecoveryTitle = "未終了の検査生産があります",
     sessionRecoveryHint = "「作業を再開」でタイマーと操作を接続してください。",
     btnResumeSession = "作業を再開",
+    reclaimSessionConfirmTitle = "作業の引き継ぎ",
+    reclaimSessionConfirm =
+        "本端末で操作を引き継ぎますか？他端末（または以前のブラウザ）の操作接続は切断されます。",
+    btnReclaimSession = "本端末で引き継ぐ",
+    forceReleaseLockConfirmTitle = "端末ロックの解除",
+    forceReleaseLockConfirm =
+        "他端末のロックを解除しますか？検査員が本端末から再開できるようになります。",
+    btnForceReleaseLock = "ロック解除",
+    forceReleaseLockSuccess = "端末ロックを解除しました。",
+    otherTerminalLockBanner = "この検査生産は他の端末で操作中です。",
+    otherTerminalLockBannerReclaimable =
+        "この検査生産は別端末でロックされています。ログイン中の検査員であれば引き継ぎ可能です。",
     emptySelectProduct = "検査製品を選択すると作業を開始できます",
     inProgressStripTitle = "検査生産中",
     inProgressStripHint = "別の製品を選択中です。作業を再開するか、先に生産終了してください。",
@@ -257,7 +278,7 @@ private val JA = InspStrings(
     inProgressPanelOpen = "検査生産中一覧を表示",
     inspectorMissing = "未選択",
     helpDialogTitle = "操作説明",
-    helpDialogBody = "1. 生産日・検査製品を選び「生産開始」で計測を開始します。\n2. 一時停止・休憩・再開で稼働時間を記録します。\n3. 不良は項目別に +/- で入力します（生産中のみ）。\n4. 「生産終了」で箱数/本数を確定し実績を保存します。\n5. 班長が指定した「次の製品（参考）」は「選ぶ」で検査製品に反映できます。\n6. オフライン時は端末に保存され、接続復旧後に自動同期されます。",
+    helpDialogBody = "1. 生産日・検査製品を選び「生産開始」で計測を開始します。\n2. 一時停止・休憩・再開で稼働時間を記録します。\n3. 不良は項目別に +/- で入力します（生産中のみ）。\n4. 「生産終了」で箱数/本数を確定し実績を保存します。\n5. 担当者が指定した「次の製品（参考）」は「選ぶ」で検査製品に反映できます。\n6. オフライン時は端末に保存され、接続復旧後に自動同期されます。",
 )
 
 private val EN = InspStrings(
@@ -308,6 +329,18 @@ private val EN = InspStrings(
     sessionRecoveryTitle = "Unfinished inspection production",
     sessionRecoveryHint = "Tap Resume to reconnect the timer and controls.",
     btnResumeSession = "Resume work",
+    reclaimSessionConfirmTitle = "Take over session",
+    reclaimSessionConfirm =
+        "Take over control on this device? The other device will be disconnected.",
+    btnReclaimSession = "Take over on this device",
+    forceReleaseLockConfirmTitle = "Release device lock",
+    forceReleaseLockConfirm =
+        "Release the lock held by another device? The inspector can resume on this device.",
+    btnForceReleaseLock = "Release lock",
+    forceReleaseLockSuccess = "Device lock released.",
+    otherTerminalLockBanner = "This inspection is being operated on another device.",
+    otherTerminalLockBannerReclaimable =
+        "Locked by another device. You can take over if you are the logged-in inspector.",
     emptySelectProduct = "Select an inspection product to start",
     inProgressStripTitle = "In production",
     inProgressStripHint = "Another product is selected. Resume work or end production first.",
@@ -433,6 +466,16 @@ private val ZH = InspStrings(
     sessionRecoveryTitle = "存在未结束的检查生产",
     sessionRecoveryHint = "请点击「继续作业」连接计时器和操作。",
     btnResumeSession = "继续作业",
+    reclaimSessionConfirmTitle = "接管作业",
+    reclaimSessionConfirm = "是否在本机接管操作？其他设备的连接将被断开。",
+    btnReclaimSession = "本机接管",
+    forceReleaseLockConfirmTitle = "解除端末锁",
+    forceReleaseLockConfirm = "是否解除其他设备的锁？检查员可在本机重新继续作业。",
+    btnForceReleaseLock = "解除锁",
+    forceReleaseLockSuccess = "已解除端末锁。",
+    otherTerminalLockBanner = "该检查生产正在其他设备上操作。",
+    otherTerminalLockBannerReclaimable =
+        "该会话被其他设备锁定。若您是登录中的检查员，可接管操作。",
     emptySelectProduct = "选择检查产品后即可开始作业",
     inProgressStripTitle = "检查生产中",
     inProgressStripHint = "当前选择了其他产品。请点击「继续作业」，或先结束生产。",
@@ -558,6 +601,18 @@ private val VI = InspStrings(
     sessionRecoveryTitle = "Còn sản xuất kiểm tra chưa kết thúc",
     sessionRecoveryHint = "Nhấn Tiếp tục để kết nối bộ đếm và thao tác.",
     btnResumeSession = "Tiếp tục công việc",
+    reclaimSessionConfirmTitle = "Tiếp quản phiên",
+    reclaimSessionConfirm =
+        "Tiếp quản trên thiết bị này? Thiết bị khác sẽ bị ngắt kết nối.",
+    btnReclaimSession = "Tiếp quản trên thiết bị này",
+    forceReleaseLockConfirmTitle = "Gỡ khóa thiết bị",
+    forceReleaseLockConfirm =
+        "Gỡ khóa của thiết bị khác? Kiểm tra viên có thể tiếp tục trên thiết bị này.",
+    btnForceReleaseLock = "Gỡ khóa",
+    forceReleaseLockSuccess = "Đã gỡ khóa thiết bị.",
+    otherTerminalLockBanner = "Phiên kiểm tra này đang được thao tác trên thiết bị khác.",
+    otherTerminalLockBannerReclaimable =
+        "Bị khóa bởi thiết bị khác. Bạn có thể tiếp quản nếu là kiểm tra viên đang đăng nhập.",
     emptySelectProduct = "Chọn sản phẩm kiểm tra để bắt đầu",
     inProgressStripTitle = "Đang sản xuất",
     inProgressStripHint = "Đang chọn sản phẩm khác. Nhấn Tiếp tục hoặc kết thúc sản xuất trước.",

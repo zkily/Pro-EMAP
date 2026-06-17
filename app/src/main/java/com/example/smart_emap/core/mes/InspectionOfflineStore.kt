@@ -216,6 +216,7 @@ fun mergePatch(previous: PatchInspectionBody, incoming: PatchInspectionBody): Pa
         mesClientInstanceId = incoming.mesClientInstanceId ?: previous.mesClientInstanceId,
         mesClaimClientLock = incoming.mesClaimClientLock ?: previous.mesClaimClientLock,
         mesForceRelease = incoming.mesForceRelease ?: previous.mesForceRelease,
+        mesReleaseClientLock = incoming.mesReleaseClientLock ?: previous.mesReleaseClientLock,
         remarks = incoming.remarks ?: previous.remarks,
     )
 }

@@ -3,10 +3,12 @@ package com.example.smart_emap.ui.mes.inspection
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.smart_emap.core.auth.SessionStore
 import com.example.smart_emap.core.mes.InspectionOfflineStore
 import com.example.smart_emap.core.mes.InspectionRowSnapshot
 import com.example.smart_emap.core.mes.InspectionSessionLogic
 import com.example.smart_emap.core.mes.MesDateTime
+import com.example.smart_emap.core.mes.MesInspectionWebSocket
 import com.example.smart_emap.core.mes.PendingCreatePlan
 import com.example.smart_emap.core.mes.PlanSession
 import com.example.smart_emap.core.mes.TimerPhase
@@ -117,6 +119,11 @@ data class InspectionUiState(
     val canEditDefects: Boolean = false,
     val completedQtyTotal: Int = 0,
     val showSessionRecoveryAlert: Boolean = false,
+    val showOtherTerminalLockBanner: Boolean = false,
+    val canReclaimFromOtherTerminal: Boolean = false,
+    val canForceReleaseLock: Boolean = false,
+    val reclaimConfirmRowId: Int? = null,
+    val forceReleaseConfirmRowId: Int? = null,
     val confirmedEditVisible: Boolean = false,
     val confirmedEditPlanId: Int? = null,
     val confirmedEditProductLabel: String = "",
@@ -144,6 +151,9 @@ class InspectionActualViewModel(
     private val repository: InspectionRepository,
     private val offlineStore: InspectionOfflineStore,
     private val networkMonitor: NetworkMonitor,
+    private val sessionStore: SessionStore,
+    private val defaultApiBaseUrl: String,
+    private val canMesEdit: Boolean,
     private val userId: Int,
     private val inspectorLabel: String,
 ) : ViewModel() {
@@ -159,6 +169,7 @@ class InspectionActualViewModel(
     private var reconnectSyncJob: Job? = null
     private var clientInstanceId: String = ""
     private var confirmedEditSnapshot: ConfirmedEditSnapshot? = null
+    private var mesInspectionWebSocket: MesInspectionWebSocket? = null
 
     private data class ConfirmedEditSnapshot(
         val wallStart: Long?,
@@ -185,13 +196,14 @@ class InspectionActualViewModel(
         if (started) return
         started = true
         viewModelScope.launch {
-            clientInstanceId = repository.getClientInstanceId()
+            clientInstanceId = repository.getClientInstanceId(userId)
             hydrateFromOfflineCache()
             refreshPendingSyncState()
             loadInitial()
             startTickLoop()
             startSyncLoop()
             startCheckpointLoop()
+            startMesInspectionWebSocket()
             if (networkMonitor.currentOnline()) {
                 flushOfflineQueue()
             }
@@ -210,6 +222,8 @@ class InspectionActualViewModel(
     }
 
     override fun onCleared() {
+        mesInspectionWebSocket?.stop()
+        mesInspectionWebSocket = null
         tickJob?.cancel()
         syncJob?.cancel()
         checkpointJob?.cancel()
@@ -357,11 +371,15 @@ class InspectionActualViewModel(
         closeInProgressPanel()
     }
 
+    fun requestForceReleaseActiveRow() {
+        val planId = _uiState.value.activePlanId ?: return
+        val row = managementRows.find { it.id == planId } ?: return
+        requestForceReleaseSession(row)
+    }
+
     fun onInProgressPanelResume(row: InspectionManagementRowDto) {
-        viewModelScope.launch {
-            resumeInProgressSession(row)
-            closeInProgressPanel()
-        }
+        requestResumeSession(row)
+        closeInProgressPanel()
     }
 
     fun openHelpDialog() {
@@ -401,19 +419,76 @@ class InspectionActualViewModel(
 
     fun canResumeSession(row: InspectionManagementRowDto): Boolean {
         if (row.id == null || !isRowMesActive(row)) return false
-        return rowMesLockOwner(row) != MesLockOwner.Other
+        if (rowMesLockOwner(row) == MesLockOwner.Other) return canInspectorReclaimRow(row)
+        return true
+    }
+
+    fun canForceReleaseSession(row: InspectionManagementRowDto): Boolean {
+        if (!canMesEdit) return false
+        if (row.id == null || !isRowMesActive(row)) return false
+        return rowMesLockOwner(row) == MesLockOwner.Other
+    }
+
+    fun resumeSessionButtonLabel(row: InspectionManagementRowDto): String {
+        val s = inspStringsFor(_uiState.value.locale)
+        return if (rowMesLockOwner(row) == MesLockOwner.Other && canInspectorReclaimRow(row)) {
+            s.btnReclaimSession
+        } else {
+            s.btnResumeSession
+        }
+    }
+
+    private fun canInspectorReclaimRow(row: InspectionManagementRowDto): Boolean {
+        if (row.id == null || !isRowMesActive(row)) return false
+        val ri = row.mesInspectorUserId ?: return false
+        return ri == userId
+    }
+
+    fun requestResumeSession(row: InspectionManagementRowDto) {
+        if (rowMesLockOwner(row) == MesLockOwner.Other && canInspectorReclaimRow(row)) {
+            _uiState.update { it.copy(reclaimConfirmRowId = row.id) }
+            return
+        }
+        resumeInProgressSession(row)
+    }
+
+    fun dismissReclaimConfirm() {
+        _uiState.update { it.copy(reclaimConfirmRowId = null) }
+    }
+
+    fun confirmReclaimSession() {
+        val planId = _uiState.value.reclaimConfirmRowId ?: return
+        val row = managementRows.find { it.id == planId } ?: return
+        _uiState.update { it.copy(reclaimConfirmRowId = null) }
+        resumeInProgressSession(row)
+    }
+
+    fun requestForceReleaseSession(row: InspectionManagementRowDto) {
+        if (!canForceReleaseSession(row)) return
+        _uiState.update { it.copy(forceReleaseConfirmRowId = row.id) }
+    }
+
+    fun dismissForceReleaseConfirm() {
+        _uiState.update { it.copy(forceReleaseConfirmRowId = null) }
+    }
+
+    fun confirmForceReleaseSession() {
+        val planId = _uiState.value.forceReleaseConfirmRowId ?: return
+        val row = managementRows.find { it.id == planId } ?: return
+        _uiState.update { it.copy(forceReleaseConfirmRowId = null) }
+        forceReleaseMesClientLock(row)
     }
 
     fun resumeActiveSession() {
         val planId = _uiState.value.activePlanId ?: return
         val row = managementRows.find { it.id == planId } ?: return
-        resumeInProgressSession(row)
+        requestResumeSession(row)
     }
 
     /** 切回当前检验员正在生产的计划并恢复操作 */
     fun resumeMyActiveProduction() {
         val row = findMyActiveProductionRow() ?: return
-        resumeInProgressSession(row)
+        requestResumeSession(row)
     }
 
     private fun findMyActiveProductionRow(): InspectionManagementRowDto? =
@@ -430,11 +505,12 @@ class InspectionActualViewModel(
                 _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
                 return@launch
             }
-            if (rowMesLockOwner(row) == MesLockOwner.Other) {
+            val owner = rowMesLockOwner(row)
+            if (owner == MesLockOwner.Other && !canInspectorReclaimRow(row)) {
                 _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
                 return@launch
             }
-            if (rowMesLockOwner(row) != MesLockOwner.Mine) {
+            if (owner != MesLockOwner.Mine) {
                 val ok = patchWithConflictHandling(
                     planId,
                     PatchInspectionBody(
@@ -463,6 +539,25 @@ class InspectionActualViewModel(
         }
     }
 
+    private fun forceReleaseMesClientLock(row: InspectionManagementRowDto) {
+        viewModelScope.launch {
+            val s = inspStringsFor(_uiState.value.locale)
+            val planId = row.id ?: return@launch
+            if (!canForceReleaseSession(row)) return@launch
+            val ok = patchWithConflictHandling(
+                planId,
+                PatchInspectionBody(
+                    mesForceRelease = true,
+                    mesReleaseClientLock = true,
+                ),
+            )
+            if (!ok) return@launch
+            if (networkMonitor.currentOnline()) loadPlans()
+            publishUi()
+            _uiState.update { it.copy(snackbarMessage = s.forceReleaseLockSuccess) }
+        }
+    }
+
     fun onStartProduction() {
         viewModelScope.launch {
             val state = _uiState.value
@@ -475,7 +570,11 @@ class InspectionActualViewModel(
                 if (existingRow != null && isRowMesActive(existingRow)) {
                     when (rowMesLockOwner(existingRow)) {
                         MesLockOwner.Other -> {
-                            _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
+                            if (canInspectorReclaimRow(existingRow)) {
+                                requestResumeSession(existingRow)
+                            } else {
+                                _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
+                            }
                             return@launch
                         }
                         MesLockOwner.Unclaimed, MesLockOwner.Mine -> {
@@ -1866,6 +1965,13 @@ class InspectionActualViewModel(
                     rowMesLockOwner(row) != MesLockOwner.Other &&
                     !locallyOperated.contains(row.id)
             } == true,
+            showOtherTerminalLockBanner = activeRow?.let { row ->
+                row.id != null && isRowMesActive(row) && rowMesLockOwner(row) == MesLockOwner.Other
+            } == true,
+            canReclaimFromOtherTerminal = activeRow?.let { row ->
+                rowMesLockOwner(row) == MesLockOwner.Other && canInspectorReclaimRow(row)
+            } == true,
+            canForceReleaseLock = activeRow?.let { row -> canForceReleaseSession(row) } == true,
             showActiveProductionSwitchBanner = showActiveProductionSwitchBanner,
             activeProductionSwitchLabel = myActiveRow?.let { rowShortLabel(it) }.orEmpty(),
             showNextAssignmentStrip = showNextStrip,
@@ -1948,6 +2054,19 @@ class InspectionActualViewModel(
                 flushInProgressTimerCheckpoints()
             }
         }
+    }
+
+    private fun startMesInspectionWebSocket() {
+        mesInspectionWebSocket?.stop()
+        mesInspectionWebSocket = MesInspectionWebSocket(
+            sessionStore = sessionStore,
+            defaultApiBaseUrl = defaultApiBaseUrl,
+            scope = viewModelScope,
+        ) { productionDay, _ ->
+            if (productionDay == _uiState.value.productionDay.trim()) {
+                viewModelScope.launch { syncPlansFromServer() }
+            }
+        }.also { it.start() }
     }
 
     private suspend fun flushInProgressTimerCheckpoints() {
@@ -2153,6 +2272,9 @@ class InspectionActualViewModel(
         private val repository: InspectionRepository,
         private val offlineStore: InspectionOfflineStore,
         private val networkMonitor: NetworkMonitor,
+        private val sessionStore: SessionStore,
+        private val defaultApiBaseUrl: String,
+        private val canMesEdit: Boolean,
         private val userId: Int,
         private val inspectorLabel: String,
     ) : ViewModelProvider.Factory {
@@ -2162,6 +2284,9 @@ class InspectionActualViewModel(
                 repository,
                 offlineStore,
                 networkMonitor,
+                sessionStore,
+                defaultApiBaseUrl,
+                canMesEdit,
                 userId,
                 inspectorLabel,
             ) as T

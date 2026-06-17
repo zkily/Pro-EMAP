@@ -14,15 +14,41 @@ class MesClientIdStore(private val context: Context) {
     private val inspectionKey = stringPreferencesKey("inspection_client_instance_v1")
     private val weldingKey = stringPreferencesKey("welding_client_instance_v1")
 
-    suspend fun getClientInstanceId(): String = getOrCreateId(inspectionKey)
+    suspend fun getClientInstanceId(userId: Int? = null): String =
+        getOrCreateId(inspectionKey, userId)
 
-    suspend fun getWeldingClientInstanceId(): String = getOrCreateId(weldingKey)
+    suspend fun getWeldingClientInstanceId(): String = getOrCreateId(weldingKey, null)
 
-    private suspend fun getOrCreateId(key: androidx.datastore.preferences.core.Preferences.Key<String>): String {
-        val existing = context.mesClientDataStore.data.map { it[key] }.first()?.trim()
-        if (!existing.isNullOrEmpty()) return existing
+    private fun userBackupKey(userId: Int) =
+        stringPreferencesKey("inspection_client_instance_u$userId")
+
+    private suspend fun readId(key: androidx.datastore.preferences.core.Preferences.Key<String>): String? =
+        context.mesClientDataStore.data.map { it[key]?.trim().orEmpty() }.first().ifEmpty { null }
+
+    private suspend fun writeId(
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        value: String,
+    ) {
+        context.mesClientDataStore.edit { prefs -> prefs[key] = value }
+    }
+
+    private suspend fun getOrCreateId(
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        userId: Int?,
+    ): String {
+        readId(key)?.let { existing ->
+            if (userId != null) writeId(userBackupKey(userId), existing)
+            return existing
+        }
+        if (userId != null) {
+            readId(userBackupKey(userId))?.let { backup ->
+                writeId(key, backup)
+                return backup
+            }
+        }
         val id = UUID.randomUUID().toString()
-        context.mesClientDataStore.edit { prefs -> prefs[key] = id }
+        writeId(key, id)
+        if (userId != null) writeId(userBackupKey(userId), id)
         return id
     }
 }
