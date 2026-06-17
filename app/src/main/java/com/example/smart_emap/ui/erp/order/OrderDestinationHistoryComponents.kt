@@ -1,16 +1,31 @@
 package com.example.smart_emap.ui.erp.order
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
@@ -32,6 +48,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +56,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -49,12 +68,78 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.data.model.DestinationOptionDto
+import kotlinx.coroutines.delay
 import java.text.NumberFormat
 import java.util.Locale
 
 private val destHistNumberFormat = NumberFormat.getIntegerInstance(Locale.JAPAN)
 
 private val destHistFilterFieldHeight = 36.dp
+
+@Composable
+fun DestHistoryStaggeredReveal(
+    index: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(index * 70L)
+        visible = true
+    }
+    AnimatedVisibility(
+        modifier = modifier,
+        visible = visible,
+        enter = fadeIn(tween(400, easing = FastOutSlowInEasing)) +
+            slideInVertically(tween(400, easing = FastOutSlowInEasing)) { it / 6 } +
+            scaleIn(initialScale = 0.98f, animationSpec = tween(400, easing = FastOutSlowInEasing)),
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun DestHistoryAnimatedBackground() {
+    val transition = rememberInfiniteTransition(label = "dest-hist-bg")
+    val orb1 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(9000), RepeatMode.Reverse),
+        label = "orb1",
+    )
+    val orb2 by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(tween(11000), RepeatMode.Reverse),
+        label = "orb2",
+    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .size(260.dp)
+                .align(Alignment.TopEnd)
+                .offset(x = (orb1 * 20 - 10).dp, y = (-60).dp + (orb2 * 12).dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color(0x2E6366F1), Color(0x148B5CF6), Color.Transparent),
+                        radius = 320f,
+                    ),
+                ),
+        )
+        Box(
+            modifier = Modifier
+                .size(200.dp)
+                .align(Alignment.BottomStart)
+                .offset(x = (-40).dp, y = (orb2 * 24).dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color(0x2406B6D4), Color.Transparent),
+                        radius = 260f,
+                    ),
+                ),
+        )
+    }
+}
 
 @Composable
 fun DestHistoryHeroPanel(
@@ -71,19 +156,41 @@ fun DestHistoryHeroPanel(
     onSearch: () -> Unit,
 ) {
     var destExpanded by remember { mutableStateOf(false) }
-    val heroShape = RoundedCornerShape(14.dp)
+    val heroShape = RoundedCornerShape(16.dp)
     val heroGradient = Brush.linearGradient(
-        listOf(Color(0xFF312E81), Color(0xFF4F46E5), Color(0xFF7C3AED)),
+        listOf(Color(0xFF4F46E5), Color(0xFF6366F1), Color(0xFF7C3AED), Color(0xFF6D28D9)),
+    )
+    val iconPulse = rememberInfiniteTransition(label = "dest-hero-icon")
+    val iconGlow by iconPulse.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "iconGlow",
     )
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(10.dp, heroShape, spotColor = Color(0x404F46E5))
+            .shadow(12.dp, heroShape, spotColor = Color(0x554F46E5))
             .clip(heroShape)
             .background(heroGradient)
-            .border(1.dp, Color.White.copy(alpha = 0.12f), heroShape),
+            .border(1.dp, Color.White.copy(alpha = 0.22f), heroShape),
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.45f),
+                            Color.White.copy(alpha = 0.18f),
+                            Color.Transparent,
+                        ),
+                    ),
+                ),
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -92,28 +199,39 @@ fun DestHistoryHeroPanel(
         ) {
             Box(
                 modifier = Modifier
-                    .size(38.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.16f))
-                    .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(10.dp)),
+                    .size(40.dp)
+                    .scale(iconGlow)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .border(1.dp, Color.White.copy(alpha = 0.32f), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.LocalShipping, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
             }
             Column(modifier = Modifier.weight(1f).padding(horizontal = 10.dp)) {
-                Text("納入先別受注履歴", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(
+                    "納入先別受注履歴",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    letterSpacing = (-0.3).sp,
+                )
                 Text(
                     "納入先ごとの受注データ分析・履歴管理",
-                    color = Color.White.copy(alpha = 0.88f),
+                    color = Color.White.copy(alpha = 0.86f),
                     fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
                 )
             }
-            if (showResultBadge) {
+            AnimatedVisibility(
+                visible = showResultBadge,
+                enter = fadeIn(tween(300)) + scaleIn(initialScale = 0.85f, animationSpec = tween(300)),
+            ) {
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color.White.copy(alpha = 0.14f))
-                        .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(999.dp))
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(999.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -124,14 +242,14 @@ fun DestHistoryHeroPanel(
             }
         }
 
-        HorizontalDivider(color = Color.White.copy(alpha = 0.14f), thickness = 1.dp)
+        HorizontalDivider(color = Color.White.copy(alpha = 0.16f), thickness = 1.dp)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.08f))
+                .background(Color.White.copy(alpha = 0.07f))
                 .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.Bottom,
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             DestHistoryConditionBadge()
@@ -195,9 +313,11 @@ private fun DestHistoryFilterGroup(
     accent: Color,
     content: @Composable () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Row(
-            modifier = Modifier.height(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
@@ -211,7 +331,13 @@ private fun DestHistoryFilterGroup(
             ) {
                 Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
             }
-            Text(label, color = Color.White.copy(alpha = 0.92f), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                label,
+                color = Color.White.copy(alpha = 0.92f),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+            )
         }
         content()
     }
@@ -220,14 +346,22 @@ private fun DestHistoryFilterGroup(
 @Composable
 private fun DestHistorySearchButton(isLoading: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = tween(120),
+        label = "searchBtnScale",
+    )
     Box(
         modifier = Modifier
             .height(destHistFilterFieldHeight)
+            .scale(scale)
             .shadow(8.dp, shape, spotColor = Color(0x55000000))
             .clip(shape)
             .background(Brush.linearGradient(listOf(Color(0xFF334155), Color(0xFF0F172A))))
-            .border(1.dp, Color.White.copy(alpha = 0.22f), shape)
-            .clickable(enabled = !isLoading, onClick = onClick)
+            .border(1.dp, Color.White.copy(alpha = 0.24f), shape)
+            .clickable(enabled = !isLoading, interactionSource = interaction, indication = null, onClick = onClick)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -306,10 +440,8 @@ fun DestHistorySummarySection(summary: List<DestinationHistorySummaryUi>) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(34.dp)
-                        .background(
-                            Brush.verticalGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9))),
-                        ),
+                        .height(36.dp)
+                        .background(OrderMonthlyColors.tableHeaderBackground),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     DestHistoryHeaderCell("年月", 140.dp, TextAlign.Center)
@@ -317,17 +449,19 @@ fun DestHistorySummarySection(summary: List<DestinationHistorySummaryUi>) {
                 }
                 HorizontalDivider(color = Color(0xFFE2E8F0))
                 summary.forEachIndexed { index, row ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(IntrinsicSize.Min)
-                            .background(if (index % 2 == 1) Color(0xFFFAFBFC) else Color.White)
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        DestHistoryDateCell(row.ym, 140.dp)
-                        Box(modifier = Modifier.weight(1f).padding(end = 12.dp), contentAlignment = Alignment.CenterEnd) {
-                            DestHistoryQuantityCell(row.totalQuantity)
+                    DestHistoryAnimatedRow(index = index, key = row.ym) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                                .background(if (index % 2 == 1) Color(0xFFFAFBFC) else Color.White)
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            DestHistoryDateCell(row.ym, 140.dp)
+                            Box(modifier = Modifier.weight(1f).padding(end = 12.dp), contentAlignment = Alignment.CenterEnd) {
+                                DestHistoryQuantityCell(row.totalQuantity)
+                            }
                         }
                     }
                 }
@@ -351,28 +485,18 @@ fun DestHistoryDetailsSection(
                 if (items.isNotEmpty()) {
                     DestHistoryStatChip("明細", "${items.size}件")
                 }
-                Box(
-                    modifier = Modifier
-                        .height(30.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White)
-                        .border(1.dp, Color(0x594F46E5), RoundedCornerShape(8.dp))
-                        .clickable(onClick = onPrint)
-                        .padding(horizontal = 10.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(Icons.Default.Print, contentDescription = null, tint = Color(0xFF4F46E5), modifier = Modifier.size(14.dp))
-                        Text("印刷", color = Color(0xFF4F46E5), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
+                DestHistoryPrintButton(onClick = onPrint)
             }
         },
     ) {
         when {
             isLoading -> {
-                Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = Color(0xFF4F46E5), modifier = Modifier.size(28.dp))
+                Box(modifier = Modifier.fillMaxWidth().padding(28.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF6366F1),
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 2.5.dp,
+                    )
                 }
             }
             !hasSearched -> DestHistoryEmptyHint("納入先と期間を選択して検索してください")
@@ -385,8 +509,8 @@ fun DestHistoryDetailsSection(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(34.dp)
-                                .background(Brush.verticalGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9)))),
+                                .height(36.dp)
+                                .background(OrderMonthlyColors.tableHeaderBackground),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             DestHistoryHeaderCell("出荷日", 108.dp, TextAlign.Center)
@@ -398,24 +522,26 @@ fun DestHistoryDetailsSection(
                         }
                         HorizontalDivider(color = Color(0xFFE2E8F0))
                         items.forEachIndexed { index, row ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(IntrinsicSize.Min)
-                                    .background(if (index % 2 == 1) Color(0xFFFAFBFC) else Color.White)
-                                    .padding(vertical = 7.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                DestHistoryDateCell(row.date, 108.dp)
-                                DestHistoryNameCell(row.destinationName, 160.dp)
-                                DestHistoryNameCell(row.productName, 160.dp)
-                                Box(Modifier.width(120.dp).padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
-                                    DestHistoryQuantityCell(row.quantity)
+                            DestHistoryAnimatedRow(index = index, key = "${row.date}-${row.productName}-$index") {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min)
+                                        .background(if (index % 2 == 1) Color(0xFFFAFBFC) else Color.White)
+                                        .padding(vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    DestHistoryDateCell(row.date, 108.dp)
+                                    DestHistoryNameCell(row.destinationName, 160.dp)
+                                    DestHistoryNameCell(row.productName, 160.dp)
+                                    Box(Modifier.width(120.dp).padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
+                                        DestHistoryQuantityCell(row.quantity)
+                                    }
+                                    Box(Modifier.width(100.dp), contentAlignment = Alignment.Center) {
+                                        DestHistoryStatusTag(row.status)
+                                    }
+                                    DestHistoryDateCell(row.deliveryDate.ifBlank { "-" }, 108.dp)
                                 }
-                                Box(Modifier.width(100.dp), contentAlignment = Alignment.Center) {
-                                    DestHistoryStatusTag(row.status)
-                                }
-                                DestHistoryDateCell(row.deliveryDate.ifBlank { "-" }, 108.dp)
                             }
                         }
                     }
@@ -432,27 +558,94 @@ private fun DestHistoryPanelCard(
     trailing: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
+    val cardShape = RoundedCornerShape(14.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(6.dp, RoundedCornerShape(12.dp), spotColor = Color(0x0F000000))
-            .clip(RoundedCornerShape(12.dp))
+            .shadow(8.dp, cardShape, spotColor = Color(0x1A6366F1))
+            .clip(cardShape)
             .background(Color.White)
-            .border(1.dp, Color(0x140F172A), RoundedCornerShape(12.dp))
-            .padding(10.dp),
+            .border(1.dp, Color(0x1A6366F1), cardShape)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        listOf(Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFF06B6D4)),
+                    ),
+                    size = androidx.compose.ui.geometry.Size(size.width, 3.dp.toPx()),
+                )
+            }
+            .padding(12.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(icon, contentDescription = null, tint = Color(0xFF4F46E5), modifier = Modifier.size(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFFEEF2FF), Color(0xFFE0E7FF))))
+                        .border(1.dp, Color(0xFFC7D2FE), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = Color(0xFF6366F1), modifier = Modifier.size(15.dp))
+                }
                 Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A))
             }
             trailing()
         }
         content()
+    }
+}
+
+@Composable
+private fun DestHistoryAnimatedRow(
+    index: Int,
+    key: String,
+    content: @Composable () -> Unit,
+) {
+    var visible by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(key) {
+        visible = false
+        delay((index.coerceAtMost(12) * 35L))
+        visible = true
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) +
+            slideInVertically(tween(280, easing = FastOutSlowInEasing)) { it / 8 },
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun DestHistoryPrintButton(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(8.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.95f else 1f,
+        animationSpec = tween(120),
+        label = "printBtnScale",
+    )
+    Box(
+        modifier = Modifier
+            .height(30.dp)
+            .scale(scale)
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(Color(0xFFEEF2FF), Color.White)))
+            .border(1.dp, Color(0x806366F1), shape)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(Icons.Default.Print, contentDescription = null, tint = Color(0xFF6366F1), modifier = Modifier.size(14.dp))
+            Text("印刷", color = Color(0xFF6366F1), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
@@ -474,8 +667,24 @@ private fun DestHistoryStatChip(label: String, value: String) {
 
 @Composable
 private fun DestHistoryEmptyHint(text: String) {
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
-        Text(text, fontSize = 12.sp, color = Color(0xFF94A3B8))
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
+                .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Inbox, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(22.dp))
+        }
+        Text(text, fontSize = 12.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Medium)
     }
 }
 
@@ -489,7 +698,7 @@ private fun DestHistoryHeaderCell(text: String, width: androidx.compose.ui.unit.
             else -> Alignment.CenterStart
         },
     ) {
-        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A), textAlign = align)
+        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OrderMonthlyColors.TableHeaderTint, textAlign = align)
     }
 }
 
@@ -503,7 +712,7 @@ private fun DestHistoryHeaderCell(text: String, modifier: Modifier, align: TextA
             else -> Alignment.CenterStart
         },
     ) {
-        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF0F172A), textAlign = align)
+        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = OrderMonthlyColors.TableHeaderTint, textAlign = align)
     }
 }
 

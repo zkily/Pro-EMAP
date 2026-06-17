@@ -347,33 +347,44 @@ private fun detectQuickRange(start: String, end: String): OrderDailyViewModel.Qu
 
 @Composable
 fun OrderDailySummaryStrip(summary: OrderDailySummaryUi) {
-    data class Kpi(val title: String, val value: Int, val accent: Color)
+    data class Kpi(val title: String, val value: Int, val accent: Brush)
     val cards = listOf(
-        Kpi("件数", summary.count, Color(0xFF6366F1)),
-        Kpi("確定本数", summary.confirmedUnits, Color(0xFF10B981)),
-        Kpi("確定箱数", summary.confirmedBoxes, Color(0xFF3B82F6)),
-        Kpi("内示本数", summary.forecastUnits, Color(0xFF8B5CF6)),
+        Kpi("件数", summary.count, Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF8B5CF6)))),
+        Kpi("確定本数", summary.confirmedUnits, Brush.horizontalGradient(listOf(Color(0xFF10B981), Color(0xFF059669)))),
+        Kpi("確定箱数", summary.confirmedBoxes, Brush.horizontalGradient(listOf(Color(0xFF3B82F6), Color(0xFF2563EB)))),
+        Kpi("内示本数", summary.forecastUnits, Brush.horizontalGradient(listOf(Color(0xFF8B5CF6), Color(0xFF7C3AED)))),
     )
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         cards.forEach { card ->
-            Row(
+            val shape = RoundedCornerShape(14.dp)
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .shadow(4.dp, RoundedCornerShape(12.dp), spotColor = Color(0x0F000000))
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.White.copy(alpha = 0.88f))
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp)),
+                    .shadow(8.dp, shape, ambientColor = Color(0x1A6366F1), spotColor = Color(0x286366F1))
+                    .clip(shape)
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.72f)),
+                        ),
+                    )
+                    .border(
+                        1.dp,
+                        Brush.linearGradient(
+                            listOf(Color.White.copy(alpha = 0.95f), Color(0xFF6366F1).copy(alpha = 0.08f)),
+                        ),
+                        shape,
+                    ),
             ) {
                 Box(
                     modifier = Modifier
-                        .width(3.dp)
-                        .height(52.dp)
+                        .fillMaxWidth()
+                        .height(3.dp)
                         .background(card.accent),
                 )
-                Column(modifier = Modifier.padding(start = 8.dp, top = 8.dp, end = 6.dp, bottom = 8.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
                     Text(card.title, fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
                     Text(
                         dailyNumberFormat.format(card.value),
@@ -402,16 +413,32 @@ fun OrderDailyTableSection(
     onPageChange: (Int) -> Unit,
     onPageSizeChange: (Int) -> Unit,
 ) {
-    val sectionShape = RoundedCornerShape(14.dp)
+    val sectionShape = RoundedCornerShape(16.dp)
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(6.dp, sectionShape, spotColor = Color(0x0A000000))
+            .shadow(10.dp, sectionShape, ambientColor = Color(0x1A6366F1), spotColor = Color(0x286366F1))
             .clip(sectionShape)
-            .background(Color.White.copy(alpha = 0.82f))
-            .border(1.dp, Color(0xFFE2E8F0), sectionShape)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .background(
+                Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.88f), Color.White.copy(alpha = 0.7f)),
+                ),
+            )
+            .border(
+                1.dp,
+                Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.95f), Color(0xFF6366F1).copy(alpha = 0.1f)),
+                ),
+                sectionShape,
+            ),
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF8B5CF6)))),
+        )
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -454,6 +481,7 @@ fun OrderDailyTableSection(
                     onPageSizeChange = onPageSizeChange,
                 )
             }
+        }
         }
     }
 }
@@ -505,12 +533,12 @@ fun OrderDailyDataTable(
                     DailyTableCell(row.date.orEmpty(), 96.dp)
                     DailyTableCell(row.weekday.orEmpty(), 44.dp, TextAlign.Center)
                     DailyTableCell(row.monthlyOrderId.orEmpty(), 140.dp, monospace = true)
-                    DailyTableCell(row.destinationCd, 84.dp, monospace = true)
+                    DailyTableCell(row.destinationCd.orEmpty(), 84.dp, monospace = true)
                     DailyTableCell(row.destinationName.orEmpty(), 120.dp)
-                    DailyTableCell(row.productCd, 84.dp, monospace = true)
+                    DailyTableCell(row.productCd.orEmpty(), 84.dp, monospace = true)
                     DailyTableCell(row.productName.orEmpty(), 120.dp)
                     DailyTableCell(row.productType.orEmpty(), 72.dp, TextAlign.Center)
-                    DailyTableCell(row.forecastUnits.toString(), 72.dp, TextAlign.End, monospace = true)
+                    DailyTableCell(row.forecastUnits?.toString() ?: "0", 72.dp, TextAlign.End, monospace = true)
                     DailyTableCell((row.confirmedBoxes ?: 0).toString(), 64.dp, TextAlign.End, monospace = true)
                     DailyTableCell((row.confirmedUnits ?: 0).toString(), 64.dp, TextAlign.End, monospace = true)
                     Box(Modifier.width(80.dp).padding(horizontal = 4.dp), contentAlignment = Alignment.Center) {

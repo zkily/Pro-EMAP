@@ -178,10 +178,10 @@ private fun OrderDailyItemDto.toHistoryItem(): DestinationHistoryItemUi {
     val d = date.orEmpty()
     return DestinationHistoryItemUi(
         date = d,
-        destinationCd = destinationCd,
-        destinationName = destinationName.orEmpty().ifBlank { destinationCd },
-        productCd = productCd,
-        productName = productName.orEmpty().ifBlank { productCd },
+        destinationCd = destinationCd.orEmpty(),
+        destinationName = destinationName.orEmpty().ifBlank { destinationCd.orEmpty() },
+        productCd = productCd.orEmpty(),
+        productName = productName.orEmpty().ifBlank { productCd.orEmpty() },
         quantity = confirmedUnits ?: 0,
         status = status.orEmpty(),
         deliveryDate = deliveryDate.orEmpty(),

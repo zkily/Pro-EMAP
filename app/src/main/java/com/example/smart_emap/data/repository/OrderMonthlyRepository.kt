@@ -131,7 +131,7 @@ class OrderMonthlyRepository(
     )
 
     suspend fun loadDailyByMonthlyOrderId(monthlyOrderId: String): List<OrderDailyItemDto> =
-        apiClient.orderDailyApi().list(monthlyOrderId = monthlyOrderId)
+        apiClient.orderDailyApi().list(monthlyOrderId = monthlyOrderId).map { it.normalized() }
 
     suspend fun loadDailyBatchRows(monthlyOrderId: String): List<OrderDailyEditRowUi> =
         OrderDailyUiMapper.processBatchRows(loadDailyByMonthlyOrderId(monthlyOrderId))
@@ -155,18 +155,18 @@ class OrderMonthlyRepository(
         startDate = startDate,
         endDate = endDate,
         destinationCd = destinationCd?.takeIf { it.isNotBlank() },
-    )
+    ).map { it.normalized() }
 
     suspend fun updateDailyForecast(id: Int, forecastUnits: Int, row: OrderDailyItemDto) {
         apiClient.orderDailyApi().update(
             id = id,
             body = OrderDailyCreateBodyDto(
                 monthlyOrderId = row.monthlyOrderId,
-                destinationCd = row.destinationCd,
+                destinationCd = row.destinationCd.orEmpty(),
                 destinationName = row.destinationName,
                 date = row.date.orEmpty(),
                 weekday = row.weekday,
-                productCd = row.productCd,
+                productCd = row.productCd.orEmpty(),
                 productName = row.productName,
                 productType = row.productType,
                 forecastUnits = forecastUnits,
@@ -197,7 +197,7 @@ class OrderMonthlyRepository(
         val step1List = allRows.filter { r ->
             val d = normDate(r.deliveryDate)
             val cu = r.confirmedUnits ?: 0
-            val fu = r.forecastUnits
+            val fu = r.forecastUnits ?: 0
             d.isNotEmpty() && d >= startDate && d <= endDate90 && cu > 0 && fu != cu
         }
         val step1Payloads = step1List.map { r ->
@@ -216,7 +216,7 @@ class OrderMonthlyRepository(
         val step2List = allRows.filter { r ->
             val d = normDate(r.deliveryDate)
             val cu = r.confirmedUnits ?: 0
-            val fu = r.forecastUnits
+            val fu = r.forecastUnits ?: 0
             d.isNotEmpty() && d >= startDate && d <= todayStr && cu <= 0 && fu > 0
         }
         val step2Payloads = step2List.map { r ->
@@ -235,7 +235,7 @@ class OrderMonthlyRepository(
         val step2Ids = step2List.map { it.id }.toSet()
         val byProductLastDate = mutableMapOf<String, String>()
         for (r in allRows) {
-            val key = r.productCd.ifBlank { r.id.toString() }
+            val key = r.productCd.orEmpty().ifBlank { r.id.toString() }
             val d = normDate(r.deliveryDate)
             val cb = r.confirmedBoxes ?: 0
             if (cb > 0 && d.isNotEmpty() && d >= startDate && d <= endDate90) {
@@ -245,11 +245,11 @@ class OrderMonthlyRepository(
         }
         val step3List = allRows.filter { r ->
             if (r.id in step2Ids) return@filter false
-            val key = r.productCd.ifBlank { r.id.toString() }
+            val key = r.productCd.orEmpty().ifBlank { r.id.toString() }
             val lastD = byProductLastDate[key] ?: return@filter false
             val d = normDate(r.deliveryDate)
             val cu = r.confirmedUnits ?: 0
-            val fu = r.forecastUnits
+            val fu = r.forecastUnits ?: 0
             d.isNotEmpty() && d >= startDate && d <= lastD && cu <= 0 && fu > 0
         }
         val step3Payloads = step3List.map { r ->
@@ -270,7 +270,7 @@ class OrderMonthlyRepository(
         for (r in allRows) {
             val cu = r.confirmedUnits ?: 0
             if (cu <= 0) continue
-            val key = r.productCd.ifBlank { r.id.toString() }
+            val key = r.productCd.orEmpty().ifBlank { r.id.toString() }
             val d = normDate(r.deliveryDate)
             if (d.isEmpty()) continue
             val prev = lastConfirmedDateByProduct[key].orEmpty()
@@ -280,9 +280,9 @@ class OrderMonthlyRepository(
             if (r.id in step2And3Ids) return@filter false
             val d = normDate(r.deliveryDate)
             val cu = r.confirmedUnits ?: 0
-            val fu = r.forecastUnits
+            val fu = r.forecastUnits ?: 0
             if (cu > 0 || fu <= 0) return@filter false
-            val key = r.productCd.ifBlank { r.id.toString() }
+            val key = r.productCd.orEmpty().ifBlank { r.id.toString() }
             val lastDate = lastConfirmedDateByProduct[key]
             if (lastDate != null) return@filter d.isNotEmpty() && d < lastDate
             d.isNotEmpty() && d <= todayStr

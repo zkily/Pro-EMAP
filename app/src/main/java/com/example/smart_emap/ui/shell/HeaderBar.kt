@@ -1,7 +1,16 @@
 package com.example.smart_emap.ui.shell
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +27,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -34,13 +43,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.data.model.UserDto
+import com.example.smart_emap.ui.system.user.avatarGradientFor
 import kotlinx.coroutines.delay
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -127,25 +140,12 @@ fun HeaderBar(
             }
 
             Box {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { userMenuExpanded = true }
-                        .background(Color(0x470F172A))
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFFE0E7FF), modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = user.fullName ?: user.username,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                HeaderUserChip(
+                    displayName = user.fullName ?: user.username,
+                    role = roleDisplayName(user.role),
+                    expanded = userMenuExpanded,
+                    onClick = { userMenuExpanded = true },
+                )
                 DropdownMenu(
                     expanded = userMenuExpanded,
                     onDismissRequest = { userMenuExpanded = false },
@@ -177,6 +177,106 @@ fun HeaderBar(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HeaderUserChip(
+    displayName: String,
+    role: String,
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = tween(140),
+        label = "header-user-press",
+    )
+    val pulseTransition = rememberInfiniteTransition(label = "header-user-pulse")
+    val ringAlpha by pulseTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.55f,
+        animationSpec = infiniteRepeatable(tween(1800), RepeatMode.Reverse),
+        label = "header-user-ring",
+    )
+    val avatarLetter = remember(displayName) {
+        displayName.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty().ifEmpty { "?" }
+    }
+
+    Row(
+        modifier = Modifier
+            .scale(scale)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(start = 5.dp, end = 10.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .drawBehind {
+                    drawCircle(
+                        color = Color.White.copy(alpha = ringAlpha),
+                        radius = size.minDimension * 0.62f,
+                    )
+                }
+                .clip(RoundedCornerShape(9.dp))
+                .background(avatarGradientFor(displayName))
+                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(9.dp))
+                .drawBehind {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.24f), Color.Transparent),
+                            startY = 0f,
+                            endY = size.height * 0.5f,
+                        ),
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = avatarLetter,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(modifier = Modifier.widthIn(max = 120.dp)) {
+            Text(
+                text = displayName,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = TextStyle(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color(0x440F172A),
+                        offset = androidx.compose.ui.geometry.Offset(0f, 1f),
+                        blurRadius = 4f,
+                    ),
+                ),
+            )
+            Text(
+                text = role,
+                color = Color(0xFFC7D2FE),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(modifier = Modifier.width(4.dp))
+        Icon(
+            Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.75f),
+            modifier = Modifier
+                .size(16.dp)
+                .scale(scaleX = 1f, scaleY = if (expanded) -1f else 1f),
+        )
     }
 }
 

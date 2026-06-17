@@ -40,14 +40,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material.icons.filled.TrendingUp
@@ -64,8 +62,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -79,9 +79,11 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.example.smart_emap.ui.system.user.avatarGradientFor
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,9 +131,10 @@ fun DashboardScreen(
         ) {
             StaggeredReveal(index = 0) {
                 WelcomeBanner(
-                    title = viewModel.welcomeTitle(),
+                    displayName = user.fullName?.trim().orEmpty().ifEmpty { user.username },
+                    role = user.role,
+                    departmentName = user.departmentName,
                     subtitle = "Smart-EMAP システムへようこそ",
-                    dateTime = uiState.currentDateTime,
                 )
             }
 
@@ -317,23 +320,61 @@ private fun Modifier.glassSurface(
 
 @Composable
 private fun WelcomeBanner(
-    title: String,
+    displayName: String,
+    role: String,
+    departmentName: String?,
     subtitle: String,
-    dateTime: String,
 ) {
-    val shineTransition = rememberInfiniteTransition(label = "welcome-shine")
-    val shineX by shineTransition.animateFloat(
-        initialValue = -0.4f,
-        targetValue = 1.4f,
-        animationSpec = infiniteRepeatable(tween(3200), RepeatMode.Restart),
+    val avatarLetter = remember(displayName) {
+        displayName.trim().firstOrNull()?.uppercaseChar()?.toString().orEmpty().ifEmpty { "?" }
+    }
+    val ambientTransition = rememberInfiniteTransition(label = "welcome-ambient")
+    val shineX by ambientTransition.animateFloat(
+        initialValue = -0.5f,
+        targetValue = 1.5f,
+        animationSpec = infiniteRepeatable(tween(3600), RepeatMode.Restart),
         label = "shine-x",
+    )
+    val floatY by ambientTransition.animateFloat(
+        initialValue = -3f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(2800), RepeatMode.Reverse),
+        label = "avatar-float",
+    )
+    val pulseScale by ambientTransition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1400), RepeatMode.Reverse),
+        label = "status-pulse",
+    )
+    val shimmerPhase by ambientTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2800), RepeatMode.Restart),
+        label = "name-shimmer",
+    )
+    val nameBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFF8FAFC),
+            Color(0xFFE0E7FF),
+            Color.White,
+            Color(0xFFC7D2FE),
+            Color(0xFFF8FAFC),
+        ),
+        start = Offset(shimmerPhase * 480f - 120f, 0f),
+        end = Offset(shimmerPhase * 480f + 120f, 48f),
     )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(10.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x444F46E5), spotColor = Color(0x664F46E5))
-            .clip(RoundedCornerShape(16.dp))
+            .shadow(
+                elevation = 14.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = Color(0x554F46E5),
+                spotColor = Color(0x774F46E5),
+            )
+            .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.linearGradient(
                     listOf(
@@ -343,37 +384,13 @@ private fun WelcomeBanner(
                         Color(0xFF5B21B6),
                     ),
                 ),
-            ),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(18.dp)),
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color.White.copy(alpha = 0.2f), Color.Transparent),
-                        radius = 420f,
-                    ),
-                ),
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.35f)
-                .height(80.dp)
-                .offset(x = (shineX * 320).dp)
-                .background(
-                    Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.18f),
-                            Color.Transparent,
-                        ),
-                    ),
-                ),
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -383,67 +400,241 @@ private fun WelcomeBanner(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.White.copy(alpha = 0.16f))
-                        .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center,
+                        .offset(y = floatY.dp)
+                        .shadow(10.dp, RoundedCornerShape(16.dp), spotColor = Color(0x660F172A))
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Transparent)
+                        .padding(3.dp),
                 ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = Color(0xFFEEF2FF),
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Row(
+                    Box(
                         modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(Color(0x330F172A))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                            .size(50.dp)
+                            .shadow(6.dp, RoundedCornerShape(13.dp), spotColor = Color(0x550F172A))
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(avatarGradientFor(displayName))
+                            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(13.dp))
+                            .drawBehind {
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        listOf(
+                                            Color.White.copy(alpha = 0.28f),
+                                            Color.Transparent,
+                                        ),
+                                        startY = 0f,
+                                        endY = size.height * 0.45f,
+                                    ),
+                                )
+                            },
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(RoundedCornerShape(50))
-                                .background(Brush.linearGradient(listOf(Color(0xFFA5F3FC), Color(0xFF34D399)))),
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = subtitle,
-                            color = Color.White.copy(alpha = 0.92f),
-                            fontSize = 11.sp,
+                            text = avatarLetter,
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            style = TextStyle(
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color(0x660F172A),
+                                    offset = Offset(0f, 2f),
+                                    blurRadius = 6f,
+                                ),
+                            ),
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text(
+                        text = "おかえりなさい",
+                        color = Color.White.copy(alpha = 0.82f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = displayName,
+                            style = TextStyle(
+                                brush = nameBrush,
+                                fontSize = 19.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.3.sp,
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color(0x400F172A),
+                                    offset = Offset(0f, 2f),
+                                    blurRadius = 10f,
+                                ),
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Text(
+                            text = "さん",
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        WelcomeRoleChip(label = dashboardRoleDisplayName(role))
+                        departmentName?.trim()?.takeIf { it.isNotEmpty() }?.let { dept ->
+                            WelcomeGlassChip(text = dept)
+                        }
+                    }
+                }
             }
+            Spacer(modifier = Modifier.width(10.dp))
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.14f))
-                    .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color(0x331F2937))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color(0xFFF8FAFC), modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = dateTime, color = Color(0xFFF8FAFC), fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .scale(pulseScale)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            Brush.radialGradient(
+                                listOf(Color(0xFF6EE7B7), Color(0xFF34D399)),
+                            ),
+                        )
+                        .drawBehind {
+                            drawCircle(
+                                color = Color(0xFF34D399).copy(alpha = 0.35f),
+                                radius = size.minDimension * 0.9f,
+                            )
+                        },
+                )
+                Spacer(modifier = Modifier.width(7.dp))
+                Text(
+                    text = subtitle,
+                    color = Color.White.copy(alpha = 0.94f),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End,
+                )
             }
         }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = 0.35f), Color.Transparent),
+                        radius = 520f,
+                    ),
+                ),
+        )
+        Box(modifier = Modifier.matchParentSize()) {
+            Box(
+                modifier = Modifier
+                    .size(200.dp)
+                    .align(Alignment.TopEnd)
+                    .offset(x = 24.dp, y = (-12).dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0x73A78BFA), Color.Transparent),
+                            radius = 280f,
+                        ),
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(Color(0x260F172A), Color.Transparent),
+                            radius = 360f,
+                        ),
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.55f)
+                    .fillMaxSize()
+                    .offset(x = (shineX * 340).dp, y = (-8).dp)
+                    .graphicsLayer { rotationZ = -12f }
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = 0.06f),
+                                Color.White.copy(alpha = 0.16f),
+                                Color.White.copy(alpha = 0.05f),
+                                Color.Transparent,
+                            ),
+                        ),
+                    ),
+            )
+        }
     }
+}
+
+@Composable
+private fun WelcomeRoleChip(label: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.22f), Color.White.copy(alpha = 0.08f)),
+                ),
+            )
+            .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.3.sp,
+        )
+    }
+}
+
+@Composable
+private fun WelcomeGlassChip(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color(0x2E0F172A))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = text,
+            color = Color.White.copy(alpha = 0.88f),
+            fontSize = 9.5.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun dashboardRoleDisplayName(role: String): String = when (role) {
+    "admin" -> "管理者"
+    "manager" -> "マネージャー"
+    "worker" -> "作業者"
+    "guest" -> "ゲスト"
+    "viewer" -> "閲覧者"
+    else -> "一般ユーザー"
 }
 
 @Composable
@@ -601,36 +792,48 @@ private fun DailyOrderChartSection(series: DailyConfirmedSeriesDto?) {
                     .fillMaxWidth()
                     .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(LoginColors.Primary.copy(alpha = 0.14f), Color(0xFF8B5CF6).copy(alpha = 0.1f)),
-                            ),
-                        )
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.Default.TrendingUp, contentDescription = null, tint = LoginColors.Primary, modifier = Modifier.size(15.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(LoginColors.Primary.copy(alpha = 0.14f), Color(0xFF8B5CF6).copy(alpha = 0.1f)),
+                                ),
+                            )
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.TrendingUp, contentDescription = null, tint = LoginColors.Primary, modifier = Modifier.size(15.dp))
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "日別受注数量（確定本数）",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF000000),
+                        )
+                        Text(
+                            text = "過去2週間・今後1週間（JST）",
+                            fontSize = 10.sp,
+                            color = Color(0xFF64748B),
+                            lineHeight = 12.sp,
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = "日別受注数量（確定本数）",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF000000),
-                    )
-                    Text(
-                        text = "過去2週間・今後1週間（JST）",
-                        fontSize = 10.sp,
-                        color = Color(0xFF64748B),
-                        lineHeight = 12.sp,
-                    )
-                }
+                Text(
+                    text = "単位：本",
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8),
+                    fontWeight = FontWeight.Medium,
+                )
             }
             val items = series?.items.orEmpty()
             if (items.isEmpty()) {
@@ -684,14 +887,6 @@ private fun DailyOrderChartLegend() {
                 textColor = Color(0xFF64748B),
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "単位：本",
-            fontSize = 10.sp,
-            color = Color(0xFF94A3B8),
-            fontWeight = FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
     }
 }
 
@@ -757,9 +952,9 @@ private fun chartXLabelStep(barCount: Int): Int = when {
 }
 
 private fun chartValueFontPx(barCount: Int, density: Float): Float = when {
-    barCount > 18 -> 6.5f * density
-    barCount > 14 -> 7f * density
-    else -> 7.5f * density
+    barCount > 18 -> 7.5f * density
+    barCount > 14 -> 8f * density
+    else -> 8.5f * density
 }
 
 @Composable
@@ -793,7 +988,7 @@ private fun DailyOrderBarChart(
         val yTicks = (0..4).map { tick -> (maxValue * tick) / 4 }
         val xLabelStep = chartXLabelStep(barCount)
         val valueFontPx = chartValueFontPx(barCount, density)
-        val xLabelFontPx = 8f * density
+        val xLabelFontPx = 9f * density
         val valueLabelOffset = 5f * density
 
         yTicks.forEach { tick ->
@@ -814,7 +1009,7 @@ private fun DailyOrderBarChart(
                     x = leftPad - 8f,
                     y = gridY + 3.5f,
                     color = Color(0xFF94A3B8),
-                    fontSizePx = 8f * density,
+                    fontSizePx = 9f * density,
                     align = Paint.Align.RIGHT,
                 )
             }

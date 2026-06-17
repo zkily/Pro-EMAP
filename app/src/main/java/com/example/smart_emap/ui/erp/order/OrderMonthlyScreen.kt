@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -57,6 +58,8 @@ fun OrderMonthlyScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = LayoutColors.ShellBg,
+        // MainShell 内嵌：不再叠加状态栏 inset，避免工具栏上方留白
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
@@ -69,7 +72,10 @@ fun OrderMonthlyScreen(
                     .background(OrderMonthlyColors.pageBackground),
             ) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 10.dp)
+                        .padding(bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {

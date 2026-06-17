@@ -116,21 +116,31 @@ data class UpdateOrderFieldsResponseDto(
 data class OrderDailyItemDto(
     val id: Int = 0,
     @Json(name = "monthly_order_id") val monthlyOrderId: String? = null,
-    @Json(name = "destination_cd") val destinationCd: String = "",
+    @Json(name = "destination_cd") val destinationCd: String? = null,
     @Json(name = "destination_name") val destinationName: String? = null,
     val date: String? = null,
-    @Json(name = "product_cd") val productCd: String = "",
+    @Json(name = "product_cd") val productCd: String? = null,
     @Json(name = "product_name") val productName: String? = null,
+    @Json(name = "product_alias") val productAlias: String? = null,
     @Json(name = "product_type") val productType: String? = null,
     @Json(name = "unit_per_box") val unitPerBox: Int? = null,
     val weekday: String? = null,
-    @Json(name = "forecast_units") val forecastUnits: Int = 0,
+    @Json(name = "forecast_units") val forecastUnits: Int? = null,
     @Json(name = "confirmed_boxes") val confirmedBoxes: Int? = null,
     @Json(name = "confirmed_units") val confirmedUnits: Int? = null,
     val status: String? = null,
     val remarks: String? = null,
     @Json(name = "delivery_date") val deliveryDate: String? = null,
-)
+) {
+    fun normalized(): OrderDailyItemDto = copy(
+        destinationCd = destinationCd.orEmpty(),
+        productCd = productCd.orEmpty(),
+        forecastUnits = forecastUnits ?: 0,
+        confirmedBoxes = confirmedBoxes ?: 0,
+        confirmedUnits = confirmedUnits ?: 0,
+        unitPerBox = unitPerBox ?: 0,
+    )
+}
 
 data class BatchUpdateDailyItemDto(
     val id: Int,

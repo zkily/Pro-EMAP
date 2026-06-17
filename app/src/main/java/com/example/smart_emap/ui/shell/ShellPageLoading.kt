@@ -13,6 +13,7 @@ import com.example.smart_emap.ui.aps.scheduling.SchedulingViewModel
 import com.example.smart_emap.ui.dashboard.DashboardViewModel
 import com.example.smart_emap.ui.erp.order.OrderDailyViewModel
 import com.example.smart_emap.ui.erp.order.OrderDestinationHistoryViewModel
+import com.example.smart_emap.ui.erp.order.OrderHomeViewModel
 import com.example.smart_emap.ui.erp.order.OrderMonthlyViewModel
 import com.example.smart_emap.ui.erp.production.planning.PlanBaselineViewModel
 import com.example.smart_emap.ui.erp.production.planning.PlanScheduleViewModel
@@ -100,6 +101,7 @@ fun rememberShellPageLoading(
     orderMonthlyViewModel: OrderMonthlyViewModel,
     orderDailyViewModel: OrderDailyViewModel,
     orderDestinationHistoryViewModel: OrderDestinationHistoryViewModel,
+    orderHomeViewModel: OrderHomeViewModel,
     materialReceivingHistoryViewModel: MaterialReceivingHistoryViewModel,
     materialReceivingInspectionViewModel: MaterialReceivingInspectionViewModel,
     materialForecastViewModel: MaterialForecastViewModel,
@@ -146,6 +148,7 @@ fun rememberShellPageLoading(
     val orderMonthly by orderMonthlyViewModel.uiState.collectAsState()
     val orderDaily by orderDailyViewModel.uiState.collectAsState()
     val orderDestinationHistory by orderDestinationHistoryViewModel.uiState.collectAsState()
+    val orderHome by orderHomeViewModel.uiState.collectAsState()
     val materialReceivingHistory by materialReceivingHistoryViewModel.uiState.collectAsState()
     val materialReceivingInspection by materialReceivingInspectionViewModel.uiState.collectAsState()
     val materialForecast by materialForecastViewModel.uiState.collectAsState()
@@ -207,6 +210,8 @@ fun rememberShellPageLoading(
         orderMonthly.isLoading,
         orderDaily.isLoading,
         orderDestinationHistory.isLoading,
+        orderHome.isLoadingSummary,
+        orderHome.isLoadingAnalytics,
         materialReceivingHistory.isLoading,
         materialReceivingInspection.isLoading,
         materialForecast.isLoading,
@@ -261,6 +266,7 @@ fun rememberShellPageLoading(
             "/mes/productionInstruction/forming" -> formingInstruction.isLoading
             "/mes/productionInstruction/welding" -> weldingInstruction.isLoading
             "/aps/scheduling" -> scheduling.isLoading
+            "/erp/order" -> orderHome.isLoadingSummary || orderHome.isLoadingAnalytics
             "/erp/order/monthly" -> orderMonthly.isLoading
             "/erp/order/daily" -> orderDaily.isLoading
             "/erp/order/destination-history" -> orderDestinationHistory.isLoading

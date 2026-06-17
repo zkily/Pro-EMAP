@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,50 +47,54 @@ fun OrderDestinationHistoryScreen(viewModel: OrderDestinationHistoryViewModel) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = LayoutColors.ShellBg,
+        // MainShell 内嵌：不再叠加状态栏 inset，避免页头上方留白
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(
-                    androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(
-                            androidx.compose.ui.graphics.Color(0xFFEEF2FF),
-                            androidx.compose.ui.graphics.Color(0xFFF8FAFC),
-                            androidx.compose.ui.graphics.Color(0xFFF1F5F9),
-                        ),
-                    ),
-                ),
+                .background(OrderMonthlyColors.pageBackground),
         ) {
+            DestHistoryAnimatedBackground()
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 10.dp)
+                    .padding(bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item {
-                    DestHistoryHeroPanel(
-                        resultCount = uiState.detailItems.size,
-                        showResultBadge = uiState.detailItems.isNotEmpty(),
-                        destinationCd = uiState.destinationCd,
-                        startDate = uiState.startDate,
-                        endDate = uiState.endDate,
-                        destinationOptions = uiState.destinationOptions,
-                        isLoading = uiState.isLoading,
-                        onDestinationChange = viewModel::setDestinationCd,
-                        onStartDateChange = viewModel::setStartDate,
-                        onEndDateChange = viewModel::setEndDate,
-                        onSearch = viewModel::search,
-                    )
+                    DestHistoryStaggeredReveal(index = 0) {
+                        DestHistoryHeroPanel(
+                            resultCount = uiState.detailItems.size,
+                            showResultBadge = uiState.detailItems.isNotEmpty(),
+                            destinationCd = uiState.destinationCd,
+                            startDate = uiState.startDate,
+                            endDate = uiState.endDate,
+                            destinationOptions = uiState.destinationOptions,
+                            isLoading = uiState.isLoading,
+                            onDestinationChange = viewModel::setDestinationCd,
+                            onStartDateChange = viewModel::setStartDate,
+                            onEndDateChange = viewModel::setEndDate,
+                            onSearch = viewModel::search,
+                        )
+                    }
                 }
                 item {
-                    DestHistorySummarySection(summary = uiState.summaryItems)
+                    DestHistoryStaggeredReveal(index = 1) {
+                        DestHistorySummarySection(summary = uiState.summaryItems)
+                    }
                 }
                 item {
-                    DestHistoryDetailsSection(
-                        items = uiState.detailItems,
-                        isLoading = uiState.isLoading,
-                        hasSearched = uiState.hasSearched,
-                        onPrint = viewModel::preparePrint,
-                    )
+                    DestHistoryStaggeredReveal(index = 2) {
+                        DestHistoryDetailsSection(
+                            items = uiState.detailItems,
+                            isLoading = uiState.isLoading,
+                            hasSearched = uiState.hasSearched,
+                            onPrint = viewModel::preparePrint,
+                        )
+                    }
                 }
             }
         }

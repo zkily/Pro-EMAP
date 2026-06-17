@@ -106,7 +106,7 @@ class DashboardViewModel(
         return listOf(
             StatCardUi(
                 key = "sales",
-                label = "今月売上",
+                label = "今月売上(確定本数より)",
                 value = "¥${numberFormat.format(sales.monthlyOrderAmount.toLong())}",
                 gradientStart = LoginColors.Primary,
                 gradientEnd = LoginColors.PrimaryDark,
@@ -136,7 +136,7 @@ class DashboardViewModel(
     }
 
     private fun buildStatCardsEmpty(): List<StatCardUi> = listOf(
-        StatCardUi("sales", "今月売上", "¥0", LoginColors.Primary, LoginColors.PrimaryDark),
+        StatCardUi("sales", "今月売上(確定本数より)", "¥0", LoginColors.Primary, LoginColors.PrimaryDark),
         StatCardUi("orders", "今月受注（確定本数）", "0", Color(0xFFF43F5E), Color(0xFFE11D48)),
         StatCardUi("inventory", "在庫数量", "0", LoginColors.MesBadgeStart, LoginColors.MesBadgeEnd),
         StatCardUi("products", "アクティブ製品", "0", Color(0xFF10B981), Color(0xFF059669)),

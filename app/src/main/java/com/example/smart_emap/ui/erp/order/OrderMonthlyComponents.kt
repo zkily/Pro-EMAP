@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -386,8 +388,13 @@ fun OrderMonthlyProgressBar(visible: Boolean, percent: Int) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun OrderMonthlySummaryCards(summary: OrderMonthlySummaryDto) {
+fun OrderMonthlySummaryCards(
+    summary: OrderMonthlySummaryDto,
+    premiumStyle: Boolean = false,
+    useResponsiveGrid: Boolean = false,
+) {
     data class CardDef(
         val title: String,
         val value: Int,
@@ -416,19 +423,50 @@ fun OrderMonthlySummaryCards(summary: OrderMonthlySummaryDto) {
         CardDef("外注検査", summary.externalInspectionCount, Icons.Default.Search, Brush.linearGradient(listOf(Color(0xFFA855F7), Color(0xFF9333EA)))),
     )
 
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 2.dp),
-    ) {
-        items(cards) { card ->
-            SummaryCard(
-                title = card.title,
-                value = numberFormat.format(card.value),
-                icon = card.icon,
-                iconGradient = card.iconGradient,
-                valueColor = card.valueColor,
-            )
+    if (useResponsiveGrid) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val cols = when {
+                maxWidth >= 1200.dp -> 5
+                maxWidth >= 900.dp -> 4
+                maxWidth >= 576.dp -> 3
+                else -> 2
+            }
+            val gap = 8.dp
+            val cardWidth = (maxWidth - gap * (cols - 1)) / cols
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(gap),
+                verticalArrangement = Arrangement.spacedBy(gap),
+            ) {
+                cards.forEach { card ->
+                    SummaryCard(
+                        title = card.title,
+                        value = numberFormat.format(card.value),
+                        icon = card.icon,
+                        iconGradient = card.iconGradient,
+                        valueColor = card.valueColor,
+                        premiumStyle = premiumStyle,
+                        cardWidth = cardWidth,
+                    )
+                }
+            }
+        }
+    } else {
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp),
+        ) {
+            items(cards) { card ->
+                SummaryCard(
+                    title = card.title,
+                    value = numberFormat.format(card.value),
+                    icon = card.icon,
+                    iconGradient = card.iconGradient,
+                    valueColor = card.valueColor,
+                    premiumStyle = premiumStyle,
+                )
+            }
         }
     }
 }
@@ -440,40 +478,84 @@ private fun SummaryCard(
     icon: ImageVector,
     iconGradient: Brush,
     valueColor: Color,
+    premiumStyle: Boolean = false,
+    cardWidth: androidx.compose.ui.unit.Dp = 148.dp,
 ) {
+    val cardShape = RoundedCornerShape(12.dp)
     Box(
         modifier = Modifier
-            .width(148.dp)
-            .shadow(4.dp, RoundedCornerShape(12.dp), spotColor = Color(0x0D000000))
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color.White.copy(alpha = 0.55f))
-            .border(1.dp, Color.White.copy(alpha = 0.65f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .width(cardWidth)
+            .shadow(
+                elevation = if (premiumStyle) 8.dp else 4.dp,
+                shape = cardShape,
+                ambientColor = if (premiumStyle) Color(0x1A6366F1) else Color(0x0D000000),
+                spotColor = if (premiumStyle) Color(0x286366F1) else Color(0x0D000000),
+            )
+            .clip(cardShape)
+            .background(
+                if (premiumStyle) {
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.82f), Color.White.copy(alpha = 0.58f)),
+                    )
+                } else {
+                    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.55f), Color.White.copy(alpha = 0.55f)))
+                },
+            )
+            .border(
+                width = 1.dp,
+                brush = if (premiumStyle) {
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.95f), Color(0xFF6366F1).copy(alpha = 0.1f)),
+                    )
+                } else {
+                    Brush.linearGradient(listOf(Color.White.copy(alpha = 0.65f), Color.White.copy(alpha = 0.65f)))
+                },
+                shape = cardShape,
+            ),
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .size(52.dp)
-                .background(
-                    Brush.linearGradient(listOf(Color(0x146366F1), Color.Transparent)),
-                    shape = RoundedCornerShape(99.dp),
-                ),
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        if (premiumStyle) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
-                    .shadow(3.dp, RoundedCornerShape(9.dp))
-                    .clip(RoundedCornerShape(9.dp))
+                    .fillMaxWidth()
+                    .height(2.dp)
                     .background(iconGradient),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontSize = 10.5.sp, color = OrderMonthlyColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(top = if (premiumStyle) 2.dp else 0.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(52.dp)
+                    .background(
+                        Brush.linearGradient(listOf(Color(0x146366F1), Color.Transparent)),
+                        shape = RoundedCornerShape(99.dp),
+                    ),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .shadow(
+                            elevation = if (premiumStyle) 6.dp else 3.dp,
+                            shape = RoundedCornerShape(9.dp),
+                            spotColor = if (premiumStyle) Color(0x336366F1) else Color(0x33000000),
+                        )
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(iconGradient),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, fontSize = 10.5.sp, color = OrderMonthlyColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

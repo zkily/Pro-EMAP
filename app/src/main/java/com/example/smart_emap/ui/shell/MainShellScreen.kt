@@ -37,6 +37,8 @@ import com.example.smart_emap.ui.erp.order.OrderDailyScreen
 import com.example.smart_emap.ui.erp.order.OrderDailyViewModel
 import com.example.smart_emap.ui.erp.order.OrderDestinationHistoryScreen
 import com.example.smart_emap.ui.erp.order.OrderDestinationHistoryViewModel
+import com.example.smart_emap.ui.erp.order.OrderHomeScreen
+import com.example.smart_emap.ui.erp.order.OrderHomeViewModel
 import com.example.smart_emap.ui.erp.order.OrderMonthlyScreen
 import com.example.smart_emap.ui.erp.order.OrderMonthlyViewModel
 import com.example.smart_emap.ui.erp.production.planning.PlanBaselineScreen
@@ -233,6 +235,13 @@ fun MainShellScreen(
     val orderDestinationHistoryViewModel: OrderDestinationHistoryViewModel = viewModel(
         factory = OrderDestinationHistoryViewModel.Factory(
             repository = appContainer.orderDailyRepository,
+        ),
+    )
+
+    val orderHomeViewModel: OrderHomeViewModel = viewModel(
+        factory = OrderHomeViewModel.Factory(
+            repository = appContainer.orderMonthlyRepository,
+            dailyRepository = appContainer.orderDailyRepository,
         ),
     )
 
@@ -470,6 +479,7 @@ fun MainShellScreen(
             orderMonthlyViewModel = orderMonthlyViewModel,
             orderDailyViewModel = orderDailyViewModel,
             orderDestinationHistoryViewModel = orderDestinationHistoryViewModel,
+            orderHomeViewModel = orderHomeViewModel,
             materialReceivingHistoryViewModel = materialReceivingHistoryViewModel,
             materialReceivingInspectionViewModel = materialReceivingInspectionViewModel,
             materialForecastViewModel = materialForecastViewModel,
@@ -528,6 +538,7 @@ private fun MainShellContent(
     orderMonthlyViewModel: OrderMonthlyViewModel,
     orderDailyViewModel: OrderDailyViewModel,
     orderDestinationHistoryViewModel: OrderDestinationHistoryViewModel,
+    orderHomeViewModel: OrderHomeViewModel,
     materialReceivingHistoryViewModel: MaterialReceivingHistoryViewModel,
     materialReceivingInspectionViewModel: MaterialReceivingInspectionViewModel,
     materialForecastViewModel: MaterialForecastViewModel,
@@ -654,6 +665,7 @@ private fun MainShellContent(
                             "/mes/actualDataCollection/welding" -> weldingViewModel.refreshAll()
                             "/mes/actualDataCollection/cutting" -> cuttingViewModel.refreshAll()
                             "/mes/actualDataCollection/chamfering" -> chamferingViewModel.refreshAll()
+                            "/erp/order" -> orderHomeViewModel.refreshAll()
                             "/erp/order/monthly" -> orderMonthlyViewModel.refreshAll()
                             "/erp/order/daily" -> orderDailyViewModel.refreshAll()
                             "/erp/order/destination-history" -> orderDestinationHistoryViewModel.loadDestinationOptions()
@@ -710,6 +722,7 @@ private fun MainShellContent(
                     orderMonthlyViewModel = orderMonthlyViewModel,
                     orderDailyViewModel = orderDailyViewModel,
                     orderDestinationHistoryViewModel = orderDestinationHistoryViewModel,
+                    orderHomeViewModel = orderHomeViewModel,
                     materialReceivingHistoryViewModel = materialReceivingHistoryViewModel,
                     materialReceivingInspectionViewModel = materialReceivingInspectionViewModel,
                     materialForecastViewModel = materialForecastViewModel,
@@ -769,6 +782,7 @@ private fun MainShellContent(
                             orderMonthlyViewModel = orderMonthlyViewModel,
                             orderDailyViewModel = orderDailyViewModel,
                             orderDestinationHistoryViewModel = orderDestinationHistoryViewModel,
+                            orderHomeViewModel = orderHomeViewModel,
                             materialReceivingHistoryViewModel = materialReceivingHistoryViewModel,
                             materialReceivingInspectionViewModel = materialReceivingInspectionViewModel,
                             materialForecastViewModel = materialForecastViewModel,
@@ -827,6 +841,7 @@ private fun ShellRouteContent(
     orderMonthlyViewModel: OrderMonthlyViewModel,
     orderDailyViewModel: OrderDailyViewModel,
     orderDestinationHistoryViewModel: OrderDestinationHistoryViewModel,
+    orderHomeViewModel: OrderHomeViewModel,
     materialReceivingHistoryViewModel: MaterialReceivingHistoryViewModel,
     materialReceivingInspectionViewModel: MaterialReceivingInspectionViewModel,
     materialForecastViewModel: MaterialForecastViewModel,
@@ -887,6 +902,10 @@ private fun ShellRouteContent(
         "/master/destination",
         "/master/destination/holiday",
         -> MasterScreen(path = path, viewModel = masterViewModel)
+        "/erp/order" -> OrderHomeScreen(
+            viewModel = orderHomeViewModel,
+            onNavigate = onNavigate,
+        )
         "/erp/order/monthly" -> OrderMonthlyScreen(viewModel = orderMonthlyViewModel)
         "/erp/order/daily" -> OrderDailyScreen(viewModel = orderDailyViewModel)
         "/erp/order/destination-history" -> OrderDestinationHistoryScreen(viewModel = orderDestinationHistoryViewModel)

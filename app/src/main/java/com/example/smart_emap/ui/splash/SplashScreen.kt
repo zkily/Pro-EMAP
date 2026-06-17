@@ -178,7 +178,7 @@ private fun SplashCredits() {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "Chinome工作室",
+            text = "Chinomeスタジオ",
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color.White.copy(alpha = 0.88f),
@@ -195,12 +195,20 @@ private fun SplashCredits() {
                 color = LoginColors.Accent.copy(alpha = 0.95f),
             )
             Text(
-                text = "制作人 ZK",
+                text = "プロデューサー ZK",
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.72f),
                 letterSpacing = 0.04.sp,
             )
         }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "著作権所有 ZK（HAYASHI）",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Normal,
+            color = Color.White.copy(alpha = 0.55f),
+            letterSpacing = 0.02.sp,
+        )
     }
 }

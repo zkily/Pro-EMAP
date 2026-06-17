@@ -66,8 +66,10 @@ data class OrderDailyUiState(
     val keyword: String = "",
     val destinationOptions: List<DestinationOptionDto> = emptyList(),
     val allProductOptions: List<MasterProductItemDto> = emptyList(),
+    val heroProductOptions: List<MasterProductItemDto> = emptyList(),
     val filteredProductOptions: List<MasterProductItemDto> = emptyList(),
     val lastFetchedText: String = "",
+    val listError: String? = null,
     val snackbarMessage: String? = null,
     val pendingCsvShare: String? = null,
     val activeDialog: OrderDailyPageDialog = OrderDailyPageDialog.None,
@@ -102,8 +104,9 @@ class OrderDailyViewModel(
             runCatching { repository.loadProductOptions() }
                 .onSuccess { products ->
                     _uiState.update { state ->
-                        state.copy(
-                            allProductOptions = products,
+                        val withProducts = state.copy(allProductOptions = products)
+                        withProducts.copy(
+                            heroProductOptions = heroProductOptionsFor(withProducts),
                             filteredProductOptions = if (state.form.destinationCd.isBlank()) {
                                 emptyList()
                             } else {
@@ -128,7 +131,7 @@ class OrderDailyViewModel(
 
     private suspend fun loadListInternal(showLoading: Boolean) {
         val state = _uiState.value
-        if (showLoading) _uiState.update { it.copy(isLoading = true) }
+        if (showLoading) _uiState.update { it.copy(isLoading = true, listError = null) }
         runCatching {
             repository.loadList(
                 OrderDailyListFilters(
@@ -145,6 +148,7 @@ class OrderDailyViewModel(
                     fullList = rows,
                     summary = summary,
                     lastFetchedText = java.time.ZonedDateTime.now(japanZone).format(fetchedFormatter),
+                    listError = null,
                     page = 1,
                 )
             }
@@ -157,6 +161,7 @@ class OrderDailyViewModel(
                     summary = OrderDailySummaryUi(),
                     total = 0,
                     pageRangeText = "表示 0件",
+                    listError = e.message ?: "一覧の取得に失敗しました",
                     snackbarMessage = e.message ?: "一覧の取得に失敗しました",
                 )
             }
@@ -186,7 +191,16 @@ class OrderDailyViewModel(
     }
 
     fun setDestinationCd(value: String) {
-        _uiState.update { it.copy(destinationCd = value, page = 1) }
+        _uiState.update { state ->
+            val next = state.copy(destinationCd = value, page = 1)
+            val products = heroProductOptionsFor(next)
+            val keyword = if (value.isNotBlank() && state.keyword.isNotBlank()) {
+                if (products.any { it.productCd == state.keyword }) state.keyword else ""
+            } else {
+                state.keyword
+            }
+            next.copy(keyword = keyword, heroProductOptions = products)
+        }
         loadList()
     }
 
@@ -240,17 +254,17 @@ class OrderDailyViewModel(
                 form = OrderDailyFormUi(
                     editId = row.id,
                     monthlyOrderId = row.monthlyOrderId.orEmpty(),
-                    destinationCd = row.destinationCd,
+                    destinationCd = row.destinationCd.orEmpty(),
                     destinationName = row.destinationName.orEmpty(),
                     date = row.date.orEmpty(),
                     weekday = row.weekday.orEmpty(),
-                    productCd = row.productCd,
+                    productCd = row.productCd.orEmpty(),
                     productName = row.productName.orEmpty(),
                     productType = row.productType.orEmpty(),
                     unitPerBox = (row.unitPerBox ?: 0).toString(),
                     confirmedBoxes = (row.confirmedBoxes ?: 0).toString(),
                     confirmedUnits = row.confirmedUnits ?: 0,
-                    forecastUnits = row.forecastUnits,
+                    forecastUnits = row.forecastUnits ?: 0,
                     status = row.status.orEmpty().ifBlank { "未出荷" },
                     remarks = row.remarks.orEmpty(),
                     deliveryDate = row.deliveryDate.orEmpty(),
@@ -258,7 +272,7 @@ class OrderDailyViewModel(
                 filteredProductOptions = emptyList(),
             )
         }
-        loadFormProductOptions(row.destinationCd, row.productCd)
+        loadFormProductOptions(row.destinationCd.orEmpty(), row.productCd.orEmpty())
     }
 
     fun dismissDialog() {
@@ -512,6 +526,14 @@ class OrderDailyViewModel(
                 pageRangeText = rangeText,
             )
         }
+    }
+
+    private fun heroProductOptionsFor(state: OrderDailyUiState): List<MasterProductItemDto> {
+        val all = state.allProductOptions
+        val dest = state.destinationCd
+        if (dest.isBlank()) return all
+        val filtered = all.filter { it.destinationCd == dest }
+        return if (filtered.isNotEmpty()) filtered else all
     }
 
     private fun filterProducts(

@@ -5,11 +5,11 @@ plugins {
 }
 
 /** 登录页默认 API 地址（可在登录画面手动修改） */
-val DEFAULT_API_HOST = project.findProperty("default_api_host")?.toString() ?: "127.0.0.1"
+val defaultApiHost = project.findProperty("default_api_host")?.toString() ?: "127.0.0.1"
 /** 后端 API 端口（startsub: 8010 / start.py: 8005）。勿用 3005/5010 等前端端口。 */
-val DEFAULT_API_PORT = project.findProperty("default_api_port")?.toString() ?: "8010"
+val defaultApiPort = project.findProperty("default_api_port")?.toString() ?: "8010"
 
-val defaultDevApiBaseUrl = "http://$DEFAULT_API_HOST:$DEFAULT_API_PORT/"
+val defaultDevApiBaseUrl = "http://$defaultApiHost:$defaultApiPort/"
 println("SmartEMAP DEFAULT_API_BASE_URL = $defaultDevApiBaseUrl")
 
 android {
@@ -27,6 +27,16 @@ android {
 
         // 开发默认 API 地址（登录页可编辑）
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"$defaultDevApiBaseUrl\"")
+
+        ndk {
+            abiFilters.clear()
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = false
+        }
     }
 
     buildTypes {
