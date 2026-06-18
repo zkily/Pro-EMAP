@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smart_emap.SmartEmapAppContainer
+import com.example.smart_emap.data.model.ShortcutItemDto
 import com.example.smart_emap.data.model.UserDto
 import com.example.smart_emap.ui.aps.scheduling.SchedulingScreen
 import com.example.smart_emap.ui.aps.scheduling.SchedulingViewModel
@@ -449,9 +450,21 @@ fun MainShellScreen(
         viewModelStoreOwner = activity,
         factory = MainShellViewModel.Factory(),
     )
+    val shortcutsViewModel: SidebarShortcutsViewModel = viewModel(
+        factory = SidebarShortcutsViewModel.Factory(appContainer.sidebarShortcutsRepository),
+    )
     val shellState by shellViewModel.uiState.collectAsState()
+    val shortcutsState by shortcutsViewModel.uiState.collectAsState()
     val activePath = shellState.activePath
     val tabs = shellState.tabs
+
+    LaunchedEffect(user.id) {
+        shortcutsViewModel.load()
+    }
+
+    LaunchedEffect(activePath) {
+        shortcutsViewModel.recordVisit(activePath)
+    }
 
     LaunchedEffect(user.id, user.role, user.permissions, user.menuCodes) {
         shellViewModel.enforceUserAccess(user)
@@ -465,6 +478,8 @@ fun MainShellScreen(
             shellState = shellState,
             activePath = activePath,
             tabs = tabs,
+            shortcutsPinned = shortcutsState.pinned,
+            shortcutsFrequent = shortcutsState.frequent,
             dashboardViewModel = dashboardViewModel,
             inspectionViewModel = inspectionViewModel,
             inspectionManualRegistrationViewModel = inspectionManualRegistrationViewModel,
@@ -524,6 +539,8 @@ private fun MainShellContent(
     shellState: MainShellUiState,
     activePath: String,
     tabs: List<ShellTab>,
+    shortcutsPinned: List<ShortcutItemDto> = emptyList(),
+    shortcutsFrequent: List<ShortcutItemDto> = emptyList(),
     dashboardViewModel: DashboardViewModel,
     inspectionViewModel: InspectionActualViewModel,
     inspectionManualRegistrationViewModel: InspectionManualRegistrationViewModel,
@@ -613,6 +630,8 @@ private fun MainShellContent(
                     user = user,
                     isCollapsed = sidebarCollapsed,
                     activePath = activePath,
+                    shortcutsPinned = shortcutsPinned,
+                    shortcutsFrequent = shortcutsFrequent,
                     showCollapseControl = !layoutMode.useMobileOverlay && !layoutMode.useCompactSidebar,
                     onNavigate = { path ->
                         shellViewModel.navigateTo(path, user)
@@ -902,10 +921,7 @@ private fun ShellRouteContent(
         "/master/destination",
         "/master/destination/holiday",
         -> MasterScreen(path = path, viewModel = masterViewModel)
-        "/erp/order" -> OrderHomeScreen(
-            viewModel = orderHomeViewModel,
-            onNavigate = onNavigate,
-        )
+        "/erp/order" -> OrderHomeScreen(viewModel = orderHomeViewModel)
         "/erp/order/monthly" -> OrderMonthlyScreen(viewModel = orderMonthlyViewModel)
         "/erp/order/daily" -> OrderDailyScreen(viewModel = orderDailyViewModel)
         "/erp/order/destination-history" -> OrderDestinationHistoryScreen(viewModel = orderDestinationHistoryViewModel)

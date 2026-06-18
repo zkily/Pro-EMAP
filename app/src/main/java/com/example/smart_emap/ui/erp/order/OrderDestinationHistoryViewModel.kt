@@ -130,7 +130,7 @@ class OrderDestinationHistoryViewModel(
             ?: state.destinationCd
         _uiState.update {
             it.copy(
-                pendingPrintHtml = buildPrintHtml(
+                pendingPrintHtml = buildDestinationHistoryPrintHtml(
                     items = state.detailItems,
                     summary = state.summaryItems,
                     destinationLabel = destLabel,
@@ -187,55 +187,4 @@ private fun OrderDailyItemDto.toHistoryItem(): DestinationHistoryItemUi {
         deliveryDate = deliveryDate.orEmpty(),
         ym = if (d.length >= 7) d.take(7) else "",
     )
-}
-
-private fun buildPrintHtml(
-    items: List<DestinationHistoryItemUi>,
-    summary: List<DestinationHistorySummaryUi>,
-    destinationLabel: String,
-    startDate: String,
-    endDate: String,
-    numberFormat: NumberFormat,
-): String {
-    fun esc(s: String) = s
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
-
-    val filterInfo = "検索条件: 期間: $startDate ~ $endDate / 納入先: ${esc(destinationLabel)}"
-    val summaryRows = summary.joinToString("") { row ->
-        """<tr><td class="center">${esc(row.ym)}</td><td class="number">${numberFormat.format(row.totalQuantity)}</td></tr>"""
-    }
-    val detailRows = items.joinToString("") { row ->
-        """<tr>
-            <td class="center">${esc(row.date)}</td>
-            <td>${esc(row.destinationName)}</td>
-            <td>${esc(row.productName)}</td>
-            <td class="number">${numberFormat.format(row.quantity)}</td>
-            <td class="center">${esc(row.status.ifBlank { "-" })}</td>
-            <td class="center">${esc(row.deliveryDate.ifBlank { "-" })}</td>
-        </tr>"""
-    }
-    return """
-        <!DOCTYPE html><html><head><meta charset="utf-8"/>
-        <title>納入先別受注履歴</title>
-        <style>
-          body{font-family:sans-serif;padding:16px;color:#0f172a}
-          h2{color:#4f46e5;margin:0 0 8px}
-          .filter{font-size:12px;color:#64748b;margin-bottom:12px}
-          table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12px}
-          th,td{border:1px solid #e2e8f0;padding:6px 8px}
-          th{background:#f8fafc;font-weight:700}
-          .center{text-align:center}.number{text-align:right;font-family:monospace}
-        </style></head><body>
-        <h2>納入先別受注履歴</h2>
-        <div class="filter">$filterInfo</div>
-        <h3>月別集計</h3>
-        <table><thead><tr><th>年月</th><th>受注数量合計</th></tr></thead><tbody>$summaryRows</tbody></table>
-        <h3>受注明細</h3>
-        <table><thead><tr><th>出荷日</th><th>納入先名</th><th>製品名</th><th>数量</th><th>状態</th><th>納入日</th></tr></thead>
-        <tbody>$detailRows</tbody></table>
-        </body></html>
-    """.trimIndent()
 }

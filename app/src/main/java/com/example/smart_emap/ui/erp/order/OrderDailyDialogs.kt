@@ -48,10 +48,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.rememberDatePickerState
+import com.example.smart_emap.ui.common.BeautifulDatePickerDialog
+import com.example.smart_emap.ui.common.BeautifulDatePickerCompactChip
 import androidx.compose.material3.TextButton
 import java.time.Instant
 import java.time.LocalDate
@@ -507,7 +505,6 @@ private fun DailyFilterSection(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DailyManageDateField(
     date: String,
@@ -515,87 +512,31 @@ private fun DailyManageDateField(
 ) {
     var showPicker by remember { mutableStateOf(false) }
     val accent = DailyFilterAccents.Date
-    val shape = RoundedCornerShape(8.dp)
-    val japanZone = remember { ZoneId.of("Asia/Tokyo") }
-    val initialMillis = remember(date) {
-        parseDailyDateMillis(date) ?: LocalDate.now(japanZone)
-            .atStartOfDay(japanZone)
-            .toInstant()
-            .toEpochMilli()
-    }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
 
     if (showPicker) {
-        DatePickerDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            onDateSelected(formatDailyDateMillis(millis, japanZone))
-                        }
-                        showPicker = false
-                    },
-                ) {
-                    Text("確定", color = accent, fontWeight = FontWeight.SemiBold)
-                }
+        BeautifulDatePickerDialog(
+            value = date,
+            title = "日付",
+            accentColor = accent,
+            confirmLabel = "確定",
+            onDismiss = { showPicker = false },
+            onConfirm = {
+                onDateSelected(it)
+                showPicker = false
             },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) {
-                    Text("キャンセル", color = OrderMonthlyColors.TextMuted)
-                }
-            },
-        ) {
-            DatePicker(
-                state = datePickerState,
-                colors = DatePickerDefaults.colors(
-                    selectedDayContainerColor = accent,
-                    todayDateBorderColor = accent,
-                    selectedYearContainerColor = accent,
-                ),
-            )
-        }
+        )
     }
 
-    Box(
-        modifier = Modifier
-            .widthIn(min = 112.dp)
-            .height(DailyFilterControlHeight)
-            .shadow(3.dp, shape, spotColor = accent.copy(alpha = 0.35f))
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color.White, Color(0xFFEFF6FF)),
-                ),
-            )
-            .border(1.dp, accent.copy(alpha = 0.35f), shape)
-            .clickable { showPicker = true },
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.55f), Color.Transparent),
-                    ),
-                ),
-        )
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
-            Text(
-                text = date.ifBlank { "選択" },
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (date.isBlank()) OrderMonthlyColors.TextMuted else DailyFilterAccents.DateDark,
-                maxLines = 1,
-            )
-        }
-    }
+    BeautifulDatePickerCompactChip(
+        value = date,
+        placeholder = "日付",
+        accentColor = accent,
+        onClick = { showPicker = true },
+        height = DailyFilterControlHeight,
+        minWidth = 112.dp,
+        elevated = true,
+        modifier = Modifier.widthIn(min = 112.dp),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

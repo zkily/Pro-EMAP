@@ -1,6 +1,5 @@
 package com.example.smart_emap.ui.erp.order
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.example.smart_emap.core.system.HtmlPrintHelper
+import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
@@ -35,13 +36,14 @@ fun OrderDestinationHistoryScreen(viewModel: OrderDestinationHistoryViewModel) {
 
     LaunchedEffect(uiState.pendingPrintHtml) {
         val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/html"
-            putExtra(Intent.EXTRA_SUBJECT, "納入先別受注履歴")
-            putExtra(Intent.EXTRA_TEXT, html)
-        }
-        context.startActivity(Intent.createChooser(intent, "印刷 / 共有"))
+        val opened = HtmlPrintHelper.printHtml(
+            context = context,
+            html = html,
+            jobName = "納入先別受注履歴",
+            layout = PrintPageLayout.A4_LANDSCAPE_SINGLE,
+        )
         viewModel.clearPendingPrintHtml()
+        if (!opened) snackbarHostState.showSnackbar("印刷画面を開けませんでした")
     }
 
     Scaffold(

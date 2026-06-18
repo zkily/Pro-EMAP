@@ -343,6 +343,11 @@ class OrderMonthlyViewModel(
         }
     }
 
+    fun adjustEditForecastUnits(delta: Int) {
+        val current = _uiState.value.editForm.forecastUnits.toIntOrNull() ?: 0
+        setEditForecastUnits((current + delta).coerceAtLeast(0).toString())
+    }
+
     fun saveEdit() {
         val state = _uiState.value
         val editId = state.editId ?: return

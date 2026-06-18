@@ -57,12 +57,44 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.example.smart_emap.ui.erp.order.OrderDailyDatePickerDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ShoppingCart
+import com.example.smart_emap.ui.common.BeautifulDatePickerDialog
+import com.example.smart_emap.ui.common.formatBeautifulDisplayDate
 import com.example.smart_emap.ui.erp.order.GlassButtonStyle
 import com.example.smart_emap.ui.erp.order.GlassPillButton
 import com.example.smart_emap.ui.erp.order.GlassToolbarButton
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 
 private val SyncDialogShape = RoundedCornerShape(18.dp)
+
+private val ManualOrderAccent = Color(0xFF10B981)
+private val ManualOrderAccentDark = Color(0xFF059669)
+private val ManualOrderAccentLight = Color(0xFF34D399)
+private val ManualOrderDialogShape = RoundedCornerShape(24.dp)
+private val ManualOrderHeaderGradient = Brush.linearGradient(
+    listOf(Color(0xFF047857), Color(0xFF059669), Color(0xFF10B981), Color(0xFF34D399)),
+)
 
 private val SyncFieldItems = listOf(
     "材料名" to "material_name",
@@ -526,11 +558,13 @@ private fun DataGenDateFieldRow(
 ) {
     var showPicker by remember { mutableStateOf(false) }
     if (showPicker) {
-        OrderDailyDatePickerDialog(
+        BeautifulDatePickerDialog(
             value = value,
-            accent = accent,
+            title = label,
+            accentColor = accent,
+            confirmLabel = "確定",
             onDismiss = { showPicker = false },
-            onConfirm = { onChange(it); showPicker = false },
+            onConfirm = { picked -> onChange(picked); showPicker = false },
         )
     }
     Column(
@@ -632,156 +666,271 @@ fun MaterialManualOrderDialog(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
     var materialExpanded by remember { mutableStateOf(false) }
+    var dialogVisible by remember { mutableStateOf(false) }
     val calculatedWeight = form.orderBundleQuantity * (selectedMaterial?.longWeight ?: 0.0)
     val calculatedAmount = calculatedWeight * (selectedMaterial?.unitPrice ?: 0.0)
+    val jpFmt = remember { java.text.NumberFormat.getIntegerInstance(java.util.Locale.JAPAN) }
+    val scroll = rememberScrollState()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) { dialogVisible = true }
 
     Dialog(
         onDismissRequest = { if (!loading) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .shadow(16.dp, SyncDialogShape)
-                .clip(SyncDialogShape)
-                .background(Color.White)
-                .border(1.dp, Color(0xFFE2E8F0), SyncDialogShape),
+        AnimatedVisibility(
+            visible = dialogVisible,
+            enter = scaleIn(
+                initialScale = 0.88f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+            ) + fadeIn(tween(280)),
+            exit = fadeOut(tween(180)),
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFDCFCE7)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF16A34A), modifier = Modifier.size(16.dp))
-                    }
-                    Column {
-                        Text("材料注文追加", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("新しい材料注文を手動で入力", fontSize = 11.sp, color = Color(0xFF64748B))
-                    }
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, enabled = !loading) {
-                        Icon(Icons.Default.Close, contentDescription = "閉じる", tint = Color(0xFF94A3B8))
-                    }
-                }
-
-                ManualOrderFieldLabel("日付")
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .widthIn(max = 420.dp)
+                    .shadow(28.dp, ManualOrderDialogShape, spotColor = ManualOrderAccent.copy(alpha = 0.45f))
+                    .clip(ManualOrderDialogShape)
+                    .background(Color.White)
+                    .border(1.dp, Color.White.copy(alpha = 0.85f), ManualOrderDialogShape),
+            ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFF8FAFC))
-                        .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                        .clickable(enabled = !loading) { showDatePicker = true }
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                ) {
-                    Text(form.date.ifBlank { "日付を選択" }, fontSize = 12.sp, color = Color(0xFF334155))
-                }
-
-                ManualOrderFieldLabel("材料")
-                ExposedDropdownMenuBox(
-                    expanded = materialExpanded,
-                    onExpandedChange = { if (!loading) materialExpanded = it },
+                        .background(ManualOrderHeaderGradient)
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFFF8FAFC))
-                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        Text(
-                            if (form.materialCd.isBlank()) "材料を選択" else "${form.materialCd} - ${form.materialName}",
-                            fontSize = 12.sp,
-                            color = Color(0xFF334155),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    ExposedDropdownMenu(
-                        expanded = materialExpanded,
-                        onDismissRequest = { materialExpanded = false },
-                        modifier = Modifier.heightIn(max = 260.dp),
-                    ) {
-                        materialOptions.forEach { material ->
-                            val cd = material.materialCd.orEmpty()
-                            DropdownMenuItem(
-                                text = { Text("$cd - ${material.materialName.orEmpty()}", fontSize = 12.sp) },
-                                onClick = {
-                                    onMaterialChange(cd)
-                                    materialExpanded = false
-                                },
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color.White.copy(alpha = 0.22f))
+                                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.ShoppingCart,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(26.dp),
                             )
                         }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "材料注文追加",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 18.sp,
+                                color = Color.White,
+                            )
+                            Text(
+                                "新しい材料注文を手動で入力",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.88f),
+                            )
+                        }
+                        IconButton(
+                            onClick = onDismiss,
+                            enabled = !loading,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color.White.copy(alpha = 0.18f)),
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "閉じる", tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        ManualOrderFieldLabel("注文束数")
-                        ManualOrderQuantityField(form.orderQuantity, loading) { onOrderQuantityChange(it) }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        ManualOrderFieldLabel("注文本数")
-                        ManualOrderQuantityField(form.orderBundleQuantity, loading) { onOrderBundleQuantityChange(it) }
-                    }
-                }
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 460.dp)
+                        .verticalScroll(scroll)
+                        .padding(horizontal = 18.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    ManualOrderFormSection(title = "基本情報", icon = Icons.Default.CalendarMonth) {
+                        ManualOrderFieldLabel("日付")
+                        ManualOrderSelectField(
+                            value = if (form.date.isBlank()) "" else formatBeautifulDisplayDate(form.date, withWeekday = false),
+                            placeholder = "日付を選択",
+                            accent = ManualOrderAccent,
+                            enabled = !loading,
+                            leadingIcon = Icons.Default.CalendarMonth,
+                            onClick = { showDatePicker = true },
+                        )
 
-                ManualOrderFieldLabel("備考")
-                androidx.compose.material3.OutlinedTextField(
-                    value = form.remarks,
-                    onValueChange = onRemarksChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !loading,
-                    textStyle = TextStyle(fontSize = 12.sp),
-                    placeholder = { Text("備考（任意）", fontSize = 12.sp) },
-                    minLines = 2,
-                )
+                        ManualOrderFieldLabel("材料")
+                        ExposedDropdownMenuBox(
+                            expanded = materialExpanded,
+                            onExpandedChange = { if (!loading) materialExpanded = it },
+                        ) {
+                            ManualOrderSelectField(
+                                value = if (form.materialCd.isBlank()) "" else "${form.materialCd} - ${form.materialName}",
+                                placeholder = "材料を選択",
+                                accent = ManualOrderAccent,
+                                enabled = !loading,
+                                leadingIcon = Icons.Default.Inventory2,
+                                onClick = { materialExpanded = true },
+                                modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            )
+                            ExposedDropdownMenu(
+                                expanded = materialExpanded,
+                                onDismissRequest = { materialExpanded = false },
+                                modifier = Modifier.heightIn(max = 280.dp),
+                            ) {
+                                materialOptions.forEach { material ->
+                                    val cd = material.materialCd.orEmpty()
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                "$cd - ${material.materialName.orEmpty()}",
+                                                fontSize = 13.sp,
+                                                maxLines = 2,
+                                            )
+                                        },
+                                        onClick = {
+                                            onMaterialChange(cd)
+                                            materialExpanded = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
 
-                selectedMaterial?.let { material ->
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFF8FAFC),
-                        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("材料詳細", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color(0xFF475569))
-                            if (calculatedWeight > 0 || calculatedAmount > 0) {
-                                Text(
-                                    "重量 ${calculatedWeight.toInt()}kg · 金額 ¥${java.text.NumberFormat.getIntegerInstance(java.util.Locale.JAPAN).format(calculatedAmount.toInt())}",
-                                    fontSize = 11.sp,
-                                    color = Color(0xFF2563EB),
+                    ManualOrderFormSection(title = "注文数量", icon = Icons.Default.Add) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                ManualOrderFieldLabel("注文束数")
+                                ManualOrderQuantityField(
+                                    value = form.orderQuantity,
+                                    enabled = !loading,
+                                    accent = Color(0xFFFDE68A),
+                                    accentBorder = Color(0xFFF59E0B),
+                                    onChange = onOrderQuantityChange,
                                 )
                             }
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ManualOrderDetailChip("仕入先", material.supplierName.orEmpty())
-                                ManualOrderDetailChip("規格", material.standardSpec.orEmpty())
-                                ManualOrderDetailChip("単価", "¥${material.unitPrice?.toInt() ?: 0}")
-                                ManualOrderDetailChip("束本数", "${material.piecesPerBundle ?: 0}")
-                                ManualOrderDetailChip("一本重量", "${material.longWeight ?: 0}kg")
+                            Column(modifier = Modifier.weight(1f)) {
+                                ManualOrderFieldLabel("注文本数")
+                                ManualOrderQuantityField(
+                                    value = form.orderBundleQuantity,
+                                    enabled = !loading,
+                                    accent = Color(0xFFDCFCE7),
+                                    accentBorder = ManualOrderAccent,
+                                    editable = true,
+                                    onChange = onOrderBundleQuantityChange,
+                                )
+                            }
+                        }
+
+                        ManualOrderFieldLabel("備考")
+                        androidx.compose.material3.OutlinedTextField(
+                            value = form.remarks,
+                            onValueChange = onRemarksChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !loading,
+                            textStyle = TextStyle(fontSize = 13.sp, color = Color(0xFF334155)),
+                            placeholder = { Text("備考（任意）", fontSize = 13.sp, color = Color(0xFF94A3B8)) },
+                            minLines = 2,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = ManualOrderAccent,
+                                unfocusedBorderColor = Color(0xFFE2E8F0),
+                                focusedContainerColor = Color(0xFFF8FAFC),
+                                unfocusedContainerColor = Color(0xFFF8FAFC),
+                            ),
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = selectedMaterial != null,
+                        enter = fadeIn(tween(320)) + expandVertically(
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+                        ) + slideInVertically(initialOffsetY = { it / 3 }),
+                        exit = fadeOut(tween(200)) + shrinkVertically(),
+                    ) {
+                        selectedMaterial?.let { material ->
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = Color(0xFFF0FDF4),
+                                border = BorderStroke(1.dp, ManualOrderAccent.copy(alpha = 0.28f)),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Icon(Icons.Default.Info, contentDescription = null, tint = ManualOrderAccent, modifier = Modifier.size(18.dp))
+                                        Text("材料詳細", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF166534))
+                                        if (calculatedWeight > 0 || calculatedAmount > 0) {
+                                            Spacer(Modifier.weight(1f))
+                                            Surface(
+                                                shape = RoundedCornerShape(20.dp),
+                                                color = ManualOrderAccent.copy(alpha = 0.12f),
+                                            ) {
+                                                Text(
+                                                    "重量 ${calculatedWeight.toInt()}kg · ¥${jpFmt.format(calculatedAmount.toInt())}",
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = ManualOrderAccentDark,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        ManualOrderDetailChip("仕入先", material.supplierName.orEmpty())
+                                        ManualOrderDetailChip("規格", material.standardSpec.orEmpty())
+                                        ManualOrderDetailChip("単価", "¥${material.unitPrice?.toInt() ?: 0}")
+                                        ManualOrderDetailChip("束本数", "${material.piecesPerBundle ?: 0}")
+                                        ManualOrderDetailChip("一本重量", "${material.longWeight ?: 0}kg")
+                                        ManualOrderDetailChip("安全在庫", "${material.safetyStock ?: 0}")
+                                        ManualOrderDetailChip("リードタイム", "${material.leadTime ?: 0}日")
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
+                HorizontalDivider(color = Color(0xFFE2E8F0))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    GlassPillButton("キャンセル", onClick = onDismiss)
-                    Spacer(Modifier.width(8.dp))
-                    GlassPillButton(
+                    ManualOrderFooterButton(
+                        text = "キャンセル",
+                        filled = false,
+                        enabled = !loading,
+                        onClick = onDismiss,
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    ManualOrderFooterButton(
                         text = if (loading) "登録中…" else "登録",
+                        filled = true,
+                        enabled = !loading,
+                        loading = loading,
                         onClick = onConfirm,
-                        filled = !loading,
                     )
                 }
             }
@@ -789,9 +938,11 @@ fun MaterialManualOrderDialog(
     }
 
     if (showDatePicker) {
-        OrderDailyDatePickerDialog(
+        BeautifulDatePickerDialog(
             value = form.date,
-            accent = Color(0xFF16A34A),
+            title = "日付",
+            accentColor = ManualOrderAccent,
+            confirmLabel = "確定",
             onDismiss = { showDatePicker = false },
             onConfirm = {
                 onDateChange(it)
@@ -802,46 +953,276 @@ fun MaterialManualOrderDialog(
 }
 
 @Composable
-private fun ManualOrderFieldLabel(text: String) {
-    Text(text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF64748B))
+private fun ManualOrderFormSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ManualOrderAccent.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(icon, contentDescription = null, tint = ManualOrderAccent, modifier = Modifier.size(15.dp))
+            }
+            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF334155))
+        }
+        content()
+    }
 }
 
 @Composable
-private fun ManualOrderQuantityField(value: Int, enabled: Boolean, onChange: (Int) -> Unit) {
+private fun ManualOrderSelectField(
+    value: String,
+    placeholder: String,
+    accent: Color,
+    enabled: Boolean,
+    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val hasValue = value.isNotBlank()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xFFF8FAFC), if (hasValue) Color(0xFFF0FDF4) else Color(0xFFF8FAFC)),
+                ),
+            )
+            .border(
+                1.dp,
+                if (hasValue) accent.copy(alpha = 0.45f) else Color(0xFFE2E8F0),
+                shape,
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(leadingIcon, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+        Text(
+            text = value.ifBlank { placeholder },
+            fontSize = 13.sp,
+            fontWeight = if (hasValue) FontWeight.Medium else FontWeight.Normal,
+            color = if (hasValue) Color(0xFF1E293B) else Color(0xFF94A3B8),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun ManualOrderFooterButton(
+    text: String,
+    filled: Boolean,
+    enabled: Boolean,
+    loading: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier = Modifier
+            .height(42.dp)
+            .widthIn(min = 100.dp)
+            .clip(shape)
+            .then(
+                if (filled) {
+                    Modifier.background(
+                        Brush.linearGradient(listOf(ManualOrderAccentDark, ManualOrderAccent, ManualOrderAccentLight)),
+                    )
+                } else {
+                    Modifier
+                        .background(Color.White)
+                        .border(1.dp, Color(0xFFE2E8F0), shape)
+                },
+            )
+            .clickable(enabled = enabled && !loading, onClick = onClick)
+            .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (loading && filled) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = Color.White,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (filled) {
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+                Text(
+                    text,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (filled) Color.White else Color(0xFF64748B),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ManualOrderFieldLabel(text: String) {
+    Text(text, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF64748B))
+}
+
+@Composable
+private fun ManualOrderQuantityField(
+    value: Int,
+    enabled: Boolean,
+    accent: Color,
+    accentBorder: Color,
+    onChange: (Int) -> Unit,
+    editable: Boolean = false,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    var text by remember { mutableStateOf(value.toString()) }
+    var focused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(value) {
+        if (!focused) text = value.toString()
+    }
+
+    val numericValue = if (editable) text.toIntOrNull() ?: value else value
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFFF8FAFC))
-            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            .clip(shape)
+            .background(accent.copy(alpha = 0.55f))
+            .border(1.dp, accentBorder.copy(alpha = 0.35f), shape)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.White)
-                .clickable(enabled = enabled) { onChange((value - 1).coerceAtLeast(0)) },
-            contentAlignment = Alignment.Center,
-        ) { Text("−", fontWeight = FontWeight.Bold) }
-        Text(value.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.White)
-                .clickable(enabled = enabled) { onChange(value + 1) },
-            contentAlignment = Alignment.Center,
-        ) { Text("+", fontWeight = FontWeight.Bold) }
+        ManualOrderStepperBtn(enabled = enabled) {
+            val next = (numericValue - 1).coerceAtLeast(0)
+            if (editable) text = next.toString()
+            onChange(next)
+        }
+        if (editable) {
+            BasicTextField(
+                value = text,
+                onValueChange = { raw ->
+                    val digits = raw.filter { it.isDigit() }.take(6)
+                    text = digits
+                    onChange(digits.toIntOrNull() ?: 0)
+                },
+                enabled = enabled,
+                singleLine = true,
+                textStyle = TextStyle(
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B),
+                    textAlign = TextAlign.Center,
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 4.dp)
+                    .height(32.dp)
+                    .onFocusChanged { state ->
+                        focused = state.isFocused
+                        if (!state.isFocused) {
+                            val parsed = text.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                            text = parsed.toString()
+                            onChange(parsed)
+                        }
+                    },
+                decorationBox = { inner ->
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (text.isEmpty() && !focused) {
+                            Text(
+                                "0",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF94A3B8),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        inner()
+                    }
+                },
+            )
+        } else {
+            Text(
+                value.toString(),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1E293B),
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp),
+            )
+        }
+        ManualOrderStepperBtn(enabled = enabled, plus = true) {
+            val next = numericValue + 1
+            if (editable) text = next.toString()
+            onChange(next)
+        }
+    }
+}
+
+@Composable
+private fun ManualOrderStepperBtn(enabled: Boolean, plus: Boolean = false, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = if (enabled) 0.92f else 0.5f))
+            .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(if (plus) "+" else "−", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF475569))
     }
 }
 
 @Composable
 private fun ManualOrderDetailChip(label: String, value: String) {
-    Text("$label: ${value.ifBlank { "—" }}", fontSize = 10.sp, color = Color(0xFF64748B))
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color.White.copy(alpha = 0.85f),
+        border = BorderStroke(1.dp, ManualOrderAccent.copy(alpha = 0.15f)),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+            Text(label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = Color(0xFF94A3B8))
+            Text(
+                value.ifBlank { "—" },
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF334155),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
+
+private val PrintConfirmAccent = Color(0xFF667EEA)
+private val PrintConfirmDialogShape = RoundedCornerShape(20.dp)
+private val PrintConfirmHeaderGradient = Brush.linearGradient(
+    listOf(Color(0xFF667EEA), Color(0xFF764BA2), Color(0xFF6D28D9)),
+)
 
 @Composable
 fun MaterialPrintOrderConfirmDialog(
@@ -857,38 +1238,119 @@ fun MaterialPrintOrderConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var dialogVisible by remember { mutableStateOf(false) }
+    val scroll = rememberScrollState()
+
+    androidx.compose.runtime.LaunchedEffect(Unit) { dialogVisible = true }
+
     Dialog(
         onDismissRequest = { if (!loading) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .shadow(16.dp, SyncDialogShape)
-                .clip(SyncDialogShape)
-                .background(Color.White)
-                .border(1.dp, Color(0xFFE2E8F0), SyncDialogShape),
+        AnimatedVisibility(
+            visible = dialogVisible,
+            enter = scaleIn(
+                initialScale = 0.9f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+            ) + fadeIn(tween(260)),
+            exit = fadeOut(tween(180)),
         ) {
-            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("注文書印刷確認", fontWeight = FontWeight.Bold, fontSize = 15.sp, modifier = Modifier.weight(1f))
-                    GlassToolbarButton(
-                        label = if (loading) "処理中…" else "印刷実行",
-                        icon = Icons.Default.Print,
-                        style = GlassButtonStyle.Blue,
-                        enabled = !loading,
-                        onClick = onConfirm,
-                    )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.94f)
+                    .widthIn(max = 460.dp)
+                    .shadow(24.dp, PrintConfirmDialogShape, spotColor = PrintConfirmAccent.copy(alpha = 0.35f))
+                    .clip(PrintConfirmDialogShape)
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE2E8F0), PrintConfirmDialogShape),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(PrintConfirmHeaderGradient)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("注文書印刷確認", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                            Text(
+                                "対象注文 $orderCount 件 · A4 縦",
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
+                        PrintConfirmHeaderButton(
+                            label = if (loading) "処理中…" else "印刷実行",
+                            loading = loading,
+                            enabled = !loading,
+                            onClick = onConfirm,
+                        )
+                    }
                 }
-                Text("対象注文: ${orderCount}件", fontSize = 12.sp, color = Color(0xFF64748B))
-                PrintFormField("受注先会社名", form.recipientCompany, loading, onRecipientCompanyChange)
-                PrintFormField("受注先担当者", form.recipientPersons, loading, onRecipientPersonsChange)
-                PrintFormField("承認者", form.approver, loading, onApproverChange)
-                PrintFormField("発行者", form.issuer, loading, onIssuerChange)
-                PrintFormField("備考1", form.note1, loading, onNote1Change, minLines = 2)
-                PrintFormField("備考2", form.note2, loading, onNote2Change, minLines = 2)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    GlassPillButton("閉じる", onClick = onDismiss)
+
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(scroll)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PrintConfirmSection(title = "受注先情報", icon = Icons.Default.Person) {
+                        PrintConfirmField("受注先会社名", form.recipientCompany, loading, onRecipientCompanyChange)
+                        PrintConfirmField("受注先担当者", form.recipientPersons, loading, onRecipientPersonsChange)
+                    }
+
+                    PrintConfirmSection(title = "承認・発行情報", icon = Icons.Default.Edit) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            PrintConfirmField(
+                                label = "承認者",
+                                value = form.approver,
+                                enabled = !loading,
+                                onChange = onApproverChange,
+                                modifier = Modifier.weight(1f),
+                            )
+                            PrintConfirmField(
+                                label = "発行者",
+                                value = form.issuer,
+                                enabled = !loading,
+                                onChange = onIssuerChange,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+
+                    PrintConfirmSection(title = "備考・注意事項", icon = Icons.Default.Inventory2) {
+                        PrintConfirmField(
+                            label = "備考1",
+                            value = form.note1,
+                            enabled = !loading,
+                            onChange = onNote1Change,
+                            minLines = 2,
+                        )
+                        PrintConfirmField(
+                            label = "備考2",
+                            value = form.note2,
+                            enabled = !loading,
+                            onChange = onNote2Change,
+                            minLines = 2,
+                        )
+                    }
                 }
             }
         }
@@ -896,22 +1358,97 @@ fun MaterialPrintOrderConfirmDialog(
 }
 
 @Composable
-private fun PrintFormField(
+private fun PrintConfirmSection(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = Color(0xFFFAFBFC),
+        border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(icon, contentDescription = null, tint = PrintConfirmAccent, modifier = Modifier.size(14.dp))
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF374151))
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun PrintConfirmHeaderButton(
+    label: String,
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(8.dp)
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(Color(0x99FFFFFF))
+            .border(1.dp, Color(0x66000000), shape)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            if (loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                    color = Color(0xFF1E293B),
+                )
+            } else {
+                Icon(Icons.Default.Print, contentDescription = null, tint = Color(0xFF1E293B), modifier = Modifier.size(14.dp))
+            }
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+        }
+    }
+}
+
+@Composable
+private fun PrintConfirmField(
     label: String,
     value: String,
     enabled: Boolean,
     onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
     minLines: Int = 1,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF64748B))
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
         androidx.compose.material3.OutlinedTextField(
             value = value,
             onValueChange = onChange,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
-            textStyle = TextStyle(fontSize = 12.sp),
+            textStyle = TextStyle(fontSize = 12.sp, color = Color(0xFF1F2937)),
             minLines = minLines,
+            singleLine = minLines == 1,
+            shape = RoundedCornerShape(8.dp),
+            colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = PrintConfirmAccent,
+                unfocusedBorderColor = Color(0xFFE5E7EB),
+                focusedContainerColor = Color.White,
+                unfocusedContainerColor = Color.White,
+                disabledContainerColor = Color(0xFFF9FAFB),
+            ),
         )
     }
 }

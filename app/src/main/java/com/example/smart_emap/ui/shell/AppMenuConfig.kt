@@ -1,6 +1,8 @@
 package com.example.smart_emap.ui.shell
 
 import com.example.smart_emap.core.auth.canAccessMenuCode
+import com.example.smart_emap.core.auth.canAccessPath
+import com.example.smart_emap.data.model.ShortcutItemDto
 import com.example.smart_emap.data.model.UserDto
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -442,6 +445,36 @@ object AppMenuConfig {
     /** ダッシュボード?? menu_codes ダッシュボードダッシュボード??? */
     fun menusForUser(user: UserDto): List<AppMenuNode> =
         rootMenus.mapNotNull { filterNodeForUser(it, user) }
+
+    /** Web サイドバー「よく使う」：ピン留め + よく使うページをメニュー Group に変換 */
+    fun shortcutsGroupForUser(
+        pinned: List<ShortcutItemDto>,
+        frequent: List<ShortcutItemDto>,
+        user: UserDto,
+    ): AppMenuNode.Group? {
+        val children = mutableListOf<AppMenuNode>()
+        val seen = mutableSetOf<String>()
+
+        fun addShortcut(item: ShortcutItemDto) {
+            val path = item.path.trim()
+            if (path.isEmpty() || path in seen) return
+            if (!user.canAccessPath(path)) return
+            val leaf = findLeaf(path) ?: return
+            seen.add(path)
+            children.add(leaf)
+        }
+
+        pinned.forEach(::addShortcut)
+        frequent.forEach(::addShortcut)
+
+        if (children.isEmpty()) return null
+        return AppMenuNode.Group(
+            code = "SHORTCUTS",
+            label = "よく使う",
+            icon = Icons.Default.Star,
+            children = children,
+        )
+    }
 
     private fun filterNodeForUser(node: AppMenuNode, user: UserDto): AppMenuNode? {
         return when (node) {

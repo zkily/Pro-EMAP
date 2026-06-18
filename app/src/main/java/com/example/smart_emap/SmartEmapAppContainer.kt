@@ -24,6 +24,7 @@ class SmartEmapAppContainer(context: Context) {
     val apiClient = ApiClient(sessionStore, sessionEvents)
 
     val authRepository = AuthRepository(sessionStore, apiClient)
+    val sidebarShortcutsRepository = SidebarShortcutsRepository(apiClient)
     val dashboardRepository = DashboardRepository(apiClient)
     val systemUserRepository = SystemUserRepository(apiClient)
     val inspectionRepository = InspectionRepository(apiClient, mesClientIdStore, systemUserRepository)

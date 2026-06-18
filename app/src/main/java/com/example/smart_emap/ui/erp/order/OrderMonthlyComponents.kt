@@ -831,7 +831,7 @@ private fun TableActionsCell(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TableActionLink("日別受注", OrderMonthlyColors.ActionBlue, onDailyOrder)
-        TableActionLink("編集", OrderMonthlyColors.ActionEdit, onEdit)
+        TableActionLink("編集", OrderMonthlyColors.ActionBlue, onEdit)
         TableActionLink("削除", OrderMonthlyColors.DiffNegative, onDelete)
     }
 }
@@ -843,9 +843,9 @@ private fun TableActionLink(text: String, color: Color, onClick: () -> Unit) {
         modifier = Modifier
             .clip(RoundedCornerShape(4.dp))
             .clickable(onClick = onClick)
-            .padding(horizontal = 5.dp, vertical = 6.dp),
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
         color = color,
         maxLines = 1,
     )

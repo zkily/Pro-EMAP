@@ -1,6 +1,5 @@
 package com.example.smart_emap.ui.erp.order
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -42,7 +41,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,23 +52,11 @@ import kotlinx.coroutines.delay
 fun OrderDailyScreen(viewModel: OrderDailyViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
 
     LaunchedEffect(uiState.snackbarMessage) {
         val message = uiState.snackbarMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
         viewModel.clearSnackbar()
-    }
-
-    LaunchedEffect(uiState.pendingCsvShare) {
-        val csv = uiState.pendingCsvShare ?: return@LaunchedEffect
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/csv"
-            putExtra(Intent.EXTRA_SUBJECT, "order_daily.csv")
-            putExtra(Intent.EXTRA_TEXT, csv)
-        }
-        context.startActivity(Intent.createChooser(intent, "CSVエクスポート"))
-        viewModel.clearPendingCsvShare()
     }
 
     OrderDailyDialogs(state = uiState, viewModel = viewModel)
@@ -113,9 +99,7 @@ fun OrderDailyScreen(viewModel: OrderDailyViewModel) {
                                 destinationOptions = uiState.destinationOptions,
                                 productOptions = uiState.heroProductOptions,
                                 actionLoading = uiState.isLoading || uiState.isRefreshing,
-                                exportEnabled = uiState.fullList.isNotEmpty(),
                                 onRefresh = viewModel::refreshAll,
-                                onExportCsv = viewModel::exportCsv,
                                 onCreate = viewModel::openCreateDialog,
                                 onQuickRange = viewModel::applyQuickRange,
                                 onStartDateChange = viewModel::setStartDate,

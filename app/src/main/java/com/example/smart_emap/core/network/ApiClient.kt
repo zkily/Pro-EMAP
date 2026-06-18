@@ -25,6 +25,7 @@ import com.example.smart_emap.data.api.OrderBatchApiService
 import com.example.smart_emap.data.api.OrderDailyApiService
 import com.example.smart_emap.data.api.OrderMonthlyApiService
 import com.example.smart_emap.data.api.ProcessDefectApiService
+import com.example.smart_emap.data.api.ShortcutsApiService
 import com.example.smart_emap.data.api.SystemApiService
 import com.example.smart_emap.data.api.SystemUsersApiService
 import com.example.smart_emap.data.api.WeldingApiService
@@ -175,6 +176,8 @@ class ApiClient(
     suspend fun planBaselineApi(): PlanBaselineApiService = createService(PlanBaselineApiService::class.java)
 
     suspend fun planDataApi(): PlanDataApiService = createService(PlanDataApiService::class.java)
+
+    suspend fun shortcutsApi(): ShortcutsApiService = createService(ShortcutsApiService::class.java)
 
     private fun createRetrofit(baseUrl: String, client: OkHttpClient): Retrofit {
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"

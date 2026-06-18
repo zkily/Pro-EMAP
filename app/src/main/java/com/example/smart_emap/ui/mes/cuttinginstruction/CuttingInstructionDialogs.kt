@@ -51,11 +51,7 @@ import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.SelectableDates
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -114,6 +110,7 @@ import com.example.smart_emap.data.model.InstructionCuttingRowDto
 import com.example.smart_emap.data.model.InstructionPlanRowDto
 
 import com.example.smart_emap.data.model.KanbanIssuanceRowDto
+import com.example.smart_emap.ui.common.BeautifulDatePickerDialog
 import com.example.smart_emap.ui.erp.order.OrderDailyDatePickerDialog
 
 
@@ -3349,10 +3346,6 @@ private fun SplitToNextDayDialog(
     val warningColor = Color(0xFFE6A23C)
 
     if (showDatePicker) {
-        val initialMillis = remember(nextDay) {
-            runCatching { LocalDate.parse(nextDay.trim().take(10)).atStartOfDay(japanZone).toInstant().toEpochMilli() }
-                .getOrElse { LocalDate.now(japanZone).atStartOfDay(japanZone).toInstant().toEpochMilli() }
-        }
         val selectableDates = remember {
             object : SelectableDates {
                 override fun isSelectableDate(utcTimeMillis: Long): Boolean {
@@ -3361,38 +3354,18 @@ private fun SplitToNextDayDialog(
                 }
             }
         }
-        val dateState = rememberDatePickerState(
-            initialSelectedDateMillis = initialMillis,
+        BeautifulDatePickerDialog(
+            value = nextDay,
+            title = "翌営業日",
+            accentColor = warningColor,
+            confirmLabel = "確定",
             selectableDates = selectableDates,
+            onDismiss = { showDatePicker = false },
+            onConfirm = {
+                nextDay = it
+                showDatePicker = false
+            },
         )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    dateState.selectedDateMillis?.let { millis ->
-                        val selected = Instant.ofEpochMilli(millis).atZone(japanZone).toLocalDate()
-                        nextDay = selected.toString()
-                    }
-                    showDatePicker = false
-                }) {
-                    Text("確定", color = warningColor, fontWeight = FontWeight.SemiBold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("キャンセル", color = Color(0xFF64748B))
-                }
-            },
-        ) {
-            DatePicker(
-                state = dateState,
-                colors = DatePickerDefaults.colors(
-                    selectedDayContainerColor = warningColor,
-                    todayDateBorderColor = warningColor,
-                    selectedYearContainerColor = warningColor,
-                ),
-            )
-        }
     }
 
     Dialog(onDismissRequest = { if (!submitting) onDismiss() }) {

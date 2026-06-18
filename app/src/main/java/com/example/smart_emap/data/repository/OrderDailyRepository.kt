@@ -116,36 +116,6 @@ class OrderDailyRepository(
         )
     }
 
-    fun buildCsv(rows: List<OrderDailyItemDto>): String {
-        val headers = listOf(
-            "日付", "曜日", "月受注ID", "納入先CD", "納入先名", "製品CD", "製品名", "種別",
-            "内示本数", "確定箱数", "確定本数", "ステータス", "納入日",
-        )
-        val lines = buildList {
-            add(headers.joinToString(","))
-            rows.forEach { r ->
-                add(
-                    listOf(
-                        r.date.orEmpty(),
-                        r.weekday.orEmpty(),
-                        r.monthlyOrderId.orEmpty(),
-                        r.destinationCd.orEmpty(),
-                        r.destinationName.orEmpty(),
-                        r.productCd.orEmpty(),
-                        r.productName.orEmpty(),
-                        r.productType.orEmpty(),
-                        (r.forecastUnits ?: 0).toString(),
-                        (r.confirmedBoxes ?: 0).toString(),
-                        (r.confirmedUnits ?: 0).toString(),
-                        r.status.orEmpty(),
-                        r.deliveryDate.orEmpty(),
-                    ).joinToString(",") { escapeCsvCell(it) },
-                )
-            }
-        }
-        return "\uFEFF${lines.joinToString("\r\n")}"
-    }
-
     private fun mapHttpError(e: HttpException, fallback: String): Exception {
         val body = e.response()?.errorBody()?.string()
         if (!body.isNullOrBlank()) {
@@ -159,12 +129,5 @@ class OrderDailyRepository(
         return Exception(
             NetworkErrors.formatHttpError(e.code(), e.message(), fallback, networkHints),
         )
-    }
-
-    private fun escapeCsvCell(value: String): String {
-        if (value.any { it == '"' || it == ',' || it == '\n' || it == '\r' }) {
-            return "\"${value.replace("\"", "\"\"")}\""
-        }
-        return value
     }
 }

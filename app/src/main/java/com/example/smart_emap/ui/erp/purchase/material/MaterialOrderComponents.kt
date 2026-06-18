@@ -62,7 +62,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -808,29 +807,6 @@ private fun MaterialOrderTabChip(
     }
 }
 
-private object MaterialStockCol {
-    val Date = 54.dp
-    val Supplier = 74.dp
-    val Cd = 50.dp
-    val Name = 88.dp
-    val Safety = 30.dp
-    val Stock = 30.dp
-    val Stepper = 58.dp
-    val Bundle = 34.dp
-    val Weight = 34.dp
-    val Action = 46.dp
-    val RowHeight = 34.dp
-    val Spec = 56.dp
-    val SubQty = 44.dp
-    val SubStatus = 52.dp
-    val SubLabel = 56.dp
-    val SubRemarks = 80.dp
-    val SubRowHeight = 38.dp
-    val UsageDate = 78.dp
-    val UsageStock = 44.dp
-    val OrderAmount = 52.dp
-}
-
 @Composable
 fun MaterialOrderTabActionButtons(
     actionLoading: Boolean,
@@ -863,29 +839,29 @@ fun MaterialOrderPurchaseTable(
     onOrderChange: (MaterialStockItemDto, Int) -> Unit,
     onRemarksChange: (MaterialStockItemDto, String) -> Unit,
 ) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
+    val cols = MoCols.purchaseOrder
+    MoTableShell(columns = cols) {
         Row(
-            modifier = Modifier
-                .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
-                .padding(horizontal = 6.dp, vertical = 7.dp),
+            modifier = Modifier.moTableHeaderRow(),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            stockHeaderCell("日付", MaterialStockCol.UsageDate)
-            stockHeaderCell("材料CD", MaterialStockCol.Cd + 8.dp)
-            stockHeaderCell("材料名", MaterialStockCol.Name + 20.dp)
-            stockHeaderCell("仕入先", MaterialStockCol.Supplier)
-            stockHeaderCell("規格", MaterialStockCol.Spec)
-            stockHeaderCell("現在在庫", MaterialStockCol.UsageStock)
-            stockHeaderCell("注文束数", MaterialStockCol.Stepper, Color(0xFFFDE68A))
-            stockHeaderCell("注文本数", MaterialStockCol.SubQty)
-            stockHeaderCell("重量", MaterialStockCol.Weight + 6.dp)
-            stockHeaderCell("注文金額", MaterialStockCol.OrderAmount)
-            stockHeaderCell("備考", MaterialStockCol.SubRemarks)
+            MoHeaderCell("日付", cols[0])
+            MoHeaderCell("材料CD", cols[1])
+            MoHeaderCell("材料名", cols[2], align = TextAlign.Start)
+            MoHeaderCell("仕入先", cols[3])
+            MoHeaderCell("規格", cols[4])
+            MoHeaderCell("現在在庫", cols[5])
+            MoHeaderCell("注文束数", cols[6], Color(0xFFFDE68A))
+            MoHeaderCell("注文本数", cols[7])
+            MoHeaderCell("重量", cols[8])
+            MoHeaderCell("注文金額", cols[9])
+            MoHeaderCell("備考", cols[10], align = TextAlign.Start)
         }
         items.forEachIndexed { index, row ->
             MaterialOrderPurchaseRow(
                 row = row,
+                cols = cols,
                 striped = index % 2 == 1,
                 onOrderChange = { onOrderChange(row, it) },
                 onRemarksChange = onRemarksChange,
@@ -897,185 +873,179 @@ fun MaterialOrderPurchaseTable(
 @Composable
 private fun MaterialOrderPurchaseRow(
     row: MaterialStockItemDto,
+    cols: List<MoColumnSpec>,
     striped: Boolean,
     onOrderChange: (Int) -> Unit,
     onRemarksChange: (MaterialStockItemDto, String) -> Unit,
 ) {
-    val bg = if (striped) Color(0xFFFAFBFC) else Color.White
     val stock = row.currentStock ?: 0
     val bundleQty = row.orderBundleQuantity ?: 0
     val weight = row.bundleWeight ?: 0.0
     val amount = row.orderAmount ?: 0.0
     Row(
-        modifier = Modifier
-            .height(MaterialStockCol.RowHeight)
-            .background(bg)
-            .drawBehindRowDivider(Color(0xFFE2E8F0))
-            .padding(horizontal = 6.dp),
+        modifier = Modifier.moDataRow(striped),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell(row.date.orEmpty(), MaterialStockCol.UsageDate)
-        stockBodyCell(row.materialCd.orEmpty(), MaterialStockCol.Cd + 8.dp, Color(0xFF475569))
-        stockBodyCell(row.materialName.orEmpty(), MaterialStockCol.Name + 20.dp, Color(0xFF2563EB))
-        stockBodyCell(row.supplierName.orEmpty().take(10), MaterialStockCol.Supplier, Color(0xFF64748B))
-        stockBodyCell(row.standardSpec.orEmpty(), MaterialStockCol.Spec, Color(0xFF64748B))
-        stockBodyCell(
+        MoBodyCell(row.date.orEmpty(), cols[0])
+        MoBodyCell(row.materialCd.orEmpty(), cols[1], Color(0xFF475569))
+        MoBodyCell(row.materialName.orEmpty(), cols[2], Color(0xFF2563EB), align = TextAlign.Start)
+        MoBodyCell(row.supplierName.orEmpty(), cols[3], Color(0xFF64748B))
+        MoBodyCell(row.standardSpec.orEmpty(), cols[4], Color(0xFF64748B), align = TextAlign.Start)
+        MoBodyCell(
             formatStockDisplay(stock),
-            MaterialStockCol.UsageStock,
+            cols[5],
             if (stock < 0) Color(0xFFEF4444) else Color(0xFF1E293B),
             bold = true,
         )
-        MaterialOrderStepperCell(
+        MoStepperCell(
             value = row.orderQuantity ?: 0,
-            width = MaterialStockCol.Stepper,
+            spec = cols[6],
             bg = Color(0xFFFDE68A),
             blankWhenZero = true,
             onChange = onOrderChange,
         )
-        stockBodyCell(formatStockDisplay(bundleQty), MaterialStockCol.SubQty)
-        stockBodyCell(
+        MoBodyCell(formatStockDisplay(bundleQty), cols[7])
+        MoBodyCell(
             if (bundleQty > 0) "${weight.roundToInt()}kg" else "",
-            MaterialStockCol.Weight + 6.dp,
+            cols[8],
         )
-        stockBodyCell(
+        MoBodyCell(
             if (amount > 0.0) "¥${jpNumber.format(amount.roundToInt())}" else "",
-            MaterialStockCol.OrderAmount,
+            cols[9],
             Color(0xFF1E293B),
             bold = true,
         )
-        MaterialStockRemarksCell(row = row, onRemarksChange = onRemarksChange)
+        MaterialStockRemarksCell(row = row, spec = cols[10], onRemarksChange = onRemarksChange)
     }
 }
 
 @Composable
 fun MaterialOrderHistoryTable(items: List<MaterialStockItemDto>) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
+    val cols = MoCols.purchaseOrder
+    MoTableShell(columns = cols) {
         Row(
-            modifier = Modifier
-                .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
-                .padding(horizontal = 6.dp, vertical = 7.dp),
+            modifier = Modifier.moTableHeaderRow(),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            stockHeaderCell("日付", MaterialStockCol.UsageDate)
-            stockHeaderCell("材料CD", MaterialStockCol.Cd + 8.dp)
-            stockHeaderCell("材料名", MaterialStockCol.Name + 20.dp)
-            stockHeaderCell("仕入先", MaterialStockCol.Supplier)
-            stockHeaderCell("規格", MaterialStockCol.Spec)
-            stockHeaderCell("現在在庫", MaterialStockCol.UsageStock)
-            stockHeaderCell("注文束数", MaterialStockCol.Stepper, Color(0xFFFDE68A))
-            stockHeaderCell("注文本数", MaterialStockCol.SubQty)
-            stockHeaderCell("重量(kg)", MaterialStockCol.Weight + 6.dp)
-            stockHeaderCell("注文金額", MaterialStockCol.OrderAmount)
-            stockHeaderCell("備考", MaterialStockCol.SubRemarks)
+            MoHeaderCell("日付", cols[0])
+            MoHeaderCell("材料CD", cols[1])
+            MoHeaderCell("材料名", cols[2], align = TextAlign.Start)
+            MoHeaderCell("仕入先", cols[3])
+            MoHeaderCell("規格", cols[4])
+            MoHeaderCell("現在在庫", cols[5])
+            MoHeaderCell("注文束数", cols[6], Color(0xFFFDE68A))
+            MoHeaderCell("注文本数", cols[7])
+            MoHeaderCell("重量(kg)", cols[8])
+            MoHeaderCell("注文金額", cols[9])
+            MoHeaderCell("備考", cols[10], align = TextAlign.Start)
         }
         items.forEachIndexed { index, row ->
-            MaterialOrderHistoryRow(row = row, striped = index % 2 == 1)
+            MaterialOrderHistoryRow(row = row, cols = cols, striped = index % 2 == 1)
         }
         if (items.isNotEmpty()) {
-            MaterialOrderHistorySummaryRow(items = items)
+            MaterialOrderHistorySummaryRow(items = items, cols = cols)
         }
     }
 }
 
 @Composable
-private fun MaterialOrderHistoryRow(row: MaterialStockItemDto, striped: Boolean) {
-    val bg = if (striped) Color(0xFFFAFBFC) else Color.White
+private fun MaterialOrderHistoryRow(
+    row: MaterialStockItemDto,
+    cols: List<MoColumnSpec>,
+    striped: Boolean,
+) {
     val stock = row.currentStock ?: 0
     val orderQty = row.orderQuantity ?: 0
     val bundleQty = row.orderBundleQuantity ?: 0
     val weight = row.bundleWeight ?: 0.0
     val amount = row.orderAmount ?: 0.0
     Row(
-        modifier = Modifier
-            .height(MaterialStockCol.RowHeight)
-            .background(bg)
-            .drawBehindRowDivider(Color(0xFFE2E8F0))
-            .padding(horizontal = 6.dp),
+        modifier = Modifier.moDataRow(striped),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell(row.date.orEmpty(), MaterialStockCol.UsageDate)
-        stockBodyCell(row.materialCd.orEmpty(), MaterialStockCol.Cd + 8.dp, Color(0xFF475569))
-        stockBodyCell(row.materialName.orEmpty(), MaterialStockCol.Name + 20.dp, Color(0xFF2563EB))
-        stockBodyCell(row.supplierName.orEmpty().take(10), MaterialStockCol.Supplier, Color(0xFF64748B))
-        stockBodyCell(row.standardSpec.orEmpty(), MaterialStockCol.Spec, Color(0xFF64748B))
-        stockBodyCell(
+        MoBodyCell(row.date.orEmpty(), cols[0])
+        MoBodyCell(row.materialCd.orEmpty(), cols[1], Color(0xFF475569))
+        MoBodyCell(row.materialName.orEmpty(), cols[2], Color(0xFF2563EB), align = TextAlign.Start)
+        MoBodyCell(row.supplierName.orEmpty(), cols[3], Color(0xFF64748B))
+        MoBodyCell(row.standardSpec.orEmpty(), cols[4], Color(0xFF64748B), align = TextAlign.Start)
+        MoBodyCell(
             formatStockDisplay(stock),
-            MaterialStockCol.UsageStock,
+            cols[5],
             if (stock < 0) Color(0xFFEF4444) else Color(0xFF1E293B),
             bold = true,
         )
-        stockBodyCell(formatStockDisplay(orderQty), MaterialStockCol.Stepper)
-        stockBodyCell(formatStockDisplay(bundleQty), MaterialStockCol.SubQty)
-        stockBodyCell(
+        MoBodyCell(formatStockDisplay(orderQty), cols[6])
+        MoBodyCell(formatStockDisplay(bundleQty), cols[7])
+        MoBodyCell(
             if (orderQty > 0 || bundleQty > 0) "${weight.roundToInt()}" else "",
-            MaterialStockCol.Weight + 6.dp,
+            cols[8],
             if (weight < 0) Color(0xFFEF4444) else Color(0xFF334155),
         )
-        stockBodyCell(
+        MoBodyCell(
             if (amount > 0.0) "¥${jpNumber.format(amount.roundToInt())}" else "",
-            MaterialStockCol.OrderAmount,
+            cols[9],
             if (amount < 0) Color(0xFFEF4444) else Color(0xFF1E293B),
             bold = true,
         )
-        stockBodyCell(row.remarks.orEmpty(), MaterialStockCol.SubRemarks, Color(0xFF64748B))
+        MoBodyCell(row.remarks.orEmpty(), cols[10], Color(0xFF64748B), align = TextAlign.Start)
     }
 }
 
 @Composable
-private fun MaterialOrderHistorySummaryRow(items: List<MaterialStockItemDto>) {
+private fun MaterialOrderHistorySummaryRow(
+    items: List<MaterialStockItemDto>,
+    cols: List<MoColumnSpec>,
+) {
     val totalOrderQty = items.sumOf { it.orderQuantity ?: 0 }
     val totalBundleQty = items.sumOf { it.orderBundleQuantity ?: 0 }
     val totalWeight = items.sumOf { (it.bundleWeight ?: 0.0).roundToInt() }
     val totalAmount = items.sumOf { (it.orderAmount ?: 0.0).roundToInt() }
     Row(
-        modifier = Modifier
-            .height(MaterialStockCol.RowHeight)
-            .background(Color(0xFFF1F5F9))
-            .drawBehindRowDivider(Color(0xFFCBD5E1))
-            .padding(horizontal = 6.dp),
+        modifier = Modifier.moSummaryRow(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell("合計", MaterialStockCol.UsageDate, Color(0xFF475569), bold = true)
-        stockBodyCell("${items.size}件", MaterialStockCol.Cd + 8.dp, Color(0xFF475569), bold = true)
-        stockBodyCell("", MaterialStockCol.Name + 20.dp)
-        stockBodyCell("", MaterialStockCol.Supplier)
-        stockBodyCell("", MaterialStockCol.Spec)
-        stockBodyCell("", MaterialStockCol.UsageStock)
-        stockBodyCell(
+        MoBodyCell("合計", cols[0], Color(0xFF475569), bold = true)
+        MoBodyCell("${items.size}件", cols[1], Color(0xFF475569), bold = true)
+        MoBodyCell("", cols[2])
+        MoBodyCell("", cols[3])
+        MoBodyCell("", cols[4])
+        MoBodyCell("", cols[5])
+        MoBodyCell(
             if (totalOrderQty > 0) totalOrderQty.toString() else "",
-            MaterialStockCol.Stepper,
+            cols[6],
             Color(0xFF1E293B),
             bold = true,
         )
-        stockBodyCell(
+        MoBodyCell(
             if (totalBundleQty > 0) totalBundleQty.toString() else "",
-            MaterialStockCol.SubQty,
+            cols[7],
             Color(0xFF1E293B),
             bold = true,
         )
-        stockBodyCell(
+        MoBodyCell(
             if (totalWeight > 0) totalWeight.toString() else "",
-            MaterialStockCol.Weight + 6.dp,
+            cols[8],
             Color(0xFF1E293B),
             bold = true,
         )
-        stockBodyCell(
+        MoBodyCell(
             if (totalAmount > 0) "¥${jpNumber.format(totalAmount)}" else "",
-            MaterialStockCol.OrderAmount,
+            cols[9],
             Color(0xFF1E293B),
             bold = true,
         )
-        stockBodyCell("", MaterialStockCol.SubRemarks)
+        MoBodyCell("", cols[10])
     }
 }
 
 @Composable
-private fun MaterialStockRemarksCell(
+private fun RowScope.MaterialStockRemarksCell(
     row: MaterialStockItemDto,
+    spec: MoColumnSpec,
     onRemarksChange: (MaterialStockItemDto, String) -> Unit,
 ) {
     var text by remember(row.id) { mutableStateOf(row.remarks.orEmpty()) }
@@ -1084,7 +1054,8 @@ private fun MaterialStockRemarksCell(
     val shape = RoundedCornerShape(6.dp)
     Box(
         modifier = Modifier
-            .width(MaterialStockCol.SubRemarks)
+            .weight(spec.weight)
+            .widthIn(min = spec.minWidth)
             .height(26.dp)
             .clip(shape)
             .background(Color.White)
@@ -1097,12 +1068,14 @@ private fun MaterialStockRemarksCell(
             onValueChange = { text = it },
             singleLine = true,
             textStyle = TextStyle(fontSize = 9.sp, color = Color(0xFF334155)),
-            modifier = Modifier.onFocusChanged { focus ->
-                if (isFocused && !focus.isFocused && text != row.remarks.orEmpty()) {
-                    onRemarksChange(row, text)
-                }
-                isFocused = focus.isFocused
-            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focus ->
+                    if (isFocused && !focus.isFocused && text != row.remarks.orEmpty()) {
+                        onRemarksChange(row, text)
+                    }
+                    isFocused = focus.isFocused
+                },
             decorationBox = { inner ->
                 if (text.isEmpty()) {
                     Text("備考を入力", fontSize = 9.sp, color = Color(0xFF94A3B8))
@@ -1122,25 +1095,24 @@ fun MaterialOrderInitialStockTable(
     onInitialStockChange: (MaterialStockItemDto, Int) -> Unit,
     onAdjustmentChange: (MaterialStockItemDto, Int) -> Unit,
 ) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
+    val cols = MoCols.initialStock
+    MoTableShell(columns = cols) {
         Row(
-            modifier = Modifier
-                .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
-                .padding(horizontal = 6.dp, vertical = 7.dp),
+            modifier = Modifier.moTableHeaderRow(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            stockHeaderCell("日付", MaterialStockCol.Date)
-            stockHeaderCell("仕入先", MaterialStockCol.Supplier)
-            stockHeaderCell("材料CD", MaterialStockCol.Cd + 8.dp)
-            stockHeaderCell("材料名", MaterialStockCol.Name + 12.dp)
-            stockHeaderCell("初期在庫", MaterialStockCol.Stepper + 4.dp, Color(0xFFBBF7D0))
-            stockHeaderCell("調整数", MaterialStockCol.Stepper + 4.dp, Color(0xFFC7D2FE))
+            MoHeaderCell("日付", cols[0])
+            MoHeaderCell("仕入先", cols[1])
+            MoHeaderCell("材料CD", cols[2])
+            MoHeaderCell("材料名", cols[3], align = TextAlign.Start)
+            MoHeaderCell("初期在庫", cols[4], Color(0xFFBBF7D0))
+            MoHeaderCell("調整数", cols[5], Color(0xFFC7D2FE))
         }
         items.forEachIndexed { index, row ->
             MaterialOrderInitialStockRow(
                 row = row,
+                cols = cols,
                 striped = index % 2 == 1,
                 onInitialStockChange = { onInitialStockChange(row, it) },
                 onAdjustmentChange = { onAdjustmentChange(row, it) },
@@ -1152,36 +1124,32 @@ fun MaterialOrderInitialStockTable(
 @Composable
 private fun MaterialOrderInitialStockRow(
     row: MaterialStockItemDto,
+    cols: List<MoColumnSpec>,
     striped: Boolean,
     onInitialStockChange: (Int) -> Unit,
     onAdjustmentChange: (Int) -> Unit,
 ) {
     val initial = row.initialStock ?: 0
-    val adjustment = row.adjustmentQuantity ?: 0
     val initialBg = if (initial > 0) Color(0xFFD1FAE5) else Color(0xFFECFDF5)
     Row(
-        modifier = Modifier
-            .height(MaterialStockCol.RowHeight)
-            .background(if (striped) Color(0xFFFAFBFC) else Color.White)
-            .drawBehindRowDivider(Color(0xFFE2E8F0))
-            .padding(horizontal = 6.dp),
+        modifier = Modifier.moDataRow(striped),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell(row.date.orEmpty().takeLast(5), MaterialStockCol.Date)
-        stockBodyCell(row.supplierName.orEmpty().take(10), MaterialStockCol.Supplier, Color(0xFF64748B))
-        stockBodyCell(row.materialCd.orEmpty(), MaterialStockCol.Cd + 8.dp, Color(0xFF475569))
-        stockBodyCell(row.materialName.orEmpty(), MaterialStockCol.Name + 12.dp, Color(0xFF2563EB))
-        MaterialOrderStepperCell(
+        MoBodyCell(row.date.orEmpty().takeLast(5), cols[0])
+        MoBodyCell(row.supplierName.orEmpty(), cols[1], Color(0xFF64748B))
+        MoBodyCell(row.materialCd.orEmpty(), cols[2], Color(0xFF475569))
+        MoBodyCell(row.materialName.orEmpty(), cols[3], Color(0xFF2563EB), align = TextAlign.Start)
+        MoStepperCell(
             value = initial,
-            width = MaterialStockCol.Stepper + 4.dp,
+            spec = cols[4],
             bg = initialBg,
             minValue = 0,
             onChange = onInitialStockChange,
         )
-        MaterialOrderStepperCell(
-            value = adjustment,
-            width = MaterialStockCol.Stepper + 4.dp,
+        MoStepperCell(
+            value = row.adjustmentQuantity ?: 0,
+            spec = cols[5],
             bg = Color(0xFFE0E7FF),
             minValue = null,
             onChange = onAdjustmentChange,
@@ -1194,25 +1162,24 @@ fun MaterialOrderUsageTable(
     items: List<MaterialStockItemDto>,
     onUsageChange: (MaterialStockItemDto, Int) -> Unit,
 ) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
+    val cols = MoCols.usage
+    MoTableShell(columns = cols) {
         Row(
-            modifier = Modifier
-                .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
-                .padding(horizontal = 6.dp, vertical = 7.dp),
+            modifier = Modifier.moTableHeaderRow(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            stockHeaderCell("日付", MaterialStockCol.UsageDate)
-            stockHeaderCell("仕入先", MaterialStockCol.Supplier)
-            stockHeaderCell("材料CD", MaterialStockCol.Cd + 8.dp)
-            stockHeaderCell("材料名", MaterialStockCol.Name + 20.dp)
-            stockHeaderCell("現在在庫", MaterialStockCol.UsageStock)
-            stockHeaderCell("使用数", MaterialStockCol.Stepper, Color(0xFFBAE6FD))
+            MoHeaderCell("日付", cols[0])
+            MoHeaderCell("仕入先", cols[1])
+            MoHeaderCell("材料CD", cols[2])
+            MoHeaderCell("材料名", cols[3], align = TextAlign.Start)
+            MoHeaderCell("現在在庫", cols[4])
+            MoHeaderCell("使用数", cols[5], Color(0xFFBAE6FD))
         }
         items.forEachIndexed { index, row ->
             MaterialOrderUsageRow(
                 row = row,
+                cols = cols,
                 striped = index % 2 == 1,
                 onUsageChange = { onUsageChange(row, it) },
             )
@@ -1223,33 +1190,29 @@ fun MaterialOrderUsageTable(
 @Composable
 private fun MaterialOrderUsageRow(
     row: MaterialStockItemDto,
+    cols: List<MoColumnSpec>,
     striped: Boolean,
     onUsageChange: (Int) -> Unit,
 ) {
-    val bg = if (striped) Color(0xFFFAFBFC) else Color.White
     val stock = row.currentStock ?: 0
     Row(
-        modifier = Modifier
-            .height(MaterialStockCol.RowHeight)
-            .background(bg)
-            .drawBehindRowDivider(Color(0xFFE2E8F0))
-            .padding(horizontal = 6.dp),
+        modifier = Modifier.moDataRow(striped),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell(row.date.orEmpty(), MaterialStockCol.UsageDate)
-        stockBodyCell(row.supplierName.orEmpty().take(10), MaterialStockCol.Supplier, Color(0xFF64748B))
-        stockBodyCell(row.materialCd.orEmpty(), MaterialStockCol.Cd + 8.dp, Color(0xFF475569))
-        stockBodyCell(row.materialName.orEmpty(), MaterialStockCol.Name + 20.dp, Color(0xFF2563EB))
-        stockBodyCell(
+        MoBodyCell(row.date.orEmpty(), cols[0])
+        MoBodyCell(row.supplierName.orEmpty(), cols[1], Color(0xFF64748B))
+        MoBodyCell(row.materialCd.orEmpty(), cols[2], Color(0xFF475569))
+        MoBodyCell(row.materialName.orEmpty(), cols[3], Color(0xFF2563EB), align = TextAlign.Start)
+        MoBodyCell(
             formatStockDisplay(stock),
-            MaterialStockCol.UsageStock,
+            cols[4],
             if (stock < 0) Color(0xFFEF4444) else Color(0xFF1E293B),
             bold = true,
         )
-        MaterialOrderStepperCell(
+        MoStepperCell(
             value = row.plannedUsage ?: 0,
-            width = MaterialStockCol.Stepper,
+            spec = cols[5],
             bg = Color(0xFFBAE6FD),
             blankWhenZero = true,
             onChange = onUsageChange,
@@ -1265,12 +1228,31 @@ fun MaterialOrderStockTable(
     onOrderChange: (MaterialStockItemDto, Int) -> Unit,
     onTransfer: (MaterialStockItemDto) -> Unit,
 ) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
-        MaterialOrderStockTableHeader(showTransfer)
+    val cols = if (showTransfer) MoCols.dailyStockTransfer else MoCols.dailyStock
+    MoTableShell(columns = cols) {
+        Row(
+            modifier = Modifier.moTableHeaderRow(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            MoHeaderCell("日付", cols[0])
+            MoHeaderCell("仕入先", cols[1])
+            MoHeaderCell("CD", cols[2])
+            MoHeaderCell("材料名", cols[3], align = TextAlign.Start)
+            MoHeaderCell("安全", cols[4])
+            MoHeaderCell("在庫", cols[5])
+            MoHeaderCell("使用", cols[6], Color(0xFFBAE6FD))
+            MoHeaderCell("束数", cols[7], Color(0xFFFDE68A))
+            if (showTransfer) {
+                MoHeaderCell("本数", cols[8])
+                MoHeaderCell("重量", cols[9])
+                MoHeaderCell("操作", cols[10])
+            }
+        }
         items.forEachIndexed { index, row ->
             MaterialOrderStockRow(
                 row = row,
+                cols = cols,
                 showTransfer = showTransfer,
                 striped = index % 2 == 1,
                 onUsageChange = { onUsageChange(row, it) },
@@ -1282,106 +1264,54 @@ fun MaterialOrderStockTable(
 }
 
 @Composable
-fun MaterialOrderStockTableHeader(showTransfer: Boolean = false) {
-    Row(
-        modifier = Modifier
-            .background(
-                Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))),
-            )
-            .padding(horizontal = 6.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        stockHeaderCell("日付", MaterialStockCol.Date)
-        stockHeaderCell("仕入先", MaterialStockCol.Supplier)
-        stockHeaderCell("CD", MaterialStockCol.Cd)
-        stockHeaderCell("材料名", MaterialStockCol.Name)
-        stockHeaderCell("安全", MaterialStockCol.Safety)
-        stockHeaderCell("在庫", MaterialStockCol.Stock)
-        stockHeaderCell("使用", MaterialStockCol.Stepper, Color(0xFFBAE6FD))
-        stockHeaderCell("束数", MaterialStockCol.Stepper, Color(0xFFFDE68A))
-        if (showTransfer) {
-            stockHeaderCell("本数", MaterialStockCol.Bundle)
-            stockHeaderCell("重量", MaterialStockCol.Weight)
-            stockHeaderCell("操作", MaterialStockCol.Action)
-        }
-    }
-}
-
-@Composable
-private fun stockHeaderCell(text: String, width: androidx.compose.ui.unit.Dp, tint: Color = Color.Transparent) {
-    Box(
-        modifier = Modifier
-            .width(width)
-            .clip(RoundedCornerShape(4.dp))
-            .background(tint.copy(alpha = if (tint == Color.Transparent) 0f else 0.45f))
-            .padding(vertical = 2.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF475569),
-            maxLines = 1,
-            textAlign = TextAlign.Center,
-        )
-    }
-}
-
-@Composable
-fun MaterialOrderStockRow(
+private fun MaterialOrderStockRow(
     row: MaterialStockItemDto,
+    cols: List<MoColumnSpec>,
     showTransfer: Boolean,
     striped: Boolean = false,
     onUsageChange: (Int) -> Unit,
     onOrderChange: (Int) -> Unit,
     onTransfer: () -> Unit,
 ) {
-    val borderColor = Color(0xFFE2E8F0)
-    val bg = if (striped) Color(0xFFFAFBFC) else Color.White
     Row(
-        modifier = Modifier
-            .height(MaterialStockCol.RowHeight)
-            .background(bg)
-            .border(width = 0.dp, color = Color.Transparent)
-            .drawBehindRowDivider(borderColor)
-            .padding(horizontal = 6.dp),
+        modifier = Modifier.moDataRow(striped),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell(row.date.orEmpty().takeLast(5), MaterialStockCol.Date)
-        stockBodyCell(row.supplierName.orEmpty().take(10), MaterialStockCol.Supplier, Color(0xFF64748B))
-        stockBodyCell(row.materialCd.orEmpty(), MaterialStockCol.Cd, Color(0xFF475569))
-        stockBodyCell(row.materialName.orEmpty(), MaterialStockCol.Name, Color(0xFF2563EB))
-        stockBodyCell((row.safetyStock ?: 0).toString(), MaterialStockCol.Safety)
-        stockBodyCell(
+        MoBodyCell(row.date.orEmpty().takeLast(5), cols[0])
+        MoBodyCell(row.supplierName.orEmpty(), cols[1], Color(0xFF64748B))
+        MoBodyCell(row.materialCd.orEmpty(), cols[2], Color(0xFF475569))
+        MoBodyCell(row.materialName.orEmpty(), cols[3], Color(0xFF2563EB), align = TextAlign.Start)
+        MoBodyCell((row.safetyStock ?: 0).toString(), cols[4])
+        MoBodyCell(
             (row.currentStock ?: 0).toString(),
-            MaterialStockCol.Stock,
+            cols[5],
             if ((row.currentStock ?: 0) < 0) Color(0xFFEF4444) else Color(0xFF1E293B),
             bold = true,
         )
-        MaterialOrderStepperCell(
+        MoStepperCell(
             value = row.plannedUsage ?: 0,
-            width = MaterialStockCol.Stepper,
+            spec = cols[6],
             bg = Color(0xFFE0F2FE),
             onChange = onUsageChange,
         )
-        MaterialOrderStepperCell(
+        MoStepperCell(
             value = row.orderQuantity ?: 0,
-            width = MaterialStockCol.Stepper,
+            spec = cols[7],
             bg = Color(0xFFFEF9C3),
             onChange = onOrderChange,
         )
         if (showTransfer) {
             val bundleQty = row.orderBundleQuantity ?: 0
-            stockBodyCell(if (bundleQty > 0) bundleQty.toString() else "", MaterialStockCol.Bundle)
-            stockBodyCell(
+            MoBodyCell(if (bundleQty > 0) bundleQty.toString() else "", cols[8])
+            MoBodyCell(
                 if (bundleQty > 0) "${row.bundleWeight?.toInt() ?: 0}" else "",
-                MaterialStockCol.Weight,
+                cols[9],
             )
             Box(
-                modifier = Modifier.width(MaterialStockCol.Action),
+                modifier = Modifier
+                    .weight(cols[10].weight)
+                    .widthIn(min = cols[10].minWidth),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
@@ -1401,92 +1331,6 @@ fun MaterialOrderStockRow(
 }
 
 @Composable
-private fun stockBodyCell(
-    text: String,
-    width: androidx.compose.ui.unit.Dp,
-    color: Color = Color(0xFF334155),
-    bold: Boolean = false,
-) {
-    Text(
-        text,
-        modifier = Modifier.width(width),
-        fontSize = 10.sp,
-        fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
-        color = color,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        textAlign = TextAlign.Center,
-        lineHeight = 11.sp,
-    )
-}
-
-private fun Modifier.drawBehindRowDivider(color: Color): Modifier = this.then(
-    Modifier.drawBehind {
-        drawLine(
-            color = color,
-            start = androidx.compose.ui.geometry.Offset(0f, size.height),
-            end = androidx.compose.ui.geometry.Offset(size.width, size.height),
-            strokeWidth = 1f,
-        )
-    },
-)
-
-@Composable
-private fun MaterialOrderStepperCell(
-    value: Int,
-    width: androidx.compose.ui.unit.Dp,
-    bg: Color,
-    minValue: Int? = 0,
-    blankWhenZero: Boolean = false,
-    onChange: (Int) -> Unit,
-) {
-    val btnShape = RoundedCornerShape(4.dp)
-    Row(
-        modifier = Modifier
-            .width(width)
-            .height(26.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .background(bg)
-            .padding(horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(btnShape)
-                .background(Color.White.copy(alpha = 0.85f))
-                .clickable {
-                    val next = value - 1
-                    onChange(if (minValue != null) next.coerceAtLeast(minValue) else next)
-                },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("−", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF475569))
-        }
-        Text(
-            if (blankWhenZero && value == 0) "" else value.toString(),
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF334155),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.width(22.dp),
-            maxLines = 1,
-        )
-        Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(btnShape)
-                .background(Color.White.copy(alpha = 0.85f))
-                .clickable { onChange(value + 1) },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("+", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF475569))
-        }
-    }
-}
-
-@Composable
 fun MaterialOrderSubTable(
     items: List<MaterialStockSubItemDto>,
     onUsageChange: (MaterialStockSubItemDto, Int) -> Unit,
@@ -1494,29 +1338,28 @@ fun MaterialOrderSubTable(
     onLabelColorChange: (MaterialStockSubItemDto, String?) -> Unit,
     onDelete: (MaterialStockSubItemDto) -> Unit,
 ) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
+    val cols = MoCols.subStock
+    MoTableShell(columns = cols) {
         Row(
-            modifier = Modifier
-                .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
-                .padding(horizontal = 6.dp, vertical = 7.dp),
+            modifier = Modifier.moTableHeaderRow(),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            stockHeaderCell("材料CD", MaterialStockCol.Cd + 8.dp)
-            stockHeaderCell("材料名", MaterialStockCol.Name + 20.dp)
-            stockHeaderCell("仕入先", MaterialStockCol.Supplier)
-            stockHeaderCell("規格", MaterialStockCol.Spec)
-            stockHeaderCell("注文束数", MaterialStockCol.SubQty, Color(0xFFFDE68A))
-            stockHeaderCell("注文本数", MaterialStockCol.SubQty)
-            stockHeaderCell("使用数", MaterialStockCol.Stepper, Color(0xFFBAE6FD))
-            stockHeaderCell("使用状態", MaterialStockCol.SubStatus)
-            stockHeaderCell("ラベル色", MaterialStockCol.SubLabel)
-            stockHeaderCell("備考", MaterialStockCol.SubRemarks)
-            stockHeaderCell("操作", MaterialStockCol.Action + 18.dp)
+            MoHeaderCell("材料CD", cols[0])
+            MoHeaderCell("材料名", cols[1], align = TextAlign.Start)
+            MoHeaderCell("仕入先", cols[2])
+            MoHeaderCell("規格", cols[3])
+            MoHeaderCell("注文束数", cols[4], Color(0xFFFDE68A))
+            MoHeaderCell("注文本数", cols[5])
+            MoHeaderCell("使用数", cols[6], Color(0xFFBAE6FD))
+            MoHeaderCell("使用状態", cols[7])
+            MoHeaderCell("ラベル色", cols[8])
+            MoHeaderCell("備考", cols[9], align = TextAlign.Start)
+            MoHeaderCell("操作", cols[10])
         }
         items.forEachIndexed { index, row ->
             MaterialOrderSubRow(
                 row = row,
+                cols = cols,
                 striped = index % 2 == 1,
                 onUsageChange = onUsageChange,
                 onRemarksChange = onRemarksChange,
@@ -1542,51 +1385,56 @@ private fun isSubItemUsed(row: MaterialStockSubItemDto): Boolean {
 @Composable
 private fun MaterialOrderSubRow(
     row: MaterialStockSubItemDto,
+    cols: List<MoColumnSpec>,
     striped: Boolean,
     onUsageChange: (MaterialStockSubItemDto, Int) -> Unit,
     onRemarksChange: (MaterialStockSubItemDto, String) -> Unit,
     onLabelColorChange: (MaterialStockSubItemDto, String?) -> Unit,
     onDelete: (MaterialStockSubItemDto) -> Unit,
 ) {
-    val bg = if (striped) Color(0xFFFAFBFC) else Color.White
     val usage = row.plannedUsage?.toInt() ?: 0
     val used = isSubItemUsed(row)
     Row(
         modifier = Modifier
-            .height(MaterialStockCol.SubRowHeight)
-            .background(bg)
+            .fillMaxWidth()
+            .height(MoCols.subRowHeight)
+            .background(if (striped) Color(0xFFFAFBFC) else Color.White)
             .drawBehindRowDivider(Color(0xFFE2E8F0))
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        stockBodyCell(row.materialCd.orEmpty(), MaterialStockCol.Cd + 8.dp, Color(0xFF475569))
-        stockBodyCell(row.materialName.orEmpty(), MaterialStockCol.Name + 20.dp, Color(0xFF2563EB))
-        stockBodyCell(row.supplierName.orEmpty().take(10), MaterialStockCol.Supplier, Color(0xFF64748B))
-        stockBodyCell(row.standardSpec.orEmpty(), MaterialStockCol.Spec, Color(0xFF64748B))
-        stockBodyCell(formatSubQty(row.orderQuantity), MaterialStockCol.SubQty)
-        stockBodyCell(formatSubQty(row.orderBundleQuantity), MaterialStockCol.SubQty)
-        MaterialOrderStepperCell(
+        MoBodyCell(row.materialCd.orEmpty(), cols[0], Color(0xFF475569))
+        MoBodyCell(row.materialName.orEmpty(), cols[1], Color(0xFF2563EB), align = TextAlign.Start)
+        MoBodyCell(row.supplierName.orEmpty(), cols[2], Color(0xFF64748B))
+        MoBodyCell(row.standardSpec.orEmpty(), cols[3], Color(0xFF64748B), align = TextAlign.Start)
+        MoBodyCell(formatSubQty(row.orderQuantity), cols[4])
+        MoBodyCell(formatSubQty(row.orderBundleQuantity), cols[5])
+        MoStepperCell(
             value = usage,
-            width = MaterialStockCol.Stepper,
+            spec = cols[6],
             bg = Color(0xFFBAE6FD),
             onChange = { onUsageChange(row, it) },
         )
         Box(
-            modifier = Modifier.width(MaterialStockCol.SubStatus),
+            modifier = Modifier
+                .weight(cols[7].weight)
+                .widthIn(min = cols[7].minWidth),
             contentAlignment = Alignment.Center,
         ) {
             MaterialSubUsageStatusBadge(used = used)
         }
         MaterialSubLabelColorSelect(
             value = row.labelColor,
+            spec = cols[8],
             onChange = { onLabelColorChange(row, it) },
         )
         MaterialSubRemarksCell(
             row = row,
+            spec = cols[9],
             onRemarksChange = onRemarksChange,
         )
-        MaterialSubDeleteButton(onClick = { onDelete(row) })
+        MaterialSubDeleteButton(spec = cols[10], onClick = { onDelete(row) })
     }
 }
 
@@ -1613,8 +1461,9 @@ private fun MaterialSubUsageStatusBadge(used: Boolean) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MaterialSubLabelColorSelect(
+private fun RowScope.MaterialSubLabelColorSelect(
     value: String?,
+    spec: MoColumnSpec,
     onChange: (String?) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -1623,7 +1472,9 @@ private fun MaterialSubLabelColorSelect(
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = it },
-        modifier = Modifier.width(MaterialStockCol.SubLabel),
+        modifier = Modifier
+            .weight(spec.weight)
+            .widthIn(min = spec.minWidth),
     ) {
         Row(
             modifier = Modifier
@@ -1682,8 +1533,9 @@ private fun MaterialSubLabelColorSelect(
 }
 
 @Composable
-private fun MaterialSubRemarksCell(
+private fun RowScope.MaterialSubRemarksCell(
     row: MaterialStockSubItemDto,
+    spec: MoColumnSpec,
     onRemarksChange: (MaterialStockSubItemDto, String) -> Unit,
 ) {
     var text by remember(row.id) { mutableStateOf(row.remarks.orEmpty()) }
@@ -1694,7 +1546,8 @@ private fun MaterialSubRemarksCell(
     var isFocused by remember(row.id) { mutableStateOf(false) }
     Box(
         modifier = Modifier
-            .width(MaterialStockCol.SubRemarks)
+            .weight(spec.weight)
+            .widthIn(min = spec.minWidth)
             .height(26.dp)
             .clip(shape)
             .background(Color.White)
@@ -1707,12 +1560,14 @@ private fun MaterialSubRemarksCell(
             onValueChange = { text = it },
             singleLine = true,
             textStyle = TextStyle(fontSize = 9.sp, color = Color(0xFF334155)),
-            modifier = Modifier.onFocusChanged { focus ->
-                if (isFocused && !focus.isFocused && text != row.remarks.orEmpty()) {
-                    onRemarksChange(row, text)
-                }
-                isFocused = focus.isFocused
-            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { focus ->
+                    if (isFocused && !focus.isFocused && text != row.remarks.orEmpty()) {
+                        onRemarksChange(row, text)
+                    }
+                    isFocused = focus.isFocused
+                },
             decorationBox = { inner ->
                 if (text.isEmpty()) {
                     Text("備考", fontSize = 9.sp, color = Color(0xFF94A3B8))
@@ -1724,9 +1579,14 @@ private fun MaterialSubRemarksCell(
 }
 
 @Composable
-private fun MaterialSubDeleteButton(onClick: () -> Unit) {
+private fun RowScope.MaterialSubDeleteButton(
+    spec: MoColumnSpec,
+    onClick: () -> Unit,
+) {
     Box(
-        modifier = Modifier.width(MaterialStockCol.Action + 18.dp),
+        modifier = Modifier
+            .weight(spec.weight)
+            .widthIn(min = spec.minWidth),
         contentAlignment = Alignment.Center,
     ) {
         Row(

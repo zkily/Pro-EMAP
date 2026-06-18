@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
+import com.example.smart_emap.data.model.ShortcutItemDto
 import com.example.smart_emap.data.model.UserDto
 import com.example.smart_emap.ui.theme.LoginColors
 import kotlinx.coroutines.delay
@@ -170,6 +171,8 @@ fun SidebarMenu(
     user: UserDto,
     isCollapsed: Boolean,
     activePath: String,
+    shortcutsPinned: List<ShortcutItemDto> = emptyList(),
+    shortcutsFrequent: List<ShortcutItemDto> = emptyList(),
     onNavigate: (String) -> Unit,
     onToggleCollapse: () -> Unit,
     showCollapseControl: Boolean = true,
@@ -177,6 +180,9 @@ fun SidebarMenu(
 ) {
     val visibleMenus = remember(user.id, user.role, user.permissions, user.menuCodes) {
         AppMenuConfig.menusForUser(user)
+    }
+    val shortcutsGroup = remember(user.id, shortcutsPinned, shortcutsFrequent, user.menuCodes) {
+        AppMenuConfig.shortcutsGroupForUser(shortcutsPinned, shortcutsFrequent, user)
     }
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
     var flyoutState by remember { mutableStateOf<CollapsedFlyoutState?>(null) }
@@ -243,6 +249,18 @@ fun SidebarMenu(
                     .padding(horizontal = if (isCollapsed) 4.dp else 8.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                shortcutsGroup?.let { node ->
+                    SidebarNode(
+                        node = node,
+                        depth = 0,
+                        isCollapsed = isCollapsed,
+                        activePath = activePath,
+                        expandedGroups = expandedGroups,
+                        onNavigate = onNavigate,
+                        onOpenCollapsedFlyout = ::openCollapsedFlyout,
+                        onToggleCollapse = onToggleCollapse,
+                    )
+                }
                 visibleMenus.forEach { node ->
                     SidebarNode(
                         node = node,
@@ -449,6 +467,7 @@ private fun SidebarNode(
                 label = node.label,
                 collapsedLabel = collapsedSidebarLabel(node.code, node.label),
                 icon = node.icon,
+                code = node.code,
                 isCollapsed = isCollapsed,
                 expanded = expanded,
                 isActiveInSubtree = activeInSubtree,
@@ -497,6 +516,7 @@ private fun SidebarNode(
 /** 折叠侧栏图标下方显示的简短名称 */
 private fun collapsedSidebarLabel(code: String, label: String): String = when (code) {
     "DASHBOARD" -> "ホーム"
+    "SHORTCUTS" -> "常用"
     "ERP" -> "ERP"
     "APS" -> "APS"
     "MES" -> "MES"
@@ -826,6 +846,7 @@ private fun SidebarGroupItem(
     label: String,
     collapsedLabel: String,
     icon: ImageVector,
+    code: String = "",
     isCollapsed: Boolean,
     expanded: Boolean,
     isActiveInSubtree: Boolean,
@@ -834,6 +855,7 @@ private fun SidebarGroupItem(
     modifier: Modifier = Modifier,
 ) {
     val tint = if (isActiveInSubtree) LayoutColors.SidebarTextActive else LayoutColors.SidebarText
+    val isShortcuts = code == "SHORTCUTS"
 
     if (isCollapsed) {
         SidebarCollapsedMenuItem(
@@ -841,7 +863,13 @@ private fun SidebarGroupItem(
             label = collapsedLabel,
             tint = tint,
             fontWeight = FontWeight.Bold,
-            background = null,
+            background = if (isShortcuts) {
+                Brush.horizontalGradient(
+                    listOf(Color(0x24FBBF24), Color(0x0DFBBF24)),
+                )
+            } else {
+                null
+            },
             onClick = onToggle,
             modifier = modifier,
         )
@@ -852,6 +880,25 @@ private fun SidebarGroupItem(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
+            .then(
+                if (isShortcuts) {
+                    Modifier
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0x24FBBF24), Color(0x0DFBBF24)),
+                            ),
+                        )
+                        .border(
+                            width = 3.dp,
+                            brush = Brush.verticalGradient(
+                                listOf(Color(0xBFFBBF24), Color(0x66FBBF24)),
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                        )
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClick = onToggle)
             .padding(horizontal = (10 + depth * 8).dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

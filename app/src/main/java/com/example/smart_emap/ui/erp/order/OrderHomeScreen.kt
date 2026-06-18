@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -13,9 +12,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,21 +24,15 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -57,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -66,13 +55,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.smart_emap.data.model.OrderMonthlySummaryDto
 import kotlinx.coroutines.delay
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun OrderHomeScreen(
     viewModel: OrderHomeViewModel,
-    onNavigate: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -110,19 +98,10 @@ fun OrderHomeScreen(
                 }
 
                 OrderHomeStaggeredReveal(index = 1) {
-                    OrderHomeSectionLabel(
-                        title = "当月サマリ",
-                        icon = Icons.AutoMirrored.Filled.TrendingUp,
+                    OrderHomeSummarySection(
+                        loading = uiState.isLoadingSummary,
+                        summary = uiState.summary,
                     )
-                    if (uiState.isLoadingSummary) {
-                        OrderHomeLoadingBlock(height = 96.dp)
-                    } else {
-                        OrderMonthlySummaryCards(
-                            summary = uiState.summary,
-                            premiumStyle = true,
-                            useResponsiveGrid = true,
-                        )
-                    }
                 }
 
                 uiState.errorMessage?.let { msg ->
@@ -191,13 +170,65 @@ fun OrderHomeScreen(
                     }
                 }
 
-                OrderHomeStaggeredReveal(index = 6) {
-                    OrderHomeSectionLabel(
-                        title = "機能メニュー",
-                        icon = Icons.Default.GridView,
-                    )
-                    OrderHomeQuickNavGrid(onNavigate = onNavigate)
-                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OrderHomeSummarySection(
+    loading: Boolean,
+    summary: OrderMonthlySummaryDto,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        OrderHomeSectionLabel(
+            title = "当月サマリ",
+            icon = Icons.AutoMirrored.Filled.TrendingUp,
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x1A6366F1), spotColor = Color(0x206366F1))
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color.White.copy(alpha = 0.78f), Color.White.copy(alpha = 0.58f)),
+                    ),
+                )
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.95f),
+                            Color.White.copy(alpha = 0.4f),
+                            Color(0xFF6366F1).copy(alpha = 0.1f),
+                        ),
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))),
+                    ),
+            )
+            if (loading) {
+                OrderHomeLoadingBlock(height = 96.dp)
+            } else {
+                OrderMonthlySummaryCards(
+                    summary = summary,
+                    premiumStyle = true,
+                    useResponsiveGrid = true,
+                )
             }
         }
     }
@@ -303,48 +334,6 @@ private fun OrderHomeProductRankAnalyticsCard(
                 .height(rankHeight)
                 .padding(horizontal = 4.dp),
         )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun OrderHomeQuickNavGrid(
-    onNavigate: (String) -> Unit,
-) {
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val cols = when {
-            maxWidth >= 960.dp -> 3
-            maxWidth >= 640.dp -> 2
-            else -> 1
-        }
-        val gap = 10.dp
-        val cardWidth = if (cols == 1) maxWidth else (maxWidth - gap * (cols - 1)) / cols
-        val navItems = listOf(
-        Triple("月受注", "月別・内示", Icons.Default.CalendarMonth) to
-            (listOf(Color(0xFF8B5CF6), Color(0xFF6366F1)) to "/erp/order/monthly"),
-        Triple("日受注", "日別・確定", Icons.Default.AccessTime) to
-            (listOf(Color(0xFF06B6D4), Color(0xFF0284C7)) to "/erp/order/daily"),
-        Triple("納入先履歴", "分析・照会", Icons.Default.Analytics) to
-            (listOf(Color(0xFFF59E0B), Color(0xFFD97706)) to "/erp/order/destination-history"),
-        )
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(gap),
-            verticalArrangement = Arrangement.spacedBy(gap),
-        ) {
-            navItems.forEach { (meta, route) ->
-                val (title, hint, icon) = meta
-                val (gradient, path) = route
-                OrderHomeQuickNavCard(
-                    title = title,
-                    hint = hint,
-                    icon = icon,
-                    gradient = gradient,
-                    onClick = { onNavigate(path) },
-                    modifier = Modifier.width(cardWidth),
-                )
-            }
-        }
     }
 }
 
@@ -701,94 +690,3 @@ private fun OrderHomeAnalyticsCard(
     }
 }
 
-@Composable
-private fun OrderHomeQuickNavCard(
-    title: String,
-    hint: String,
-    icon: ImageVector,
-    gradient: List<Color>,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = tween(140),
-        label = "quick-nav-press",
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .shadow(
-                elevation = if (pressed) 4.dp else 10.dp,
-                shape = RoundedCornerShape(16.dp),
-                ambientColor = gradient.first().copy(alpha = 0.15f),
-                spotColor = gradient.first().copy(alpha = 0.28f),
-            )
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = 0.82f), Color.White.copy(alpha = 0.65f)),
-                ),
-            )
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    listOf(Color.White.copy(alpha = 0.95f), gradient.first().copy(alpha = 0.2f)),
-                ),
-                shape = RoundedCornerShape(16.dp),
-            )
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(Brush.horizontalGradient(gradient)),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 14.dp)
-                .padding(top = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .shadow(8.dp, RoundedCornerShape(13.dp), spotColor = gradient.last().copy(alpha = 0.4f))
-                    .clip(RoundedCornerShape(13.dp))
-                    .background(Brush.linearGradient(gradient))
-                    .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(13.dp))
-                    .drawBehind {
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                listOf(Color.White.copy(alpha = 0.26f), Color.Transparent),
-                                startY = 0f,
-                                endY = size.height * 0.5f,
-                            ),
-                        )
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
-                Text(hint, fontSize = 11.sp, color = Color(0xFF64748B))
-            }
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowForward,
-                contentDescription = null,
-                tint = gradient.first().copy(alpha = 0.7f),
-                modifier = Modifier
-                    .size(20.dp)
-                    .offset(x = if (pressed) 2.dp else 0.dp),
-            )
-        }
-    }
-}

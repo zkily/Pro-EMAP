@@ -63,7 +63,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.NoteAdd
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Refresh
 
 private val dailyNumberFormat = java.text.NumberFormat.getIntegerInstance(java.util.Locale.JAPAN)
@@ -82,9 +81,7 @@ fun OrderDailyPageHero(
     destinationOptions: List<DestinationOptionDto>,
     productOptions: List<MasterProductItemDto>,
     actionLoading: Boolean,
-    exportEnabled: Boolean,
     onRefresh: () -> Unit,
-    onExportCsv: () -> Unit,
     onCreate: () -> Unit,
     onQuickRange: (OrderDailyViewModel.QuickRange) -> Unit,
     onStartDateChange: (String) -> Unit,
@@ -141,7 +138,6 @@ fun OrderDailyPageHero(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     DailyTbBtn("更新", Icons.Default.Refresh, DailyTbVariant.Refresh, !actionLoading, onRefresh)
-                    DailyTbBtn("CSV", Icons.Default.FileDownload, DailyTbVariant.Export, exportEnabled && !actionLoading, onExportCsv)
                     DailyTbBtn("新規登録", Icons.AutoMirrored.Filled.NoteAdd, DailyTbVariant.Create, !actionLoading, onCreate)
                 }
             }
@@ -188,7 +184,7 @@ fun OrderDailyPageHero(
                         onStartChange = onStartDateChange,
                         onEndChange = onEndDateChange,
                         fieldHeight = 32.dp,
-                        fieldMinWidth = 118.dp,
+                        fieldMinWidth = 130.dp,
                     )
                     Box(modifier = Modifier.width(1.dp).height(22.dp).background(Color(0x14000000)))
                     HeroFilterDropdown(
@@ -231,7 +227,7 @@ fun OrderDailyPageHero(
     }
 }
 
-private enum class DailyTbVariant { Refresh, Export, Create }
+private enum class DailyTbVariant { Refresh, Create }
 
 @Composable
 private fun DailyTbBtn(
@@ -243,7 +239,6 @@ private fun DailyTbBtn(
 ) {
     val (gradient, shadow) = when (variant) {
         DailyTbVariant.Refresh -> Brush.linearGradient(listOf(Color(0xFF0EA5E9), Color(0xFF0284C7))) to Color(0xFF0EA5E9)
-        DailyTbVariant.Export -> Brush.linearGradient(listOf(Color(0xFFF59E0B), Color(0xFFD97706))) to Color(0xFFF59E0B)
         DailyTbVariant.Create -> Brush.linearGradient(listOf(Color(0xFF10B981), Color(0xFF059669))) to Color(0xFF10B981)
     }
     Box(

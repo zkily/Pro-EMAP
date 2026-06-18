@@ -33,13 +33,19 @@ enum class MaterialOrderTab(val label: String) {
     UnusedReceiving("材料未使用番号"),
 }
 
+private val MATERIAL_ORDER_JST: ZoneId = ZoneId.of("Asia/Tokyo")
+private val MATERIAL_ORDER_DATE_FMT: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+private fun materialOrderTodayJapan(): String =
+    LocalDate.now(MATERIAL_ORDER_JST).format(MATERIAL_ORDER_DATE_FMT)
+
 data class MaterialOrderUiState(
     val isLoading: Boolean = false,
     val actionLoading: Boolean = false,
     val tab: MaterialOrderTab = MaterialOrderTab.Daily,
     val keyword: String = "",
-    val startDate: String = LocalDate.now(ZoneId.of("Asia/Tokyo")).withDayOfMonth(1).format(DateTimeFormatter.ISO_LOCAL_DATE),
-    val endDate: String = LocalDate.now(ZoneId.of("Asia/Tokyo")).format(DateTimeFormatter.ISO_LOCAL_DATE),
+    val startDate: String = materialOrderTodayJapan(),
+    val endDate: String = materialOrderTodayJapan(),
     val supplierOptions: List<String> = emptyList(),
     val selectedSuppliers: List<String> = emptyList(),
     val stockItems: List<MaterialStockItemDto> = emptyList(),
@@ -126,7 +132,7 @@ class MaterialOrderViewModel(
     }
 
     fun setTodayRange() {
-        val today = LocalDate.now(ZoneId.of("Asia/Tokyo")).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val today = materialOrderTodayJapan()
         _uiState.update { it.copy(startDate = today, endDate = today) }
         search()
     }
@@ -575,7 +581,7 @@ class MaterialOrderViewModel(
                         printLoading = false,
                         showPrintConfirmDialog = false,
                         pendingPrintHtml = html,
-                        snackbarMessage = "印刷プレビューを共有します",
+                        snackbarMessage = "印刷プレビューを生成中…",
                     )
                 }
             }.onFailure { e ->

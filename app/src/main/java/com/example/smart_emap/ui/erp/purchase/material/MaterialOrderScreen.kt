@@ -21,11 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.example.smart_emap.data.model.MaterialStockSubItemDto
-import android.content.Intent
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.smart_emap.core.system.HtmlPrintHelper
+import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.ui.erp.purchase.PurchaseEmptyHint
 import com.example.smart_emap.ui.erp.purchase.PurchasePageBackground
 import com.example.smart_emap.ui.shell.LayoutColors
@@ -47,12 +48,17 @@ fun MaterialOrderScreen(viewModel: MaterialOrderViewModel) {
 
     LaunchedEffect(uiState.pendingPrintHtml) {
         val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/html"
-            putExtra(Intent.EXTRA_SUBJECT, "材料注文書")
-            putExtra(Intent.EXTRA_TEXT, html)
+        val deliveryYmd = uiState.startDate.replace("-", "")
+        val jobName = if (deliveryYmd.isNotBlank()) "${deliveryYmd}注文書_丸一鋼管" else "注文書"
+        val opened = HtmlPrintHelper.printHtml(
+            context = context,
+            html = html,
+            jobName = jobName,
+            layout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+        )
+        if (!opened) {
+            snackbarHostState.showSnackbar("印刷を開始できませんでした")
         }
-        context.startActivity(Intent.createChooser(intent, "印刷 / 共有"))
         viewModel.clearPendingPrintHtml()
     }
 

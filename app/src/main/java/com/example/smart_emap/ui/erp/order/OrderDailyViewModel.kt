@@ -71,7 +71,6 @@ data class OrderDailyUiState(
     val lastFetchedText: String = "",
     val listError: String? = null,
     val snackbarMessage: String? = null,
-    val pendingCsvShare: String? = null,
     val activeDialog: OrderDailyPageDialog = OrderDailyPageDialog.None,
     val form: OrderDailyFormUi = OrderDailyFormUi(),
     val formSaving: Boolean = false,
@@ -217,19 +216,6 @@ class OrderDailyViewModel(
     fun setPageSize(size: Int) {
         _uiState.update { it.copy(pageSize = size, page = 1) }
         applyPagination()
-    }
-
-    fun exportCsv() {
-        val rows = _uiState.value.fullList
-        if (rows.isEmpty()) {
-            showMessage("出力するデータがありません")
-            return
-        }
-        _uiState.update { it.copy(pendingCsvShare = repository.buildCsv(rows)) }
-    }
-
-    fun clearPendingCsvShare() {
-        _uiState.update { it.copy(pendingCsvShare = null) }
     }
 
     fun openCreateDialog() {

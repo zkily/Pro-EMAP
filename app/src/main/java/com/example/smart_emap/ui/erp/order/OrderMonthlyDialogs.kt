@@ -65,11 +65,15 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -79,10 +83,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.rememberDatePickerState
+import com.example.smart_emap.ui.common.BeautifulDatePickerDialog
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -1013,7 +1014,6 @@ private fun UpdateFieldsHeader(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UpdateFieldsDateField(
     value: String,
@@ -1021,45 +1021,19 @@ private fun UpdateFieldsDateField(
     onDateSelected: (String) -> Unit,
 ) {
     var showPicker by remember { mutableStateOf(false) }
-    val japanZone = remember { ZoneId.of("Asia/Tokyo") }
-    val initialMillis = remember(value) {
-        parseUpdateFieldsDateMillis(value) ?: LocalDate.now(japanZone)
-            .atStartOfDay(japanZone)
-            .toInstant()
-            .toEpochMilli()
-    }
-    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
 
     if (showPicker) {
-        DatePickerDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            onDateSelected(formatUpdateFieldsDateMillis(millis, japanZone))
-                        }
-                        showPicker = false
-                    },
-                ) {
-                    Text("確定", color = accent, fontWeight = FontWeight.SemiBold)
-                }
+        BeautifulDatePickerDialog(
+            value = value,
+            title = "日付を選択",
+            accentColor = accent,
+            confirmLabel = "確定",
+            onDismiss = { showPicker = false },
+            onConfirm = {
+                onDateSelected(it)
+                showPicker = false
             },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) {
-                    Text("キャンセル", color = OrderMonthlyColors.TextMuted)
-                }
-            },
-        ) {
-            DatePicker(
-                state = datePickerState,
-                colors = DatePickerDefaults.colors(
-                    selectedDayContainerColor = accent,
-                    todayDateBorderColor = accent,
-                    selectedYearContainerColor = accent,
-                ),
-            )
-        }
+        )
     }
 
     Row(
@@ -1088,19 +1062,6 @@ private fun UpdateFieldsDateField(
         )
     }
 }
-
-private fun parseUpdateFieldsDateMillis(value: String): Long? {
-    if (value.isBlank()) return null
-    return runCatching {
-        LocalDate.parse(value.trim(), DateTimeFormatter.ISO_LOCAL_DATE)
-            .atStartOfDay(ZoneId.of("Asia/Tokyo"))
-            .toInstant()
-            .toEpochMilli()
-    }.getOrNull()
-}
-
-private fun formatUpdateFieldsDateMillis(millis: Long, zone: ZoneId): String =
-    Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
 
 @Composable
 private fun UpdateFieldsCheckBox(checked: Boolean, accent: Color) {
@@ -1190,42 +1151,291 @@ private fun UpdateFieldsFooter(
 @Composable
 private fun EditMonthlyDialog(state: OrderMonthlyUiState, viewModel: OrderMonthlyViewModel) {
     val form = state.editForm
-    AlertDialog(
+    val saving = state.actionLoading
+    val greenDark = Color(0xFF064E3B)
+
+    Dialog(
         onDismissRequest = viewModel::dismissDialog,
-        title = { Text("月別受注編集") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                ReadOnlyField("納入先", "${form.destinationCd} | ${form.destinationName}")
-                ReadOnlyField("年月", "${form.year}年 ${form.month}月")
-                ReadOnlyField("製品", "${form.productCd} | ${form.productName}")
-                ReadOnlyField("種別", form.productType)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("内示本数", modifier = Modifier.width(72.dp), fontSize = 12.sp)
-                    BasicTextField(
-                        value = form.forecastUnits,
-                        onValueChange = viewModel::setEditForecastUnits,
-                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).border(1.dp, OrderMonthlyColors.BorderLight, RoundedCornerShape(8.dp)).padding(8.dp),
-                        singleLine = true,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 480.dp)
+                .fillMaxWidth(0.94f)
+                .shadow(20.dp, RoundedCornerShape(14.dp), spotColor = Color(0x33000000))
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFFF0FDF4), Color(0xFFECFDF5), Color(0xFFD1FAE5)),
+                            ),
+                        )
+                        .border(width = 1.dp, color = Color(0xFFA7F3D0))
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .shadow(6.dp, RoundedCornerShape(12.dp), spotColor = Color(0x5910B981))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF10B981), Color(0xFF059669), Color(0xFF047857)),
+                                ),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                    Text(
+                        text = "月別受注編集",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = greenDark,
+                        letterSpacing = 0.3.sp,
                     )
                 }
-                ReadOnlyField("確定本数", form.forecastTotalUnits.toString())
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFFFAFBFC), Color.White),
+                                startY = 0f,
+                                endY = 120f,
+                            ),
+                        )
+                        .padding(horizontal = 20.dp, vertical = 18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    MonthlyEditFormItem(label = "納入先", required = true) {
+                        MonthlyEditDisabledSelect("${form.destinationCd} | ${form.destinationName}")
+                    }
+                    MonthlyEditFormItem(label = "年", required = true) {
+                        MonthlyEditNumberStepper(
+                            value = form.year.toString(),
+                            enabled = false,
+                            onDecrease = {},
+                            onIncrease = {},
+                        )
+                    }
+                    MonthlyEditFormItem(label = "月", required = true) {
+                        MonthlyEditNumberStepper(
+                            value = form.month.toString(),
+                            enabled = false,
+                            onDecrease = {},
+                            onIncrease = {},
+                        )
+                    }
+                    MonthlyEditFormItem(label = "製品", required = true) {
+                        MonthlyEditDisabledSelect("${form.productCd} ${form.productName}")
+                    }
+                    MonthlyEditFormItem(label = "タイプ") {
+                        MonthlyEditDisabledSelect(form.productType)
+                    }
+                    MonthlyEditFormItem(label = "内示") {
+                        MonthlyEditNumberStepper(
+                            value = form.forecastUnits,
+                            enabled = !saving,
+                            onDecrease = { viewModel.adjustEditForecastUnits(-1) },
+                            onIncrease = { viewModel.adjustEditForecastUnits(1) },
+                            onValueChange = viewModel::setEditForecastUnits,
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.White)
+                            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+                            .clickable(enabled = !saving, onClick = viewModel::dismissDialog)
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFF475569), modifier = Modifier.size(15.dp))
+                        Text("キャンセル", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .shadow(6.dp, RoundedCornerShape(10.dp), spotColor = Color(0x663B82F6))
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF3B82F6), Color(0xFF2563EB), Color(0xFF1D4ED8)),
+                                ),
+                            )
+                            .clickable(enabled = !saving, onClick = viewModel::saveEdit)
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(15.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                        }
+                        Text(
+                            if (saving) "保存中..." else "保存",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White,
+                        )
+                    }
+                }
             }
-        },
-        confirmButton = {
-            Button(onClick = viewModel::saveEdit, enabled = !state.actionLoading) {
-                if (state.actionLoading) CircularProgressIndicator(modifier = Modifier.width(18.dp).height(18.dp), strokeWidth = 2.dp)
-                else Text("保存")
-            }
-        },
-        dismissButton = { TextButton(onClick = viewModel::dismissDialog) { Text("キャンセル") } },
-    )
+        }
+    }
 }
 
 @Composable
-private fun ReadOnlyField(label: String, value: String) {
-    Column {
-        Text(label, fontSize = 10.sp, color = OrderMonthlyColors.TextMuted)
-        Text(value, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+private fun MonthlyEditFormItem(
+    label: String,
+    required: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (required) {
+                Text("*", color = Color(0xFFDC2626), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(2.dp))
+            }
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF475569),
+            )
+        }
+        content()
+    }
+}
+
+@Composable
+private fun MonthlyEditDisabledSelect(value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(36.dp)
+            .shadow(1.dp, RoundedCornerShape(10.dp), spotColor = Color(0x0A000000))
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFF5F7FA))
+            .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = value.ifBlank { "選択" },
+            modifier = Modifier.weight(1f),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFFC0C4CC),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun MonthlyEditNumberStepper(
+    value: String,
+    enabled: Boolean,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    onValueChange: ((String) -> Unit)? = null,
+) {
+    val controlBg = if (enabled) Color.White else Color(0xFFF5F7FA)
+    val controlBorder = Color(0xFFE2E8F0)
+    val textColor = if (enabled) Color(0xFF1E293B) else Color(0xFFC0C4CC)
+    val buttonBg = Brush.verticalGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9)))
+    val buttonTint = if (enabled) Color(0xFF64748B) else Color(0xFFCBD5E1)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
+                .background(buttonBg)
+                .border(1.dp, controlBorder, RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp))
+                .clickable(enabled = enabled, onClick = onDecrease),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Remove, contentDescription = "減", tint = buttonTint, modifier = Modifier.size(16.dp))
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(36.dp)
+                .background(controlBg)
+                .border(1.dp, controlBorder),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (onValueChange != null && enabled) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = textColor,
+                        textAlign = TextAlign.Center,
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text(
+                    text = value.ifBlank { "0" },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp))
+                .background(buttonBg)
+                .border(1.dp, controlBorder, RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp))
+                .clickable(enabled = enabled, onClick = onIncrease),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "増", tint = buttonTint, modifier = Modifier.size(16.dp))
+        }
     }
 }
 

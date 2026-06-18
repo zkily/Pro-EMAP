@@ -25,18 +25,16 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
+import com.example.smart_emap.ui.common.BeautifulDatePickerDialog
+import com.example.smart_emap.ui.common.BeautifulDatePickerFormField
+import com.example.smart_emap.ui.common.BeautifulDateRangeField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,46 +59,23 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.smart_emap.data.model.DestinationOptionDto
 import com.example.smart_emap.data.model.MasterProductItemDto
 import com.example.smart_emap.data.model.OrderDailyItemDto
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrderDailyDatePickerDialog(
     value: String,
     accent: Color,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
+    title: String = "日付を選択",
 ) {
-    val japanZone = remember { ZoneId.of("Asia/Tokyo") }
-    val initialMillis = remember(value) {
-        parseDailyListDateMillis(value) ?: LocalDate.now(japanZone)
-            .atStartOfDay(japanZone).toInstant().toEpochMilli()
-    }
-    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = {
-                state.selectedDateMillis?.let { onConfirm(formatDailyListDateMillis(it, japanZone)) }
-                onDismiss()
-            }) { Text("確定", color = accent, fontWeight = FontWeight.SemiBold) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("キャンセル", color = OrderMonthlyColors.TextMuted) }
-        },
-    ) {
-        DatePicker(
-            state = state,
-            colors = DatePickerDefaults.colors(
-                selectedDayContainerColor = accent,
-                todayDateBorderColor = accent,
-                selectedYearContainerColor = accent,
-            ),
-        )
-    }
+    BeautifulDatePickerDialog(
+        value = value,
+        title = title,
+        accentColor = accent,
+        confirmLabel = "確定",
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+    )
 }
 
 @Composable
@@ -422,43 +397,14 @@ private fun FormDatePickerField(
     modifier: Modifier = Modifier,
     onChange: (String) -> Unit,
 ) {
-    var showPicker by remember { mutableStateOf(false) }
-    if (showPicker) {
-        OrderDailyDatePickerDialog(
-            value = value,
-            accent = accent,
-            onDismiss = { showPicker = false },
-            onConfirm = { onChange(it); showPicker = false },
-        )
-    }
-    Column(modifier = modifier) {
-        Text(
-            text = if (required) "$label *" else label,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-            color = Color(0xFF606266),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(32.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color.White)
-                .border(1.dp, Color(0xFFDCDFE6), RoundedCornerShape(6.dp))
-                .clickable { showPicker = true }
-                .padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = value.ifBlank { "選択" },
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (value.isBlank()) Color(0xFFA8ABB2) else Color(0xFF303133),
-                modifier = Modifier.weight(1f),
-            )
-            Icon(Icons.Default.CalendarMonth, contentDescription = "日付選択", tint = accent, modifier = Modifier.size(16.dp))
-        }
-    }
+    BeautifulDatePickerFormField(
+        label = label,
+        value = value,
+        onValueChange = onChange,
+        accentColor = accent,
+        required = required,
+        modifier = modifier,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -594,17 +540,6 @@ private fun FormNumberField(
     }
 }
 
-private fun parseDailyListDateMillis(value: String): Long? {
-    if (value.isBlank()) return null
-    return runCatching {
-        LocalDate.parse(value.trim(), DateTimeFormatter.ISO_LOCAL_DATE)
-            .atStartOfDay(ZoneId.of("Asia/Tokyo")).toInstant().toEpochMilli()
-    }.getOrNull()
-}
-
-private fun formatDailyListDateMillis(millis: Long, zone: ZoneId): String =
-    Instant.ofEpochMilli(millis).atZone(zone).toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
-
 /** Web `el-date-picker type="daterange"` 相当：開始・終了をそれぞれカレンダーで選択 */
 @Composable
 fun OrderDailyCalendarRangeField(
@@ -621,95 +556,18 @@ fun OrderDailyCalendarRangeField(
     elevated: Boolean = false,
     separatorColor: Color = Color(0xFF64748B),
 ) {
-    var pickStart by remember { mutableStateOf(false) }
-    var pickEnd by remember { mutableStateOf(false) }
-    if (pickStart) {
-        OrderDailyDatePickerDialog(
-            value = startDate,
-            accent = accent,
-            onDismiss = { pickStart = false },
-            onConfirm = { onStartChange(it); pickStart = false },
-        )
-    }
-    if (pickEnd) {
-        OrderDailyDatePickerDialog(
-            value = endDate,
-            accent = accent,
-            onDismiss = { pickEnd = false },
-            onConfirm = { onEndChange(it); pickEnd = false },
-        )
-    }
-    Row(
+    BeautifulDateRangeField(
+        startDate = startDate,
+        endDate = endDate,
+        onStartChange = onStartChange,
+        onEndChange = onEndChange,
+        accentColor = accent,
+        startLabel = startPlaceholder,
+        endLabel = endPlaceholder,
+        fieldHeight = fieldHeight,
+        fieldMinWidth = fieldMinWidth,
+        elevated = elevated,
+        separatorColor = separatorColor,
         modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        CalendarRangeDateBox(
-            value = startDate,
-            placeholder = startPlaceholder,
-            accent = accent,
-            height = fieldHeight,
-            minWidth = fieldMinWidth,
-            elevated = elevated,
-            onClick = { pickStart = true },
-        )
-        Text("～", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = separatorColor)
-        CalendarRangeDateBox(
-            value = endDate,
-            placeholder = endPlaceholder,
-            accent = accent,
-            height = fieldHeight,
-            minWidth = fieldMinWidth,
-            elevated = elevated,
-            onClick = { pickEnd = true },
-        )
-    }
-}
-
-@Composable
-private fun CalendarRangeDateBox(
-    value: String,
-    placeholder: String,
-    accent: Color,
-    height: androidx.compose.ui.unit.Dp,
-    minWidth: androidx.compose.ui.unit.Dp,
-    elevated: Boolean = false,
-    onClick: () -> Unit,
-) {
-    val shape = RoundedCornerShape(10.dp)
-    Row(
-        modifier = Modifier
-            .widthIn(min = minWidth)
-            .then(if (elevated) Modifier.shadow(5.dp, shape, spotColor = Color(0x40000000)) else Modifier)
-            .height(height)
-            .clip(shape)
-            .background(
-                if (elevated) {
-                    Brush.verticalGradient(listOf(Color.White, Color(0xFFF8FAFC)))
-                } else {
-                    Brush.linearGradient(listOf(Color.White, Color.White))
-                },
-            )
-            .border(1.dp, if (elevated) Color.White.copy(alpha = 0.85f) else Color(0xFFDCDFE6), shape)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = value.ifBlank { placeholder },
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = if (value.isNotBlank()) FontFamily.Monospace else FontFamily.Default,
-            color = if (value.isBlank()) Color(0xFFA8ABB2) else accent,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            Icons.Default.CalendarMonth,
-            contentDescription = placeholder,
-            tint = accent,
-            modifier = Modifier.size(16.dp),
-        )
-    }
+    )
 }
