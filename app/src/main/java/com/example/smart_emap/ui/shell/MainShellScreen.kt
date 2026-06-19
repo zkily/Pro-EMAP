@@ -52,7 +52,6 @@ import com.example.smart_emap.ui.erp.production.planning.ProductionDataManagemen
 import com.example.smart_emap.ui.erp.production.planning.ProductionDataManagementViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialForecastScreen
 import com.example.smart_emap.ui.erp.purchase.material.MaterialForecastViewModel
-import com.example.smart_emap.ui.erp.purchase.material.MaterialHomeScreen
 import com.example.smart_emap.ui.erp.purchase.material.MaterialOrderScreen
 import com.example.smart_emap.ui.erp.purchase.material.MaterialOrderViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingHistoryScreen
@@ -688,6 +687,7 @@ private fun MainShellContent(
                             "/erp/order/monthly" -> orderMonthlyViewModel.refreshAll()
                             "/erp/order/daily" -> orderDailyViewModel.refreshAll()
                             "/erp/order/destination-history" -> orderDestinationHistoryViewModel.loadDestinationOptions()
+                            "/erp/purchase/material" -> materialOrderViewModel.refreshAll()
                             "/erp/purchase/material/receiving-history" -> materialReceivingHistoryViewModel.refreshAll()
                             "/erp/purchase/material/receiving-inspection" -> materialReceivingInspectionViewModel.refreshAll()
                             "/erp/purchase/material/forecast" -> materialForecastViewModel.refreshAll()
@@ -925,7 +925,7 @@ private fun ShellRouteContent(
         "/erp/order/monthly" -> OrderMonthlyScreen(viewModel = orderMonthlyViewModel)
         "/erp/order/daily" -> OrderDailyScreen(viewModel = orderDailyViewModel)
         "/erp/order/destination-history" -> OrderDestinationHistoryScreen(viewModel = orderDestinationHistoryViewModel)
-        "/erp/purchase/material" -> MaterialHomeScreen(onNavigate = onNavigate)
+        "/erp/purchase/material" -> MaterialOrderScreen(viewModel = materialOrderViewModel)
         "/erp/purchase/material/receiving-history" -> MaterialReceivingHistoryScreen(viewModel = materialReceivingHistoryViewModel)
         "/erp/purchase/material/receiving-inspection" -> MaterialReceivingInspectionScreen(viewModel = materialReceivingInspectionViewModel)
         "/erp/purchase/material/forecast" -> MaterialForecastScreen(viewModel = materialForecastViewModel)

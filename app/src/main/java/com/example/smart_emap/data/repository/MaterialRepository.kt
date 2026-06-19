@@ -21,6 +21,8 @@ data class MaterialReceivingFilters(
     val startDate: String? = null,
     val endDate: String? = null,
     val suppliers: List<String> = emptyList(),
+    val page: Int = 1,
+    val pageSize: Int = 20,
 )
 
 data class MaterialStockFilters(
@@ -61,6 +63,8 @@ class MaterialRepository(
         runCatching {
             val supplierParam = filters.suppliers.takeIf { it.isNotEmpty() }?.joinToString(",")
             val resp = apiClient.materialApi().listReceiving(
+                page = filters.page,
+                pageSize = filters.pageSize,
                 keyword = filters.keyword?.takeIf { it.isNotBlank() },
                 startDate = filters.startDate?.takeIf { it.isNotBlank() },
                 endDate = filters.endDate?.takeIf { it.isNotBlank() },
@@ -69,6 +73,14 @@ class MaterialRepository(
             val page = resp.data
             (page?.list.orEmpty()) to (page?.total ?: 0)
         }.getOrElse { emptyList<MaterialLogItemDto>() to 0 }
+
+    suspend fun importReceivingCsv(): String = runCatching {
+        val resp = apiClient.materialApi().importReceivingCsv(emptyList())
+        resp.message ?: "データ読取が完了しました"
+    }.getOrElse { throw it }
+
+    suspend fun loadReceivingListAll(filters: MaterialReceivingFilters, totalCount: Int): List<MaterialLogItemDto> =
+        loadReceivingList(filters.copy(page = 1, pageSize = maxOf(totalCount, 100))).first
 
     suspend fun loadStockSuppliers(): List<String> = runCatching {
         apiClient.materialApi().stockSupplierNames().data.orEmpty()

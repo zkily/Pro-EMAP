@@ -1,21 +1,18 @@
 package com.example.smart_emap.ui.auth
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +29,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -84,7 +80,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -103,8 +98,38 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.R
 import com.example.smart_emap.ui.theme.LoginColors
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private val LoginSmoothEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+private val LoginAmbientEase = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
+
+/** 单一入场进度驱动错峰显现，避免多层 AnimatedVisibility 叠加卡顿 */
+private fun revealAt(progress: Float, start: Float, span: Float = 0.38f): Float {
+    val t = ((progress - start) / span).coerceIn(0f, 1f)
+    return FastOutSlowInEasing.transform(t)
+}
+
+@Composable
+private fun rememberLoginEntranceProgress(): Animatable<Float, AnimationVector1D> {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(920, easing = LoginSmoothEase))
+    }
+    return progress
+}
+
+private fun Modifier.loginReveal(
+    progress: Float,
+    start: Float,
+    span: Float = 0.38f,
+    offsetY: Float = 22f,
+    offsetX: Float = 0f,
+): Modifier = graphicsLayer {
+    val reveal = revealAt(progress, start, span)
+    alpha = reveal
+    translationY = (1f - reveal) * offsetY
+    translationX = (1f - reveal) * offsetX
+}
 
 private data class FeatureItem(
     val tag: String,
@@ -171,12 +196,7 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showForgotDialog by remember { mutableStateOf(false) }
     var showContactDialog by remember { mutableStateOf(false) }
-    var contentVisible by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        delay(80)
-        contentVisible = true
-    }
+    val entranceProgress = rememberLoginEntranceProgress()
 
     LaunchedEffect(uiState.errorMessage) {
         uiState.errorMessage?.let {
@@ -223,34 +243,27 @@ fun LoginScreen(
             LoginAnimatedBackground()
             val dims = rememberLoginDimensions(maxWidth, maxHeight)
 
-            AnimatedVisibility(
-                visible = contentVisible,
-                enter = fadeIn(tween(500)) + slideInVertically(
-                    animationSpec = tween(550, easing = FastOutSlowInEasing),
-                    initialOffsetY = { it / 8 },
-                ),
-                modifier = Modifier.fillMaxSize(),
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(dims.outerPadding)
+                    .imePadding(),
+                contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(dims.outerPadding)
-                        .imePadding(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (dims.isWide) {
-                        WideLoginLayout(
-                            uiState = uiState,
-                            dims = dims,
-                            callbacks = formCallbacks,
-                        )
-                    } else {
-                        NarrowLoginLayout(
-                            uiState = uiState,
-                            dims = dims,
-                            callbacks = formCallbacks,
-                        )
-                    }
+                if (dims.isWide) {
+                    WideLoginLayout(
+                        uiState = uiState,
+                        dims = dims,
+                        callbacks = formCallbacks,
+                        entranceProgress = entranceProgress.value,
+                    )
+                } else {
+                    NarrowLoginLayout(
+                        uiState = uiState,
+                        dims = dims,
+                        callbacks = formCallbacks,
+                        entranceProgress = entranceProgress.value,
+                    )
                 }
             }
         }
@@ -263,19 +276,28 @@ private fun LoginAnimatedBackground() {
     val drift1 by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = tween(14000, easing = LoginAmbientEase),
+            repeatMode = RepeatMode.Reverse,
+        ),
         label = "orb1",
     )
     val drift2 by infinite.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(12000, easing = LinearEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = tween(18000, easing = LoginAmbientEase),
+            repeatMode = RepeatMode.Reverse,
+        ),
         label = "orb2",
     )
     val spotlightPulse by infinite.animateFloat(
-        initialValue = 0.82f,
+        initialValue = 0.88f,
         targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        animationSpec = infiniteRepeatable(
+            animation = tween(4800, easing = LoginAmbientEase),
+            repeatMode = RepeatMode.Reverse,
+        ),
         label = "spotlight",
     )
 
@@ -294,9 +316,13 @@ private fun LoginAnimatedBackground() {
     ) {
         Box(
             modifier = Modifier
-                .size((340 * spotlightPulse).dp)
+                .size(340.dp)
                 .align(Alignment.TopCenter)
-                .offset(y = (-48 + drift1 * 24).dp)
+                .graphicsLayer {
+                    scaleX = spotlightPulse
+                    scaleY = spotlightPulse
+                    translationY = (-48f + drift1 * 24f)
+                }
                 .alpha(0.42f)
                 .background(
                     Brush.radialGradient(
@@ -312,7 +338,10 @@ private fun LoginAnimatedBackground() {
         Box(
             modifier = Modifier
                 .size(280.dp)
-                .offset(x = (-60 + drift1 * 40).dp, y = (-40 + drift1 * 30).dp)
+                .graphicsLayer {
+                    translationX = (-60f + drift1 * 40f)
+                    translationY = (-40f + drift1 * 30f)
+                }
                 .alpha(0.35f)
                 .background(Color.White.copy(alpha = 0.12f), CircleShape),
         )
@@ -320,7 +349,10 @@ private fun LoginAnimatedBackground() {
             modifier = Modifier
                 .size(220.dp)
                 .align(Alignment.BottomEnd)
-                .offset(x = (20 - drift2 * 50).dp, y = (40 - drift2 * 35).dp)
+                .graphicsLayer {
+                    translationX = (20f - drift2 * 50f)
+                    translationY = (40f - drift2 * 35f)
+                }
                 .alpha(0.28f)
                 .background(LoginColors.Accent.copy(alpha = 0.25f), CircleShape),
         )
@@ -329,7 +361,7 @@ private fun LoginAnimatedBackground() {
 
 private fun Modifier.loginGlassSurface(
     cornerRadius: Dp = 18.dp,
-    elevation: Dp = 14.dp,
+    elevation: Dp = 10.dp,
     accentGlow: Color = Color.White,
 ): Modifier {
     val shape = RoundedCornerShape(cornerRadius)
@@ -367,33 +399,12 @@ private fun Modifier.loginGlassSurface(
 private fun BrandLogoMark(
     size: Dp,
     cornerRadius: Dp,
-    animate: Boolean,
 ) {
-    val infinite = rememberInfiniteTransition(label = "logo-glow")
-    val glowPulse by infinite.animateFloat(
-        initialValue = 0.32f,
-        targetValue = 0.72f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "logo-glow-pulse",
-    )
-    val entryScale = remember { Animatable(if (animate) 0.78f else 1f) }
-    LaunchedEffect(animate) {
-        if (animate) {
-            entryScale.animateTo(1f, spring(dampingRatio = 0.62f, stiffness = 360f))
-        }
-    }
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier.graphicsLayer {
-            scaleX = entryScale.value
-            scaleY = entryScale.value
-        },
-    ) {
+    Box(contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier
                 .size(size + 22.dp)
-                .alpha(glowPulse * 0.6f)
+                .alpha(0.48f)
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
@@ -444,6 +455,7 @@ private fun WideLoginLayout(
     uiState: LoginUiState,
     dims: LoginDimensions,
     callbacks: LoginFormCallbacks,
+    entranceProgress: Float,
 ) {
     val scrollState = rememberScrollState()
 
@@ -478,9 +490,9 @@ private fun WideLoginLayout(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    BrandHeader(dims = dims, embedded = true, animate = true)
+                    BrandHeader(dims = dims, embedded = true, entranceProgress = entranceProgress)
                     Spacer(modifier = Modifier.height(dims.sectionGap))
-                    FeatureList(dims = dims, animate = true)
+                    FeatureList(dims = dims, entranceProgress = entranceProgress)
                 }
             }
 
@@ -506,7 +518,8 @@ private fun WideLoginLayout(
                     dims = dims,
                     callbacks = callbacks,
                     showCardShell = false,
-                    animate = true,
+                    entranceProgress = entranceProgress,
+                    revealStart = 0.18f,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
@@ -526,6 +539,7 @@ private fun NarrowLoginLayout(
     uiState: LoginUiState,
     dims: LoginDimensions,
     callbacks: LoginFormCallbacks,
+    entranceProgress: Float,
 ) {
     val scrollState = rememberScrollState()
 
@@ -535,17 +549,18 @@ private fun NarrowLoginLayout(
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandHeader(dims = dims, embedded = false, animate = true)
+        BrandHeader(dims = dims, embedded = false, entranceProgress = entranceProgress)
         Spacer(modifier = Modifier.height(dims.sectionGap))
         LoginFormContent(
             uiState = uiState,
             dims = dims,
             callbacks = callbacks,
             showCardShell = true,
-            animate = true,
+            entranceProgress = entranceProgress,
+            revealStart = 0.14f,
         )
         Spacer(modifier = Modifier.height(dims.sectionGap))
-        FeatureList(dims = dims, animate = true, compact = true)
+        FeatureList(dims = dims, entranceProgress = entranceProgress, compact = true)
         Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "© 2026 Smart-EMAP. All rights reserved.",
@@ -558,48 +573,40 @@ private fun NarrowLoginLayout(
 }
 
 @Composable
-private fun BrandHeader(dims: LoginDimensions, embedded: Boolean, animate: Boolean = false) {
-    val alpha = remember { Animatable(if (animate) 0f else 1f) }
-    val offsetY = remember { Animatable(if (animate) 28f else 0f) }
-    LaunchedEffect(animate) {
-        if (animate) {
-            launch { alpha.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
-            offsetY.animateTo(0f, spring(dampingRatio = 0.68f, stiffness = 320f))
-        }
-    }
-
+private fun BrandHeader(dims: LoginDimensions, embedded: Boolean, entranceProgress: Float) {
     val content = @Composable {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer {
-                    this.alpha = alpha.value
-                    translationY = offsetY.value
-                },
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            BrandLogoMark(
-                size = dims.logoSize,
-                cornerRadius = if (embedded) 16.dp else 18.dp,
-                animate = animate,
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Smart-EMAP",
-                fontSize = dims.brandTitleSize,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-            )
-            Text(
-                text = "生産管理システム",
-                fontSize = dims.brandSubtitleSize,
-                color = Color.White.copy(alpha = 0.92f),
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .loginReveal(entranceProgress, start = 0.04f, span = 0.34f, offsetY = 20f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                BrandLogoMark(
+                    size = dims.logoSize,
+                    cornerRadius = if (embedded) 16.dp else 18.dp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Smart-EMAP",
+                    fontSize = dims.brandTitleSize,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                )
+                Text(
+                    text = "生産管理システム",
+                    fontSize = dims.brandSubtitleSize,
+                    color = Color.White.copy(alpha = 0.92f),
+                )
+            }
             Spacer(modifier = Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ModuleBadge("ERP", LoginColors.ErpBadgeStart, LoginColors.ErpBadgeEnd, index = 0, animate = animate)
-                ModuleBadge("APS", LoginColors.ApsBadgeStart, LoginColors.ApsBadgeEnd, index = 1, animate = animate)
-                ModuleBadge("MES", LoginColors.MesBadgeStart, LoginColors.MesBadgeEnd, index = 2, animate = animate)
+                ModuleBadge("ERP", LoginColors.ErpBadgeStart, LoginColors.ErpBadgeEnd, index = 0, entranceProgress = entranceProgress)
+                ModuleBadge("APS", LoginColors.ApsBadgeStart, LoginColors.ApsBadgeEnd, index = 1, entranceProgress = entranceProgress)
+                ModuleBadge("MES", LoginColors.MesBadgeStart, LoginColors.MesBadgeEnd, index = 2, entranceProgress = entranceProgress)
             }
         }
     }
@@ -625,52 +632,39 @@ private fun ModuleBadge(
     start: Color,
     end: Color,
     index: Int = 0,
-    animate: Boolean = false,
+    entranceProgress: Float,
 ) {
-    var visible by remember { mutableStateOf(!animate) }
-    LaunchedEffect(animate) {
-        if (animate) {
-            delay(280L + index * 90L)
-            visible = true
-        }
-    }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.92f else 1f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 520f),
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 420f),
         label = "badge-scale",
     )
+    val badgeStart = 0.12f + index * 0.07f
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(380, delayMillis = index * 50)) + slideInHorizontally(
-            animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
-            initialOffsetX = { it / 4 },
-        ),
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .shadow(
-                    elevation = if (pressed) 2.dp else 6.dp,
-                    shape = RoundedCornerShape(20.dp),
-                    spotColor = start.copy(alpha = 0.55f),
-                )
-                .clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(listOf(start, end)))
-                .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
-                .clickable(interactionSource = interactionSource, indication = null) {}
-                .padding(horizontal = 10.dp, vertical = 4.dp),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-        )
-    }
+    Text(
+        text = text,
+        modifier = Modifier
+            .loginReveal(entranceProgress, start = badgeStart, span = 0.28f, offsetX = 14f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .shadow(
+                elevation = 5.dp,
+                shape = RoundedCornerShape(20.dp),
+                spotColor = start.copy(alpha = 0.45f),
+            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(Brush.linearGradient(listOf(start, end)))
+            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+            .clickable(interactionSource = interactionSource, indication = null) {}
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.White,
+    )
 }
 
 @Composable
@@ -679,103 +673,94 @@ private fun FeatureModuleCard(
     dims: LoginDimensions,
     compact: Boolean,
     index: Int,
-    animate: Boolean,
+    entranceProgress: Float,
 ) {
-    var visible by remember { mutableStateOf(!animate) }
-    LaunchedEffect(animate) {
-        if (animate) {
-            delay(200L + index * 130L)
-            visible = true
-        }
-    }
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.965f else 1f,
-        animationSpec = spring(dampingRatio = 0.58f, stiffness = 480f),
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.74f, stiffness = 400f),
         label = "feature-scale",
     )
+    val cardStart = 0.22f + index * 0.1f
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(480, delayMillis = index * 30)) + slideInVertically(
-            animationSpec = spring(dampingRatio = 0.74f, stiffness = 360f),
-            initialOffsetY = { it / 2 },
-        ),
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .loginReveal(entranceProgress, start = cardStart, span = 0.32f, offsetY = 16f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .loginGlassSurface(
+                cornerRadius = 18.dp,
+                elevation = 10.dp,
+                accentGlow = feat.gradient.first,
+            )
+            .clickable(interactionSource = interactionSource, indication = null) {}
+            .padding(horizontal = 14.dp, vertical = dims.featureRowPaddingV + 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .loginGlassSurface(
-                    cornerRadius = 18.dp,
-                    elevation = if (pressed) 8.dp else 18.dp,
-                    accentGlow = feat.gradient.first,
-                )
-                .clickable(interactionSource = interactionSource, indication = null) {}
-                .padding(horizontal = 14.dp, vertical = dims.featureRowPaddingV + 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(dims.featureIconSize + 10.dp)
-                        .alpha(if (pressed) 0.35f else 0.5f)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(
-                                    feat.gradient.first.copy(alpha = 0.75f),
-                                    Color.Transparent,
-                                ),
+        Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .size(dims.featureIconSize + 10.dp)
+                    .alpha(0.45f)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                feat.gradient.first.copy(alpha = 0.75f),
+                                Color.Transparent,
                             ),
-                            CircleShape,
                         ),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(dims.featureIconSize)
-                        .shadow(
-                            elevation = if (pressed) 4.dp else 8.dp,
-                            shape = RoundedCornerShape(12.dp),
-                            spotColor = feat.gradient.second.copy(alpha = 0.65f),
-                        )
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Brush.linearGradient(listOf(feat.gradient.first, feat.gradient.second)))
-                        .border(1.dp, Color.White.copy(alpha = 0.38f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        feat.icon,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(if (dims.isWide) 16.dp else 18.dp),
+                        CircleShape,
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .size(dims.featureIconSize)
+                    .shadow(
+                        elevation = 6.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        spotColor = feat.gradient.second.copy(alpha = 0.55f),
                     )
-                }
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    feat.tag,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.88f),
-                )
-                Text(
-                    feat.label,
-                    fontSize = if (compact) 11.sp else 12.sp,
-                    color = Color.White,
-                    lineHeight = 16.sp,
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Brush.linearGradient(listOf(feat.gradient.first, feat.gradient.second)))
+                    .border(1.dp, Color.White.copy(alpha = 0.38f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    feat.icon,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(if (dims.isWide) 16.dp else 18.dp),
                 )
             }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                feat.tag,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.88f),
+            )
+            Text(
+                feat.label,
+                fontSize = if (compact) 11.sp else 12.sp,
+                color = Color.White,
+                lineHeight = 16.sp,
+            )
         }
     }
 }
 
 @Composable
-private fun FeatureList(dims: LoginDimensions, animate: Boolean, compact: Boolean = false) {
+private fun FeatureList(
+    dims: LoginDimensions,
+    entranceProgress: Float,
+    compact: Boolean = false,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(if (dims.isWide) 8.dp else 10.dp)) {
         features.forEachIndexed { index, feat ->
             FeatureModuleCard(
@@ -783,7 +768,7 @@ private fun FeatureList(dims: LoginDimensions, animate: Boolean, compact: Boolea
                 dims = dims,
                 compact = compact,
                 index = index,
-                animate = animate,
+                entranceProgress = entranceProgress,
             )
         }
     }
@@ -795,32 +780,20 @@ private fun LoginFormContent(
     dims: LoginDimensions,
     callbacks: LoginFormCallbacks,
     showCardShell: Boolean,
-    animate: Boolean = false,
+    entranceProgress: Float,
+    revealStart: Float,
 ) {
     val usernameBringIntoView = remember { BringIntoViewRequester() }
     val passwordBringIntoView = remember { BringIntoViewRequester() }
     val apiBringIntoView = remember { BringIntoViewRequester() }
     val scope = rememberCoroutineScope()
 
-    val formAlpha = remember { Animatable(if (animate) 0f else 1f) }
-    val formOffset = remember { Animatable(if (animate) 32f else 0f) }
-    LaunchedEffect(animate) {
-        if (animate) {
-            delay(100)
-            launch { formAlpha.animateTo(1f, tween(550, easing = FastOutSlowInEasing)) }
-            formOffset.animateTo(0f, tween(550, easing = FastOutSlowInEasing))
-        }
-    }
-
     val inner = @Composable {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = if (dims.isWide) 380.dp else Dp.Unspecified)
-                .graphicsLayer {
-                    alpha = formAlpha.value
-                    translationY = formOffset.value
-                },
+                .loginReveal(entranceProgress, start = revealStart, span = 0.4f, offsetY = 24f),
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -1086,16 +1059,19 @@ private fun LoginPrimaryButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
-    val scale by androidx.compose.animation.core.animateFloatAsState(
+    val scale by animateFloatAsState(
         targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = tween(120),
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 440f),
         label = "login-btn-scale",
     )
 
     Box(
         modifier = modifier
             .height(50.dp)
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(14.dp))
             .background(
                 Brush.linearGradient(

@@ -19,8 +19,15 @@ data class MaterialLogItemDto(
     @Json(name = "outer_diameter2") val outerDiameter2: Double? = null,
     val supplier: String? = null,
     @Json(name = "material_quality") val materialQuality: String? = null,
+    @Json(name = "hd_no") val hdNo: String? = null,
+    @Json(name = "pieces_per_bundle") val piecesPerBundle: Int? = null,
+    val magnetic: String? = null,
+    val appearance: String? = null,
+    @Json(name = "created_at") val createdAt: String? = null,
+    @Json(name = "updated_at") val updatedAt: String? = null,
     val remarks: String? = null,
     val note: String? = null,
+    @Json(name = "inspector_name") val inspectorName: String? = null,
 )
 
 data class MaterialStockItemDto(
@@ -118,8 +125,16 @@ data class MaterialMasterItemDto(
     @Json(name = "pieces_per_bundle") val piecesPerBundle: Int? = null,
     @Json(name = "safety_stock") val safetyStock: Int? = null,
     @Json(name = "lead_time") val leadTime: Int? = null,
+    @Json(name = "tolerance_range") val toleranceRange: String? = null,
     @Json(name = "tolerance_1") val tolerance1: Double? = null,
     @Json(name = "tolerance_2") val tolerance2: Double? = null,
+    @Json(name = "range_value") val rangeValue: String? = null,
+    @Json(name = "min_value") val minValue: Double? = null,
+    @Json(name = "max_value") val maxValue: Double? = null,
+    @Json(name = "actual_value_1") val actualValue1: Double? = null,
+    @Json(name = "actual_value_2") val actualValue2: Double? = null,
+    @Json(name = "actual_value_3") val actualValue3: Double? = null,
+    @Json(name = "representative_model") val representativeModel: String? = null,
     val status: Int? = null,
 )
 
@@ -147,8 +162,16 @@ data class MaterialStockSubCreateBodyDto(
 )
 
 data class MaterialMasterUpdateBodyDto(
+    @Json(name = "tolerance_range") val toleranceRange: String? = null,
     @Json(name = "tolerance_1") val tolerance1: Double? = null,
     @Json(name = "tolerance_2") val tolerance2: Double? = null,
+    @Json(name = "range_value") val rangeValue: String? = null,
+    @Json(name = "min_value") val minValue: Double? = null,
+    @Json(name = "max_value") val maxValue: Double? = null,
+    @Json(name = "actual_value_1") val actualValue1: String? = null,
+    @Json(name = "actual_value_2") val actualValue2: String? = null,
+    @Json(name = "actual_value_3") val actualValue3: String? = null,
+    @Json(name = "representative_model") val representativeModel: String? = null,
     val status: Int? = null,
 )
 

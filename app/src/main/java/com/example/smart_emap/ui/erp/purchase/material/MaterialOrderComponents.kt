@@ -5,7 +5,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,8 +20,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Checkbox
@@ -188,6 +189,7 @@ private fun MaterialOrderActionBtn(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MaterialOrderKpiStrip(stats: MaterialStockStatsUi) {
     val cards = listOf(
@@ -200,46 +202,136 @@ fun MaterialOrderKpiStrip(stats: MaterialStockStatsUi) {
         KpiCardSpec("注文総重量", jpNumber.format(stats.totalBundleWeight.toLong()), "kg", Brush.linearGradient(listOf(Color(0xFFFFECD2), Color(0xFFFCB69F))), Icons.Default.TrendingUp),
         KpiCardSpec("参考注文金額", "¥${jpNumber.format(stats.totalOrderAmount.toLong())}", "", Brush.linearGradient(listOf(Color(0xFFA8CABA), Color(0xFF5D4E75))), Icons.Default.AttachMoney),
     )
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 2.dp),
-    ) {
-        items(cards) { card ->
-            MaterialOrderKpiCard(card)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val gap = when {
+            maxWidth < 480.dp -> 5.dp
+            maxWidth < 768.dp -> 6.dp
+            else -> 8.dp
+        }
+        val columns = when {
+            maxWidth >= 1200.dp -> 8
+            maxWidth < 480.dp -> 2
+            else -> 4
+        }
+        val hideIcon = maxWidth < 640.dp && maxWidth >= 480.dp
+        val compact = maxWidth < 768.dp
+        val cardWidth = ((maxWidth - gap * (columns - 1)) / columns).coerceAtLeast(72.dp)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalArrangement = Arrangement.spacedBy(gap),
+            maxItemsInEachRow = columns,
+        ) {
+            cards.forEach { card ->
+                MaterialOrderKpiCard(
+                    spec = card,
+                    modifier = Modifier.width(cardWidth),
+                    compact = compact,
+                    hideIcon = hideIcon,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun MaterialOrderKpiCard(spec: KpiCardSpec) {
+private fun MaterialOrderKpiCard(
+    spec: KpiCardSpec,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+    hideIcon: Boolean = false,
+) {
+    val shape = RoundedCornerShape(if (compact && hideIcon) 6.dp else 8.dp)
+    val iconSize = when {
+        hideIcon -> 0.dp
+        compact -> 26.dp
+        else -> 32.dp
+    }
+    val valueFontSize = when {
+        compact && hideIcon -> 12.sp
+        compact -> 14.sp
+        else -> 16.sp
+    }
+    val labelFontSize = when {
+        compact && hideIcon -> 8.sp
+        compact -> 9.sp
+        else -> 10.sp
+    }
     Surface(
-        modifier = Modifier.width(118.dp),
-        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.heightIn(min = if (compact) 44.dp else 56.dp),
+        shape = shape,
         color = Color.White,
         shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, Color(0x0D000000)),
     ) {
         Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = if (compact) 44.dp else 56.dp)
+                .height(IntrinsicSize.Min),
         ) {
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .width(if (compact && hideIcon) 2.dp else 3.dp)
+                    .fillMaxHeight()
                     .background(spec.accent),
-                contentAlignment = Alignment.Center,
+            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(
+                        horizontal = if (compact) 6.dp else 10.dp,
+                        vertical = if (compact) 5.dp else 8.dp,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
             ) {
-                Icon(spec.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            }
-            Column {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(spec.value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E293B))
-                    if (spec.unit.isNotBlank()) {
-                        Text(spec.unit, fontSize = 10.sp, color = Color(0xFF64748B), modifier = Modifier.padding(start = 2.dp, bottom = 1.dp))
+                if (!hideIcon) {
+                    Box(
+                        modifier = Modifier
+                            .size(iconSize)
+                            .clip(RoundedCornerShape(if (compact) 6.dp else 8.dp))
+                            .background(spec.accent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            spec.icon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(if (compact) 12.dp else 14.dp),
+                        )
                     }
                 }
-                Text(spec.label, fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 2, lineHeight = 11.sp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            spec.value,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = valueFontSize,
+                            color = Color(0xFF2D3748),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (spec.unit.isNotBlank()) {
+                            Text(
+                                spec.unit,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF718096),
+                                modifier = Modifier.padding(start = 2.dp, bottom = 1.dp),
+                            )
+                        }
+                    }
+                    Text(
+                        spec.label,
+                        fontSize = labelFontSize,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF718096),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 12.sp,
+                    )
+                }
             }
         }
     }

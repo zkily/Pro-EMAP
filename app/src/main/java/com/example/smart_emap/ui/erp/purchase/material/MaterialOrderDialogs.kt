@@ -1219,9 +1219,9 @@ private fun ManualOrderDetailChip(label: String, value: String) {
 }
 
 private val PrintConfirmAccent = Color(0xFF667EEA)
-private val PrintConfirmDialogShape = RoundedCornerShape(20.dp)
+private val PrintConfirmDialogShape = RoundedCornerShape(12.dp)
 private val PrintConfirmHeaderGradient = Brush.linearGradient(
-    listOf(Color(0xFF667EEA), Color(0xFF764BA2), Color(0xFF6D28D9)),
+    listOf(Color(0xFF667EEA), Color(0xFF764BA2)),
 )
 
 @Composable
@@ -1238,119 +1238,82 @@ fun MaterialPrintOrderConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var dialogVisible by remember { mutableStateOf(false) }
     val scroll = rememberScrollState()
-
-    androidx.compose.runtime.LaunchedEffect(Unit) { dialogVisible = true }
 
     Dialog(
         onDismissRequest = { if (!loading) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        AnimatedVisibility(
-            visible = dialogVisible,
-            enter = scaleIn(
-                initialScale = 0.9f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
-            ) + fadeIn(tween(260)),
-            exit = fadeOut(tween(180)),
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .widthIn(max = 520.dp)
+                .shadow(20.dp, PrintConfirmDialogShape, spotColor = Color(0x26000000))
+                .clip(PrintConfirmDialogShape)
+                .background(Color.White),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(PrintConfirmHeaderGradient)
+                    .padding(start = 14.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "注文書印刷確認",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    color = Color(0xFF0A0A0A),
+                    modifier = Modifier.weight(1f),
+                )
+                PrintConfirmHeaderButton(
+                    label = if (loading) "処理中…" else "印刷実行",
+                    loading = loading,
+                    enabled = !loading,
+                    onClick = onConfirm,
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    enabled = !loading,
+                    modifier = Modifier.size(28.dp),
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "閉じる", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.94f)
-                    .widthIn(max = 460.dp)
-                    .shadow(24.dp, PrintConfirmDialogShape, spotColor = PrintConfirmAccent.copy(alpha = 0.35f))
-                    .clip(PrintConfirmDialogShape)
-                    .background(Color.White)
-                    .border(1.dp, Color(0xFFE2E8F0), PrintConfirmDialogShape),
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(scroll)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(PrintConfirmHeaderGradient)
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color.White.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("注文書印刷確認", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
-                            Text(
-                                "対象注文 $orderCount 件 · A4 縦",
-                                fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.85f),
-                            )
-                        }
-                        PrintConfirmHeaderButton(
-                            label = if (loading) "処理中…" else "印刷実行",
-                            loading = loading,
-                            enabled = !loading,
-                            onClick = onConfirm,
-                        )
-                    }
+                PrintConfirmSection(title = "受注先情報", icon = Icons.Default.Person) {
+                    PrintConfirmFieldRow("受注先会社名", form.recipientCompany, loading, onRecipientCompanyChange)
+                    PrintConfirmFieldRow("受注先担当者", form.recipientPersons, loading, onRecipientPersonsChange)
                 }
 
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 400.dp)
-                        .verticalScroll(scroll)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    PrintConfirmSection(title = "受注先情報", icon = Icons.Default.Person) {
-                        PrintConfirmField("受注先会社名", form.recipientCompany, loading, onRecipientCompanyChange)
-                        PrintConfirmField("受注先担当者", form.recipientPersons, loading, onRecipientPersonsChange)
-                    }
+                PrintConfirmSection(title = "承認・発行情報", icon = Icons.Default.Edit) {
+                    PrintConfirmFieldRow("承認者", form.approver, loading, onApproverChange)
+                    PrintConfirmFieldRow("発行者", form.issuer, loading, onIssuerChange)
+                }
 
-                    PrintConfirmSection(title = "承認・発行情報", icon = Icons.Default.Edit) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            PrintConfirmField(
-                                label = "承認者",
-                                value = form.approver,
-                                enabled = !loading,
-                                onChange = onApproverChange,
-                                modifier = Modifier.weight(1f),
-                            )
-                            PrintConfirmField(
-                                label = "発行者",
-                                value = form.issuer,
-                                enabled = !loading,
-                                onChange = onIssuerChange,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
-
-                    PrintConfirmSection(title = "備考・注意事項", icon = Icons.Default.Inventory2) {
-                        PrintConfirmField(
-                            label = "備考1",
-                            value = form.note1,
-                            enabled = !loading,
-                            onChange = onNote1Change,
-                            minLines = 2,
-                        )
-                        PrintConfirmField(
-                            label = "備考2",
-                            value = form.note2,
-                            enabled = !loading,
-                            onChange = onNote2Change,
-                            minLines = 2,
-                        )
-                    }
+                PrintConfirmSection(title = "備考・注意事項", icon = Icons.Default.Inventory2) {
+                    PrintConfirmFieldRow(
+                        label = "備考1",
+                        value = form.note1,
+                        enabled = !loading,
+                        onChange = onNote1Change,
+                        minLines = 2,
+                    )
+                    PrintConfirmFieldRow(
+                        label = "備考2",
+                        value = form.note2,
+                        enabled = !loading,
+                        onChange = onNote2Change,
+                        minLines = 2,
+                    )
                 }
             }
         }
@@ -1364,22 +1327,30 @@ private fun PrintConfirmSection(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = Color(0xFFFAFBFC),
+        shape = RoundedCornerShape(5.dp),
+        color = Color.White,
         border = BorderStroke(1.dp, Color(0xFFE5E7EB)),
+        shadowElevation = 1.dp,
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Brush.linearGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9))))
+                    .border(BorderStroke(1.dp, Color(0xFFE5E7EB)))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                Icon(icon, contentDescription = null, tint = PrintConfirmAccent, modifier = Modifier.size(14.dp))
-                Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF374151))
+                Icon(icon, contentDescription = null, tint = PrintConfirmAccent, modifier = Modifier.size(13.dp))
+                Text(title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF334155))
             }
-            content()
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                content()
+            }
         }
     }
 }
@@ -1391,60 +1362,72 @@ private fun PrintConfirmHeaderButton(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(5.dp)
     Box(
         modifier = Modifier
             .clip(shape)
-            .background(Color(0x99FFFFFF))
-            .border(1.dp, Color(0x66000000), shape)
+            .background(Color(0x9617F19E))
+            .border(1.dp, Color(0xC6080707), shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (loading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(12.dp),
                     strokeWidth = 2.dp,
-                    color = Color(0xFF1E293B),
+                    color = Color(0xFF070707),
                 )
             } else {
-                Icon(Icons.Default.Print, contentDescription = null, tint = Color(0xFF1E293B), modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.Print, contentDescription = null, tint = Color(0xFF070707), modifier = Modifier.size(12.dp))
             }
-            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1E293B))
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF070707))
         }
     }
 }
 
 @Composable
-private fun PrintConfirmField(
+private fun PrintConfirmFieldRow(
     label: String,
     value: String,
     enabled: Boolean,
     onChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
     minLines: Int = 1,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(3.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = if (minLines > 1) Alignment.Top else Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
+        Text(
+            label,
+            modifier = Modifier
+                .widthIn(min = 95.dp)
+                .then(if (minLines > 1) Modifier.padding(top = 6.dp) else Modifier),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF475569),
+        )
         androidx.compose.material3.OutlinedTextField(
             value = value,
             onValueChange = onChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             enabled = enabled,
-            textStyle = TextStyle(fontSize = 12.sp, color = Color(0xFF1F2937)),
+            textStyle = TextStyle(
+                fontSize = if (minLines > 1) 10.sp else 11.sp,
+                color = Color(0xFF1F2937),
+                lineHeight = if (minLines > 1) 13.sp else 15.sp,
+            ),
             minLines = minLines,
             singleLine = minLines == 1,
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(4.dp),
             colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = PrintConfirmAccent,
-                unfocusedBorderColor = Color(0xFFE5E7EB),
+                unfocusedBorderColor = Color(0xFFD1D5DB),
                 focusedContainerColor = Color.White,
                 unfocusedContainerColor = Color.White,
                 disabledContainerColor = Color(0xFFF9FAFB),

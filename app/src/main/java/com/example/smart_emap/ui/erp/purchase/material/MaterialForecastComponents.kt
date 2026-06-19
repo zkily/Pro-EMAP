@@ -1,24 +1,37 @@
 package com.example.smart_emap.ui.erp.purchase.material
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -28,6 +41,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Business
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -37,6 +51,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +80,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.data.model.MaterialForecastDetailDto
@@ -80,6 +97,8 @@ enum class MaterialForecastTab(val label: String) {
 
 private val jpNumber = NumberFormat.getIntegerInstance(Locale.JAPAN)
 private val forecastAccent = Color(0xFF667EEA)
+private val forecastGradient = Brush.linearGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2)))
+private val cardShape = RoundedCornerShape(10.dp)
 
 private data class ForecastKpiSpec(
     val label: String,
@@ -89,41 +108,61 @@ private data class ForecastKpiSpec(
     val icon: ImageVector,
 )
 
+private data class ForecastColSpec(
+    val weight: Float,
+    val minWidth: Dp,
+    val alignStart: Boolean = false,
+)
+
 @Composable
 fun MaterialForecastHeroBar(
     actionLoading: Boolean,
     onRefresh: () -> Unit,
     onPrint: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(10.dp)
-    Row(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(6.dp, shape, spotColor = Color(0x40667EEA))
-            .clip(shape)
-            .background(Brush.linearGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2))))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .shadow(3.dp, cardShape, spotColor = Color(0x30667EEA)),
+        shape = cardShape,
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = BorderStroke(1.dp, Color(0xFFE8ECF4)),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box {
             Box(
+                Modifier
+                    .width(3.dp)
+                    .height(52.dp)
+                    .background(forecastGradient)
+                    .align(Alignment.CenterStart),
+            )
+            Row(
                 modifier = Modifier
-                    .size(34.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.White.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(forecastGradient),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text("材料内示管理", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF1A202C))
+                        Text("Material Forecast Management", fontSize = 9.sp, color = Color(0xFF718096))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    ForecastActionBtn("データ更新", Icons.Default.Refresh, forecastAccent.copy(alpha = 0.12f), forecastAccent, !actionLoading, onRefresh)
+                    ForecastActionBtn("印刷", Icons.Default.Print, Color(0xFFFFF7E6), Color(0xFFD97706), !actionLoading, onPrint)
+                }
             }
-            Column {
-                Text("材料内示管理", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("Material Forecast Management", color = Color.White.copy(alpha = 0.82f), fontSize = 10.sp)
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            ForecastActionBtn("データ更新", Icons.Default.Refresh, Color.White.copy(alpha = 0.18f), !actionLoading, onRefresh)
-            ForecastActionBtn("印刷", Icons.Default.Print, Color(0xE6FAAD14), !actionLoading, onPrint)
         }
     }
 }
@@ -133,20 +172,21 @@ private fun ForecastActionBtn(
     text: String,
     icon: ImageVector,
     container: Color,
+    contentColor: Color,
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
     Button(
         onClick = onClick,
         enabled = enabled,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(7.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = Color.White),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+        shape = RoundedCornerShape(6.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = contentColor),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(14.dp))
-        Spacer(Modifier.width(4.dp))
-        Text(text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Icon(icon, null, modifier = Modifier.size(12.dp))
+        Spacer(Modifier.width(3.dp))
+        Text(text, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -157,32 +197,86 @@ fun MaterialForecastKpiStrip(stats: MaterialForecastStatsDto) {
         ForecastKpiSpec("製品種類数", jpNumber.format(stats.totalProducts ?: 0), "", Brush.linearGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2))), Icons.Default.Inventory2),
         ForecastKpiSpec("材料種類数", jpNumber.format(stats.totalMaterials ?: 0), "", Brush.linearGradient(listOf(Color(0xFF43E97B), Color(0xFF38F9D7))), Icons.Default.Inventory2),
         ForecastKpiSpec("仕入先数", jpNumber.format(stats.totalSuppliers ?: 0), "", Brush.linearGradient(listOf(Color(0xFFFA709A), Color(0xFFFEE140))), Icons.Default.Business),
-        ForecastKpiSpec("内示数量合計", jpNumber.format(stats.totalForecastUnits ?: 0), "本", Brush.linearGradient(listOf(Color(0xFF4FACFE), Color(0xFF00F2FE))), Icons.AutoMirrored.Filled.TrendingUp),
-        ForecastKpiSpec("材料必要数合計", requiredText, "", Brush.linearGradient(listOf(Color(0xFFFFECD2), Color(0xFFFCB69F))), Icons.Default.Analytics),
+        ForecastKpiSpec("内示数量合計", jpNumber.format(stats.totalForecastUnits ?: 0), "本", Brush.linearGradient(listOf(Color(0xFF11998E), Color(0xFF38EF7D))), Icons.AutoMirrored.Filled.TrendingUp),
+        ForecastKpiSpec("材料必要数合計", requiredText, "", Brush.linearGradient(listOf(Color(0xFFFF8C00), Color(0xFFFFA500))), Icons.Default.Analytics),
     )
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 2.dp)) {
-        items(cards) { card -> ForecastKpiCard(card) }
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val gap = 6.dp
+        val perCardWidth = (maxWidth - gap * 4) / 5
+        val compact = perCardWidth < 110.dp
+        val hideIcon = perCardWidth < 82.dp
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            cards.forEach { card ->
+                ForecastKpiCard(
+                    spec = card,
+                    modifier = Modifier.weight(1f),
+                    compact = compact,
+                    hideIcon = hideIcon,
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun ForecastKpiCard(spec: ForecastKpiSpec) {
-    Surface(modifier = Modifier.width(128.dp), shape = RoundedCornerShape(8.dp), color = Color.White, shadowElevation = 2.dp) {
-        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(spec.accent),
-                contentAlignment = Alignment.Center,
+private fun ForecastKpiCard(spec: ForecastKpiSpec, modifier: Modifier, compact: Boolean, hideIcon: Boolean) {
+    val shape = RoundedCornerShape(8.dp)
+    val iconSize = if (hideIcon) 0.dp else if (compact) 24.dp else 28.dp
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = if (compact) 40.dp else 48.dp),
+        shape = shape,
+        color = Color.White,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, Color(0x0A000000)),
+    ) {
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(Modifier.width(3.dp).fillMaxHeight().background(spec.accent))
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(horizontal = if (compact) 5.dp else 7.dp, vertical = if (compact) 4.dp else 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp),
             ) {
-                Icon(spec.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-            }
-            Column {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(spec.value, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color(0xFF1E293B), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (spec.unit.isNotBlank()) {
-                        Text(spec.unit, fontSize = 10.sp, color = Color(0xFF64748B), modifier = Modifier.padding(start = 2.dp, bottom = 1.dp))
+                if (!hideIcon) {
+                    Box(
+                        modifier = Modifier.size(iconSize).clip(RoundedCornerShape(6.dp)).background(spec.accent),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(spec.icon, null, tint = Color.White, modifier = Modifier.size(if (compact) 11.dp else 13.dp))
                     }
                 }
-                Text(spec.label, fontSize = 9.sp, color = Color(0xFF64748B), maxLines = 2, lineHeight = 11.sp)
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            spec.value,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = if (compact) 12.sp else 14.sp,
+                            color = Color(0xFF1A202C),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (spec.unit.isNotBlank()) {
+                            Text(spec.unit, fontSize = 8.sp, color = Color(0xFF718096), modifier = Modifier.padding(start = 2.dp, bottom = 1.dp))
+                        }
+                    }
+                    Text(
+                        spec.label,
+                        fontSize = if (compact) 7.sp else 8.sp,
+                        color = Color(0xFF718096),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = 9.sp,
+                    )
+                }
             }
         }
     }
@@ -205,115 +299,158 @@ fun MaterialForecastFilterBar(
     onSupplierChange: (String) -> Unit,
     onReset: () -> Unit,
 ) {
-    val shape = RoundedCornerShape(10.dp)
+    val filterShape = RoundedCornerShape(10.dp)
     val scroll = rememberScrollState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(2.dp, shape)
-            .clip(shape)
+            .shadow(2.dp, filterShape, spotColor = Color(0x12000000))
+            .clip(filterShape)
             .background(Color.White)
-            .border(1.dp, Color(0x1A667EEA), shape)
+            .border(1.dp, Color(0x1A667EEA), filterShape)
             .horizontalScroll(scroll)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .heightIn(min = 36.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        ForecastFilterGroup("年") {
-            ForecastIntDropdown(
-                value = year,
-                options = ((year - 3)..(year + 3)).toList(),
-                format = { "${it}年" },
-                onSelect = onYearChange,
-            )
+        ForecastFilterSection(isFirst = true) {
+            ForecastFilterLabel(Icons.Default.CalendarMonth, "年")
+            ForecastIntDropdown(year, ((year - 3)..(year + 3)).toList(), { "${it}年" }, onYearChange, Modifier.width(82.dp))
         }
-        ForecastFilterGroup("月") {
-            ForecastIntDropdown(value = month, options = (1..12).toList(), format = { "${it}月" }, onSelect = onMonthChange)
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        ForecastFilterDivider()
+        ForecastFilterSection {
+            ForecastFilterLabel(Icons.Default.CalendarMonth, "月")
+            ForecastIntDropdown(month, (1..12).toList(), { "${it}月" }, onMonthChange, Modifier.width(72.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
                 ForecastNavBtn(Icons.AutoMirrored.Filled.KeyboardArrowLeft, onPrevMonth)
                 Box(
                     modifier = Modifier
+                        .height(28.dp)
                         .clip(RoundedCornerShape(6.dp))
-                        .background(forecastAccent)
+                        .background(forecastGradient)
                         .clickable(onClick = onCurrentMonth)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(horizontal = 9.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text("今月", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("今月", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
                 ForecastNavBtn(Icons.AutoMirrored.Filled.KeyboardArrowRight, onNextMonth)
             }
         }
-        ForecastFilterGroup("仕入先") {
-            ForecastSupplierDropdown(
-                supplierCd = supplierCd,
-                options = supplierOptions,
-                onSelect = onSupplierChange,
-            )
+        ForecastFilterDivider()
+        ForecastFilterSection {
+            ForecastFilterLabel(Icons.Default.Person, "仕入先")
+            ForecastSupplierDropdown(supplierCd, supplierOptions, onSupplierChange)
         }
-        ForecastFilterGroup("キーワード") {
-            Row(
-                modifier = Modifier
-                    .widthIn(min = 140.dp, max = 220.dp)
-                    .height(28.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFFF8FAFC))
-                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(4.dp))
-                BasicTextField(
-                    value = keyword,
-                    onValueChange = onKeywordChange,
-                    singleLine = true,
-                    textStyle = TextStyle(fontSize = 11.sp, color = Color(0xFF334155)),
-                    modifier = Modifier.weight(1f),
-                    decorationBox = { inner ->
-                        if (keyword.isEmpty()) {
-                            Text("製品名・材料名・仕入先名", fontSize = 10.sp, color = Color(0xFF94A3B8), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                        inner()
-                    },
-                )
-            }
+        ForecastFilterDivider()
+        ForecastFilterSection {
+            ForecastFilterLabel(Icons.Default.Search, "キーワード")
+            ForecastKeywordField(keyword, onKeywordChange)
         }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFFF8FAFC))
-                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(6.dp))
-                .clickable(onClick = onReset)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
-                Text("リセット", fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
-            }
+        ForecastFilterDivider()
+        ForecastFilterSection(isLast = true) {
+            ForecastResetBtn(onReset)
         }
     }
 }
 
 @Composable
-private fun ForecastFilterGroup(label: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF64748B))
-        content()
+private fun RowScope.ForecastFilterSection(
+    isFirst: Boolean = false,
+    isLast: Boolean = false,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.padding(
+            start = if (isFirst) 0.dp else 10.dp,
+            end = if (isLast) 0.dp else 10.dp,
+        ),
+        content = content,
+    )
+}
+
+@Composable
+private fun ForecastFilterLabel(icon: ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Icon(icon, null, tint = forecastAccent, modifier = Modifier.size(12.dp))
+        Text(text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF64748B), maxLines = 1)
     }
+}
+
+@Composable
+private fun ForecastKeywordField(value: String, onValueChange: (String) -> Unit) {
+    val shape = RoundedCornerShape(6.dp)
+    Row(
+        modifier = Modifier
+            .widthIn(min = 140.dp, max = 200.dp)
+            .height(28.dp)
+            .clip(shape)
+            .background(Color(0xFFF8FAFC))
+            .border(1.dp, Color(0xFFE2E8F0), shape)
+            .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(Icons.Default.Search, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(12.dp))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = TextStyle(fontSize = 11.sp, color = Color(0xFF334155)),
+            modifier = Modifier.weight(1f),
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text("製品名・材料名・仕入先", fontSize = 10.sp, color = Color(0xFF94A3B8), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                inner()
+            },
+        )
+    }
+}
+
+@Composable
+private fun ForecastResetBtn(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(6.dp)
+    Row(
+        modifier = Modifier
+            .height(28.dp)
+            .clip(shape)
+            .background(Color(0xFFF1F5F9))
+            .border(1.dp, Color(0xFFE2E8F0), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(Icons.Default.Refresh, null, tint = Color(0xFF64748B), modifier = Modifier.size(12.dp))
+        Text("リセット", fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun ForecastFilterDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(22.dp)
+            .background(Color(0xFFE5E7EB)),
+    )
 }
 
 @Composable
 private fun ForecastNavBtn(icon: ImageVector, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(24.dp)
+            .size(28.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFFF1F5F9))
+            .background(Color(0xFFF8FAFC))
             .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(6.dp))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+        Icon(icon, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
     }
 }
 
@@ -324,12 +461,13 @@ private fun ForecastIntDropdown(
     options: List<Int>,
     format: (Int) -> String,
     onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
         Row(
             modifier = Modifier
-                .width(88.dp)
+                .fillMaxWidth()
                 .height(28.dp)
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .clip(RoundedCornerShape(6.dp))
@@ -339,7 +477,7 @@ private fun ForecastIntDropdown(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(format(value), fontSize = 11.sp, color = Color(0xFF334155), modifier = Modifier.weight(1f), maxLines = 1)
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+            Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
         }
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
@@ -364,7 +502,7 @@ private fun ForecastSupplierDropdown(
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         Row(
             modifier = Modifier
-                .widthIn(min = 100.dp, max = 160.dp)
+                .widthIn(min = 120.dp, max = 168.dp)
                 .height(28.dp)
                 .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .clip(RoundedCornerShape(6.dp))
@@ -373,10 +511,8 @@ private fun ForecastSupplierDropdown(
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = forecastAccent, modifier = Modifier.size(12.dp))
-            Spacer(Modifier.width(4.dp))
             Text(label, fontSize = 11.sp, color = Color(0xFF334155), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
+            Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
         }
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text("全て", fontSize = 12.sp) }, onClick = { onSelect(""); expanded = false })
@@ -398,23 +534,35 @@ fun MaterialForecastTablePanel(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val outerShape = RoundedCornerShape(12.dp)
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(4.dp, outerShape, spotColor = Color(0x18000000))
-            .clip(outerShape)
-            .background(Color.White)
-            .border(1.dp, Color(0x0F667EEA), outerShape),
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, Color(0x0F667EEA)),
     ) {
-        MaterialForecastTabStrip(selected = selectedTab, onSelect = onTabSelect)
-        HorizontalDivider(color = Color(0xFFE2E8F0))
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = forecastAccent, modifier = Modifier.size(28.dp))
+        Column {
+            MaterialForecastTabStrip(selected = selectedTab, onSelect = onTabSelect)
+            HorizontalDivider(color = Color(0xFFE2E8F0))
+            AnimatedContent(
+                targetState = isLoading,
+                transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(120)) },
+                label = "forecast-table-loading",
+            ) { loading ->
+                if (loading) {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = forecastAccent, modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
+                    }
+                } else {
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(140)) },
+                        label = "forecast-tab-content",
+                    ) {
+                        Box(Modifier.padding(bottom = 4.dp)) { content() }
+                    }
+                }
             }
-        } else {
-            content()
         }
     }
 }
@@ -427,48 +575,59 @@ private fun MaterialForecastTabStrip(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Brush.linearGradient(listOf(Color(0xFFF8F9FA), Color(0xFFEEF2F7))))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .background(Color(0xFFFAFBFC))
+            .padding(horizontal = 6.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         MaterialForecastTab.entries.forEach { tab ->
             val active = tab == selected
             val icon = if (tab == MaterialForecastTab.Detail) Icons.Default.Description else Icons.Default.Analytics
-            val shape = RoundedCornerShape(8.dp)
-            Box(
+            val shape = RoundedCornerShape(7.dp)
+            Surface(
                 modifier = Modifier
+                    .weight(1f)
                     .clip(shape)
-                    .then(
-                        if (active) {
-                            Modifier.background(Brush.linearGradient(listOf(Color(0xFF667EEA), Color(0xFF764BA2)))).shadow(3.dp, shape)
-                        } else {
-                            Modifier.background(Color.Transparent)
-                        },
-                    )
-                    .clickable { onSelect(tab) }
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                    .clickable { onSelect(tab) },
+                shape = shape,
+                color = if (active) forecastAccent.copy(alpha = 0.1f) else Color.Transparent,
+                border = BorderStroke(1.dp, if (active) forecastAccent.copy(alpha = 0.35f) else Color(0xFFE5E7EB)),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Icon(icon, contentDescription = null, tint = if (active) Color.White else forecastAccent, modifier = Modifier.size(14.dp))
-                    Text(tab.label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = if (active) Color.White else Color(0xFF6B7280))
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(icon, null, tint = if (active) forecastAccent else Color(0xFF94A3B8), modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(tab.label, fontSize = 10.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, color = if (active) forecastAccent else Color(0xFF6B7280))
                 }
             }
         }
     }
 }
 
-private object ForecastCol {
-    val Year = 40.dp
-    val Month = 36.dp
-    val Supplier = 74.dp
-    val Material = 100.dp
-    val Product = 88.dp
-    val Number = 56.dp
-    val Lot = 56.dp
-    val Required = 56.dp
-    val Count = 44.dp
-    val RowHeight = 34.dp
-}
+private val detailCols = listOf(
+    ForecastColSpec(0.55f, 36.dp),
+    ForecastColSpec(0.55f, 32.dp),
+    ForecastColSpec(1.2f, 72.dp, alignStart = true),
+    ForecastColSpec(1.35f, 80.dp, alignStart = true),
+    ForecastColSpec(1.35f, 80.dp, alignStart = true),
+    ForecastColSpec(0.85f, 52.dp),
+    ForecastColSpec(0.85f, 52.dp),
+    ForecastColSpec(0.95f, 56.dp),
+)
+
+private val summaryCols = listOf(
+    ForecastColSpec(1.2f, 72.dp, alignStart = true),
+    ForecastColSpec(1.35f, 80.dp, alignStart = true),
+    ForecastColSpec(0.75f, 44.dp),
+    ForecastColSpec(0.95f, 56.dp),
+    ForecastColSpec(0.95f, 56.dp),
+    ForecastColSpec(1.0f, 64.dp),
+)
+
+private fun minTableWidth(cols: List<ForecastColSpec>): Dp =
+    cols.fold(0.dp) { acc, c -> acc + c.minWidth } + 3.dp * (cols.size - 1).coerceAtLeast(0) + 10.dp
 
 @Composable
 fun MaterialForecastDetailTable(
@@ -476,17 +635,27 @@ fun MaterialForecastDetailTable(
     stats: MaterialForecastStatsDto,
     useStatsForSummary: Boolean,
 ) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
-        ForecastHeaderRow(
-            listOf("年", "月", "仕入先", "材料名", "製品名", "内示数量", "ロットサイズ", "材料必要数"),
-            listOf(ForecastCol.Year, ForecastCol.Month, ForecastCol.Supplier, ForecastCol.Material, ForecastCol.Product, ForecastCol.Number, ForecastCol.Lot, ForecastCol.Required),
-        )
-        items.forEachIndexed { index, row -> ForecastDetailRow(row, index % 2 == 1) }
-        if (items.isNotEmpty()) {
-            val forecastSum = if (useStatsForSummary) stats.totalForecastUnits ?: 0 else items.sumOf { it.forecastUnits ?: 0 }
-            val requiredSum = if (useStatsForSummary) stats.totalMaterialRequired ?: 0.0 else items.sumOf { it.materialRequired ?: 0.0 }
-            ForecastDetailSummaryRow(forecastSum, requiredSum)
+    val labels = listOf("年", "月", "仕入先", "材料名", "製品名", "内示数量", "ロットサイズ", "材料必要数")
+    val hScroll = rememberScrollState()
+    val minW = minTableWidth(detailCols)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val needsScroll = minW > maxWidth
+        val mod = if (needsScroll) Modifier.horizontalScroll(hScroll).widthIn(min = minW) else Modifier.fillMaxWidth()
+        Column(mod.padding(horizontal = 4.dp, vertical = 4.dp)) {
+            ForecastHeaderRow(labels, detailCols)
+            items.forEachIndexed { index, row ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(tween(160, delayMillis = (index.coerceAtMost(12)) * 25)),
+                ) {
+                    ForecastDetailRow(row, index % 2 == 1)
+                }
+            }
+            if (items.isNotEmpty()) {
+                val forecastSum = if (useStatsForSummary) stats.totalForecastUnits ?: 0 else items.sumOf { it.forecastUnits ?: 0 }
+                val requiredSum = if (useStatsForSummary) stats.totalMaterialRequired ?: 0.0 else items.sumOf { it.materialRequired ?: 0.0 }
+                ForecastDetailSummaryRow(forecastSum, requiredSum)
+            }
         }
     }
 }
@@ -494,73 +663,121 @@ fun MaterialForecastDetailTable(
 @Composable
 private fun ForecastDetailRow(row: MaterialForecastDetailDto, striped: Boolean) {
     ForecastDataRow(striped) {
-        forecastCell((row.year ?: 0).toString(), ForecastCol.Year)
-        forecastCell((row.month ?: 0).toString(), ForecastCol.Month)
-        forecastCell(row.supplierName.orEmpty().take(10), ForecastCol.Supplier, Color(0xFF2563EB))
-        forecastCell(row.materialName.orEmpty(), ForecastCol.Material)
-        forecastCell(row.productName.orEmpty(), ForecastCol.Product, Color(0xFF334155), bold = true)
-        forecastCell(jpNumber.format(row.forecastUnits ?: 0), ForecastCol.Number, alignEnd = true)
-        forecastCell(row.lotSize?.toString() ?: "-", ForecastCol.Lot, alignEnd = true)
-        forecastCell(formatRequired(row.materialRequired), ForecastCol.Required, Color(0xFF2563EB), bold = true, alignEnd = true)
+        ForecastBodyCell(detailCols[0], (row.year ?: 0).toString())
+        ForecastBodyCell(detailCols[1], (row.month ?: 0).toString())
+        ForecastBodyCell(detailCols[2], row.supplierName.orEmpty(), Color(0xFF2563EB))
+        ForecastBodyCell(detailCols[3], row.materialName.orEmpty())
+        ForecastBodyCell(detailCols[4], row.productName.orEmpty(), Color(0xFF334155), bold = true)
+        ForecastBodyCell(detailCols[5], jpNumber.format(row.forecastUnits ?: 0), alignEnd = true)
+        ForecastBodyCell(detailCols[6], row.lotSize?.toString() ?: "-", alignEnd = true)
+        ForecastBodyCell(detailCols[7], formatRequired(row.materialRequired), Color(0xFF2563EB), bold = true, alignEnd = true)
     }
 }
 
 @Composable
 private fun ForecastDetailSummaryRow(forecastSum: Int, requiredSum: Double) {
     ForecastDataRow(striped = false, bg = Color(0xFFF1F5F9)) {
-        forecastCell("合計", ForecastCol.Year, Color(0xFF475569), bold = true)
-        forecastCell("", ForecastCol.Month)
-        forecastCell("", ForecastCol.Supplier)
-        forecastCell("", ForecastCol.Material)
-        forecastCell("", ForecastCol.Product)
-        forecastCell(jpNumber.format(forecastSum), ForecastCol.Number, Color(0xFF1E293B), bold = true, alignEnd = true)
-        forecastCell("", ForecastCol.Lot)
-        forecastCell(formatRequired(requiredSum), ForecastCol.Required, Color(0xFF2563EB), bold = true, alignEnd = true)
+        ForecastBodyCell(detailCols[0], "合計", Color(0xFF475569), bold = true)
+        ForecastBodyCell(detailCols[1], "")
+        ForecastBodyCell(detailCols[2], "")
+        ForecastBodyCell(detailCols[3], "")
+        ForecastBodyCell(detailCols[4], "")
+        ForecastBodyCell(detailCols[5], jpNumber.format(forecastSum), Color(0xFF1E293B), bold = true, alignEnd = true)
+        ForecastBodyCell(detailCols[6], "")
+        ForecastBodyCell(detailCols[7], formatRequired(requiredSum), Color(0xFF2563EB), bold = true, alignEnd = true)
     }
 }
 
 @Composable
 fun MaterialForecastSummaryTable(items: List<MaterialForecastSummaryDto>) {
-    val scroll = rememberScrollState()
-    Column(Modifier.horizontalScroll(scroll)) {
-        ForecastHeaderRow(
-            listOf("仕入先", "材料名", "製品数", "内示数量合計", "平均ロットサイズ", "材料必要数合計"),
-            listOf(ForecastCol.Supplier, ForecastCol.Material, ForecastCol.Count, ForecastCol.Number, ForecastCol.Lot, ForecastCol.Required + 12.dp),
-        )
-        items.forEachIndexed { index, row -> ForecastSummaryRow(row, index % 2 == 1) }
+    val labels = listOf("仕入先", "材料名", "製品数", "内示数量合計", "平均ロットサイズ", "材料必要数合計")
+    val hScroll = rememberScrollState()
+    val minW = minTableWidth(summaryCols)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val needsScroll = minW > maxWidth
+        val mod = if (needsScroll) Modifier.horizontalScroll(hScroll).widthIn(min = minW) else Modifier.fillMaxWidth()
+        Column(mod.padding(horizontal = 4.dp, vertical = 4.dp)) {
+            ForecastHeaderRow(labels, summaryCols)
+            items.forEachIndexed { index, row ->
+                AnimatedVisibility(
+                    visible = true,
+                    enter = fadeIn(tween(160, delayMillis = (index.coerceAtMost(12)) * 25)),
+                ) {
+                    ForecastSummaryRow(row, index % 2 == 1)
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun ForecastSummaryRow(row: MaterialForecastSummaryDto, striped: Boolean) {
     ForecastDataRow(striped) {
-        forecastCell(row.supplierName.orEmpty().take(10), ForecastCol.Supplier, Color(0xFF2563EB))
-        forecastCell(row.materialName.orEmpty(), ForecastCol.Material)
-        Box(modifier = Modifier.width(ForecastCol.Count), contentAlignment = Alignment.Center) {
-            Surface(shape = RoundedCornerShape(10.dp), color = Color(0xFFE0E7FF)) {
-                Text("${row.productCount ?: 0}", modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
+        ForecastBodyCell(summaryCols[0], row.supplierName.orEmpty(), Color(0xFF2563EB))
+        ForecastBodyCell(summaryCols[1], row.materialName.orEmpty())
+        Box(Modifier.weight(summaryCols[2].weight).widthIn(min = summaryCols[2].minWidth), contentAlignment = Alignment.Center) {
+            Surface(shape = RoundedCornerShape(8.dp), color = Color(0xFFE0E7FF)) {
+                Text("${row.productCount ?: 0}", modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
             }
         }
-        forecastCell(jpNumber.format(row.totalForecastUnits ?: 0), ForecastCol.Number, alignEnd = true)
-        forecastCell(row.avgLotSize?.roundToInt()?.toString() ?: "-", ForecastCol.Lot, alignEnd = true)
-        forecastCell(formatRequired(row.totalMaterialRequired), ForecastCol.Required + 12.dp, Color(0xFF2563EB), bold = true, alignEnd = true)
+        ForecastBodyCell(summaryCols[3], jpNumber.format(row.totalForecastUnits ?: 0), alignEnd = true)
+        ForecastBodyCell(summaryCols[4], row.avgLotSize?.roundToInt()?.toString() ?: "-", alignEnd = true)
+        ForecastBodyCell(summaryCols[5], formatRequired(row.totalMaterialRequired), Color(0xFF2563EB), bold = true, alignEnd = true)
     }
 }
 
 @Composable
-private fun ForecastHeaderRow(labels: List<String>, widths: List<androidx.compose.ui.unit.Dp>) {
+private fun ForecastHeaderRow(labels: List<String>, cols: List<ForecastColSpec>) {
     Row(
         modifier = Modifier
-            .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0))))
-            .padding(horizontal = 6.dp, vertical = 7.dp),
+            .fillMaxWidth()
+            .background(Brush.linearGradient(listOf(Color(0xFFF1F5F9), Color(0xFFE8EDF3))), RoundedCornerShape(6.dp))
+            .padding(horizontal = 4.dp, vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        labels.forEachIndexed { index, label ->
-            Box(modifier = Modifier.width(widths[index]).padding(vertical = 2.dp), contentAlignment = Alignment.Center) {
-                Text(label, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFF475569), maxLines = 1, textAlign = TextAlign.Center)
-            }
+        labels.forEachIndexed { i, label ->
+            ForecastHeaderCell(cols[i], label)
         }
     }
+}
+
+@Composable
+private fun RowScope.ForecastHeaderCell(spec: ForecastColSpec, label: String) {
+    Text(
+        label,
+        modifier = Modifier.weight(spec.weight).widthIn(min = spec.minWidth).padding(horizontal = 2.dp),
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color(0xFF475569),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = if (spec.alignStart) TextAlign.Start else TextAlign.Center,
+        lineHeight = 11.sp,
+    )
+}
+
+@Composable
+private fun RowScope.ForecastBodyCell(
+    spec: ForecastColSpec,
+    text: String,
+    color: Color = Color(0xFF334155),
+    bold: Boolean = false,
+    alignEnd: Boolean = false,
+) {
+    Text(
+        text.ifBlank { if (bold) text else "—" },
+        modifier = Modifier.weight(spec.weight).widthIn(min = spec.minWidth).padding(horizontal = 2.dp),
+        fontSize = 10.sp,
+        fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
+        color = color,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = when {
+            alignEnd -> TextAlign.End
+            spec.alignStart -> TextAlign.Start
+            else -> TextAlign.Center
+        },
+    )
 }
 
 @Composable
@@ -571,35 +788,16 @@ private fun ForecastDataRow(
 ) {
     Row(
         modifier = Modifier
-            .height(ForecastCol.RowHeight)
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = 32.dp)
             .background(bg ?: if (striped) Color(0xFFFAFBFC) else Color.White)
             .drawBehind {
-                drawLine(Color(0xFFE2E8F0), Offset(0f, size.height), Offset(size.width, size.height), 1f)
+                drawLine(Color(0xFFE8ECF4), Offset(0f, size.height), Offset(size.width, size.height), 1f)
             }
-            .padding(horizontal = 6.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
         content = content,
-    )
-}
-
-@Composable
-private fun RowScope.forecastCell(
-    text: String,
-    width: androidx.compose.ui.unit.Dp,
-    color: Color = Color(0xFF334155),
-    bold: Boolean = false,
-    alignEnd: Boolean = false,
-) {
-    Text(
-        text,
-        modifier = Modifier.width(width),
-        fontSize = 10.sp,
-        fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium,
-        color = color,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        textAlign = if (alignEnd) TextAlign.End else TextAlign.Center,
     )
 }
 

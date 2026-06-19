@@ -27,17 +27,30 @@ data class MaterialManualOrderFormUi(
 
 /** Web `MARUICHI_ORDER_SHEET_STYLES` と同等（A4 縦） */
 private val MARUICHI_ORDER_SHEET_STYLES = """
+    html {
+      height: 100%;
+    }
     body {
       font-family: 'Meiryo', 'Yu Gothic', sans-serif;
-      margin: 0.5cm;
+      margin: 1cm 0.5cm 0.5cm 0.5cm;
+      padding-top: 0.3cm;
+      min-height: 100%;
       font-size: 10pt;
       line-height: 1.4;
       background-color: #ffffff;
       color: #000000;
+      box-sizing: border-box;
     }
     .order-sheet {
       width: 100%;
       margin: 0 auto;
+      box-sizing: border-box;
+      position: relative;
+      min-height: 275mm;
+      padding-bottom: 36mm;
+    }
+    .order-sheet-main {
+      width: 100%;
     }
     .header {
       margin-bottom: 1mm;
@@ -50,9 +63,9 @@ private val MARUICHI_ORDER_SHEET_STYLES = """
     }
     .title {
       text-align: center;
-      font-size: 20pt;
+      font-size: 24pt;
       font-weight: bold;
-      margin: 1mm 0;
+      margin: 2mm 0 3mm;
       color: #000000;
       text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
       letter-spacing: 2px;
@@ -155,18 +168,18 @@ private val MARUICHI_ORDER_SHEET_STYLES = """
       border: 1px solid #dee2e6;
     }
     .notes {
-      margin-top: 12mm;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
       font-size: 9pt;
       line-height: 1.6;
-      position: absolute;
-      bottom: 0.5cm;
-      left: 0.5cm;
-      right: 0.5cm;
       background-color: #f8f9fa;
       padding: 4mm 6mm;
       border-radius: 6px;
       border-left: 4px solid #6c757d;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      box-sizing: border-box;
     }
     .notes p {
       margin: 2mm 0;
@@ -177,11 +190,29 @@ private val MARUICHI_ORDER_SHEET_STYLES = """
     .notes p:last-child { margin-bottom: 0; }
     @page {
       size: A4 portrait;
-      margin: 0.5cm;
+      margin: 1cm 0.5cm 0.5cm 0.5cm;
     }
     @media print {
-      body { margin: 0; }
-      .order-sheet { page-break-inside: avoid; }
+      html, body {
+        height: auto;
+        min-height: 0;
+      }
+      body {
+        margin: 0;
+        padding-top: 0.3cm;
+      }
+      .order-sheet {
+        position: relative;
+        min-height: 275mm;
+        padding-bottom: 36mm;
+        page-break-inside: avoid;
+      }
+      .notes {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
     }
 """.trimIndent()
 
@@ -216,6 +247,7 @@ fun buildMaterialOrderPrintHtml(
 
     val bodyContent = """
     <div class="order-sheet">
+      <div class="order-sheet-main">
       <div class="issued-info">発行日: $issuedDateTime</div>
       <div class="title">注 文 書</div>
       <div class="header">
@@ -260,6 +292,7 @@ fun buildMaterialOrderPrintHtml(
         <div class="summary-item">総重量  ${totalWeight.roundToInt()} Kg</div>
         <div class="summary-item">総束数  $totalBundles 束</div>
         <div class="summary-item">総本数  $totalPieces 本</div>
+      </div>
       </div>
       <div class="notes">
         <p>${escapeHtml(form.note1)}</p>

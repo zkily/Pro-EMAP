@@ -85,7 +85,6 @@ object AppMenuConfig {
                             label = "材料管理",
                             icon = Icons.Default.Inventory2,
                             children = listOf(
-                                AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_HOME", "材料管理ホーム", Icons.Default.Home, "/erp/purchase/material", isHome = true),
                                 AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_ORDER", "材料在庫管理", Icons.Default.ShoppingCart, "/erp/purchase/material/order"),
                                 AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_RECEIVING", "受入履歴", Icons.AutoMirrored.Filled.List, "/erp/purchase/material/receiving-history"),
                                 AppMenuNode.Leaf("ERP_PURCHASE_MATERIAL_INSPECTION", "受入検品", Icons.Default.CheckCircle, "/erp/purchase/material/receiving-inspection"),

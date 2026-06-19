@@ -139,6 +139,11 @@ interface MaterialApiService {
         @Body body: MaterialMasterUpdateBodyDto,
     ): ApiEnvelope<MaterialMasterItemDto>
 
+    @POST("/api/material/receiving/import-csv")
+    suspend fun importReceivingCsv(
+        @Body body: List<Map<String, String>> = emptyList(),
+    ): ApiEnvelope<Any>
+
     @POST("/api/material/stock/transfer-to-sub")
     suspend fun transferToSub(@Body body: MaterialTransferToSubBodyDto): ApiEnvelope<Any>
 }

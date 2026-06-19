@@ -270,6 +270,7 @@ fun rememberShellPageLoading(
             "/erp/order/monthly" -> orderMonthly.isLoading
             "/erp/order/daily" -> orderDaily.isLoading
             "/erp/order/destination-history" -> orderDestinationHistory.isLoading
+            "/erp/purchase/material" -> materialOrder.isLoading
             "/erp/purchase/material/receiving-history" -> materialReceivingHistory.isLoading
             "/erp/purchase/material/receiving-inspection" -> materialReceivingInspection.isLoading
             "/erp/purchase/material/forecast" -> materialForecast.isLoading
