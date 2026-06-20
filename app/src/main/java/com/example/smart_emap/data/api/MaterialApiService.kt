@@ -146,4 +146,21 @@ interface MaterialApiService {
 
     @POST("/api/material/stock/transfer-to-sub")
     suspend fun transferToSub(@Body body: MaterialTransferToSubBodyDto): ApiEnvelope<Any>
+
+    @GET("/api/material/usage/records")
+    suspend fun usageRecords(
+        @Query("page") page: Int = 1,
+        @Query("page_size") pageSize: Int = 100,
+        @Query("material_cd") materialCd: String? = null,
+        @Query("date_from") dateFrom: String? = null,
+        @Query("date_to") dateTo: String? = null,
+    ): com.example.smart_emap.data.model.MaterialUsageRecordsResponse
+
+    @GET("/api/material/usage/records/chart-summary")
+    suspend fun usageRecordsChartSummary(
+        @Query("material_cd") materialCd: String? = null,
+        @Query("date_from") dateFrom: String? = null,
+        @Query("date_to") dateTo: String? = null,
+        @Query("material_top_n") materialTopN: Int? = null,
+    ): com.example.smart_emap.data.model.MaterialUsageChartResponse
 }

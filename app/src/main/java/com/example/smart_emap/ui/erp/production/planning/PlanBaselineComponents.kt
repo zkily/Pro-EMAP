@@ -84,7 +84,7 @@ fun PlanBaselineHeroBar(actionLoading: Boolean, onRefresh: () -> Unit) {
             .shadow(6.dp, shape, spotColor = Color(0x406366F1))
             .clip(shape)
             .background(heroGradient)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {

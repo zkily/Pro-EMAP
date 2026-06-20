@@ -38,12 +38,25 @@ class SmartEmapAppContainer(context: Context) {
     val chamferingOfflineStore = ChamferingOfflineStore(context.applicationContext)
     val orderMonthlyRepository = OrderMonthlyRepository(apiClient)
     val orderDailyRepository = OrderDailyRepository(apiClient)
+    val outsourcingRepository = OutsourcingRepository(apiClient)
     val materialRepository = MaterialRepository(apiClient)
     val masterRepository = MasterRepository(apiClient)
     val apsSchedulingRepository = ApsSchedulingRepository(apiClient)
     val partRepository = PartRepository(apiClient)
     val planInstructionRepository = PlanInstructionRepository(apiClient)
     val productionSummaryRepository = ProductionSummaryRepository(apiClient)
+    val productionRequirementsRepository = ProductionRequirementsRepository(apiClient)
+    val productionActualRepository = ProductionActualRepository(apiClient)
+    val inventoryRepository = InventoryRepository(
+        apiClient = apiClient,
+        productionSummaryRepository = productionSummaryRepository,
+        materialRepository = materialRepository,
+        partRepository = partRepository,
+    )
+    val shippingRepository = ShippingRepository(
+        apiClient = apiClient,
+        productionSummaryRepository = productionSummaryRepository,
+    )
     val planBaselineRepository = PlanBaselineRepository(apiClient)
     val systemOrganizationRepository = SystemOrganizationRepository(apiClient)
     val systemRoleRepository = SystemRoleRepository(apiClient)

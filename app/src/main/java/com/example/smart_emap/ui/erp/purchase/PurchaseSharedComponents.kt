@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -51,6 +52,9 @@ val PurchasePageGradient = Brush.linearGradient(
         Color(0xFFF1F5F9),
     ),
 )
+
+/** MainShell 内の購買系ページ：Scaffold 默认 inset 会导致顶部重复留白 */
+val PurchaseShellWindowInsets = WindowInsets(0, 0, 0, 0)
 
 @Composable
 fun PurchasePageBackground(content: @Composable () -> Unit) {

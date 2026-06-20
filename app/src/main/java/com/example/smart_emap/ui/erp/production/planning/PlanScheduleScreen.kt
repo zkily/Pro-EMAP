@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -17,7 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.core.system.PrintPageLayout
-import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
 fun PlanScheduleScreen(viewModel: PlanScheduleViewModel) {
@@ -51,16 +49,14 @@ fun PlanScheduleScreen(viewModel: PlanScheduleViewModel) {
         )
     }
 
-    Scaffold(
+    ProductionScaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = LayoutColors.ShellBg,
     ) { padding ->
         PlanSchedulePageBackground {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .productionPageScaffoldPadding(padding),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 PlanScheduleHeader(

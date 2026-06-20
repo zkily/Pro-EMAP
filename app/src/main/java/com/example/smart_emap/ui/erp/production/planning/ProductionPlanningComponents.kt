@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,6 +34,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,9 +53,45 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
 import com.example.smart_emap.ui.erp.purchase.PurchasePageGradient
+import com.example.smart_emap.ui.shell.LayoutColors
+
+/** MainShell 内の生産管理ページ：Scaffold 默认 inset 会在标签栏下方产生重复留白 */
+val ProductionShellWindowInsets = WindowInsets(0, 0, 0, 0)
+
+/** 生産管理各画面のページ余白（上辺は控えめ） */
+object ProductionPageInsets {
+    val Horizontal = 6.dp
+    val Top = 1.dp
+    val Bottom = 6.dp
+}
+
+fun Modifier.productionPageScaffoldPadding(
+    @Suppress("UNUSED_PARAMETER") scaffoldPadding: PaddingValues,
+    horizontal: Dp = ProductionPageInsets.Horizontal,
+): Modifier = padding(
+    start = horizontal,
+    top = ProductionPageInsets.Top,
+    end = horizontal,
+    bottom = ProductionPageInsets.Bottom,
+)
+
+@Composable
+fun ProductionScaffold(
+    snackbarHost: @Composable () -> Unit = {},
+    content: @Composable (PaddingValues) -> Unit,
+) {
+    Scaffold(
+        snackbarHost = snackbarHost,
+        containerColor = LayoutColors.ShellBg,
+        contentWindowInsets = ProductionShellWindowInsets,
+        content = content,
+    )
+}
 
 @Composable
 fun ProductionPageBackground(content: @Composable () -> Unit) {
@@ -80,7 +118,7 @@ fun ProductionHeroBar(
             .clip(shape)
             .background(ProductionPlanningColors.CardBg)
             .border(1.dp, ProductionPlanningColors.CardBorder, shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

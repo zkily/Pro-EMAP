@@ -12,7 +12,9 @@ import com.example.smart_emap.data.api.DatabaseApiService
 import com.example.smart_emap.data.api.CuttingPlanningApiService
 import com.example.smart_emap.data.api.PlanBaselineApiService
 import com.example.smart_emap.data.api.PlanDataApiService
+import com.example.smart_emap.data.api.ProductionRequirementsApiService
 import com.example.smart_emap.data.api.ProductionSummaryApiService
+import com.example.smart_emap.data.api.InventoryApiService
 import com.example.smart_emap.data.api.StockTransactionLogApiService
 import com.example.smart_emap.data.api.DashboardApiService
 import com.example.smart_emap.data.api.ErpOptionsApiService
@@ -24,12 +26,16 @@ import com.example.smart_emap.data.api.PlanInstructionApiService
 import com.example.smart_emap.data.api.OrderBatchApiService
 import com.example.smart_emap.data.api.OrderDailyApiService
 import com.example.smart_emap.data.api.OrderMonthlyApiService
+import com.example.smart_emap.data.api.OutsourcingApiService
 import com.example.smart_emap.data.api.ProcessDefectApiService
+import com.example.smart_emap.data.api.ProductionActualLogsApiService
+import com.example.smart_emap.data.api.ShippingApiService
 import com.example.smart_emap.data.api.ShortcutsApiService
 import com.example.smart_emap.data.api.SystemApiService
 import com.example.smart_emap.data.api.SystemUsersApiService
 import com.example.smart_emap.data.api.WeldingApiService
 import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
+import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.ConnectionSpec
@@ -38,6 +44,7 @@ import okhttp3.Protocol
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import java.lang.reflect.Type
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
@@ -49,8 +56,13 @@ class ApiClient(
     private val sessionStore: SessionStore,
     private val sessionEvents: SessionEvents,
 ) {
-    private val moshi = Moshi.Builder()
+    val moshi = Moshi.Builder()
         .add(MesDefectByItemAdapterFactory)
+        .add(object : JsonAdapter.Factory {
+            override fun create(type: Type, annotations: Set<Annotation>, moshi: Moshi): JsonAdapter<*>? {
+                return moshi.nextAdapter<Any>(this, type, annotations).lenient()
+            }
+        })
         .add(KotlinJsonAdapterFactory())
         .build()
 
@@ -119,6 +131,9 @@ class ApiClient(
 
     suspend fun databaseApi(): DatabaseApiService = createService(DatabaseApiService::class.java)
 
+    suspend fun databaseApiLong(): DatabaseApiService =
+        createService(DatabaseApiService::class.java, longTimeout = true)
+
     suspend fun cuttingPlanningApi(): CuttingPlanningApiService =
         createService(CuttingPlanningApiService::class.java)
 
@@ -149,6 +164,8 @@ class ApiClient(
 
     suspend fun orderDailyApi(): OrderDailyApiService = createService(OrderDailyApiService::class.java)
 
+    suspend fun outsourcingApi(): OutsourcingApiService = createService(OutsourcingApiService::class.java)
+
     suspend fun materialApi(): MaterialApiService = createService(MaterialApiService::class.java)
 
     suspend fun materialApiLong(): MaterialApiService =
@@ -160,6 +177,12 @@ class ApiClient(
 
     suspend fun planInstructionApi(): PlanInstructionApiService =
         createService(PlanInstructionApiService::class.java)
+
+    suspend fun productionRequirementsApi(): ProductionRequirementsApiService =
+        createService(ProductionRequirementsApiService::class.java, longTimeout = true)
+
+    suspend fun productionActualLogsApi(): ProductionActualLogsApiService =
+        createService(ProductionActualLogsApiService::class.java, longTimeout = true)
 
     suspend fun productionSummaryApi(): ProductionSummaryApiService =
         createService(ProductionSummaryApiService::class.java)
@@ -173,11 +196,21 @@ class ApiClient(
     suspend fun stockTransactionLogApiLong(): StockTransactionLogApiService =
         createService(StockTransactionLogApiService::class.java, longTimeout = true)
 
+    suspend fun inventoryApi(): InventoryApiService = createService(InventoryApiService::class.java)
+
+    suspend fun inventoryApiLong(): InventoryApiService =
+        createService(InventoryApiService::class.java, longTimeout = true)
+
     suspend fun planBaselineApi(): PlanBaselineApiService = createService(PlanBaselineApiService::class.java)
 
     suspend fun planDataApi(): PlanDataApiService = createService(PlanDataApiService::class.java)
 
     suspend fun shortcutsApi(): ShortcutsApiService = createService(ShortcutsApiService::class.java)
+
+    suspend fun shippingApi(): ShippingApiService = createService(ShippingApiService::class.java)
+
+    suspend fun shippingApiLong(): ShippingApiService =
+        createService(ShippingApiService::class.java, longTimeout = true)
 
     private fun createRetrofit(baseUrl: String, client: OkHttpClient): Retrofit {
         val normalized = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"

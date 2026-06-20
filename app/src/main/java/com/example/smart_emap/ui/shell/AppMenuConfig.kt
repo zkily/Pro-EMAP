@@ -96,8 +96,8 @@ object AppMenuConfig {
                             label = "部品管理",
                             icon = Icons.Default.GridView,
                             children = listOf(
-                                AppMenuNode.Leaf("ERP_PURCHASE_PART_HOME", "部品管理ホーム", Icons.Default.Home, "/erp/purchase/part", isHome = true),
                                 AppMenuNode.Leaf("ERP_PURCHASE_PART_ORDER", "部品在庫管理", Icons.Default.ShoppingCart, "/erp/purchase/part/order"),
+                                AppMenuNode.Leaf("ERP_PURCHASE_PART_RECEIVING", "受入履歴", Icons.AutoMirrored.Filled.List, "/erp/purchase/part/receiving-history"),
                             ),
                         ),
                         AppMenuNode.Group(
@@ -139,7 +139,6 @@ object AppMenuConfig {
                     label = "生産管理",
                     icon = Icons.Default.Settings,
                     children = listOf(
-                        AppMenuNode.Leaf("ERP_PRODUCTION_HOME", "生産ホーム", Icons.Default.Home, "/erp/production", isHome = true),
                         AppMenuNode.Group(
                             code = "ERP_PRODUCTION_PLANNING",
                             label = "生産計画",
@@ -151,9 +150,35 @@ object AppMenuConfig {
                                 AppMenuNode.Leaf("ERP_PRODUCTION_PROCESS_MACHINE_PLAN", "工程別設備別計画", Icons.AutoMirrored.Filled.TrendingUp, "/erp/production/process-machine-plan"),
                             ),
                         ),
-                        AppMenuNode.Leaf("ERP_PRODUCTION_REQUIREMENTS", "生産需要量", Icons.AutoMirrored.Filled.TrendingUp, "/erp/production-requirements/material"),
-                        AppMenuNode.Leaf("ERP_PRODUCTION_METRICS", "生産指標", Icons.AutoMirrored.Filled.TrendingUp, "/erp/production/metrics/scrap-rate"),
-                        AppMenuNode.Leaf("ERP_PRODUCTION_RESULT", "生産実績", Icons.Default.Description, "/erp/production/actual-management"),
+                        AppMenuNode.Group(
+                            code = "ERP_PRODUCTION_REQUIREMENTS",
+                            label = "生産需要量",
+                            icon = Icons.AutoMirrored.Filled.TrendingUp,
+                            children = listOf(
+                                AppMenuNode.Leaf("ERP_PRODUCTION_MAT_REQ", "材料需要量", Icons.Default.Inventory2, "/erp/production-requirements/material"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_COMPONENT_REQ", "部品需要量", Icons.Default.GridView, "/erp/production-requirements/component"),
+                            ),
+                        ),
+                        AppMenuNode.Group(
+                            code = "ERP_PRODUCTION_METRICS",
+                            label = "生産指標",
+                            icon = Icons.Default.Analytics,
+                            children = listOf(
+                                AppMenuNode.Leaf("ERP_PRODUCTION_SCRAP_RATE", "廃棄率", Icons.Default.Description, "/erp/production/metrics/scrap-rate"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_UTILIZATION_RATE", "稼働率", Icons.Default.Monitor, "/erp/production/metrics/utilization-rate"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_DEFECT_RATE", "不良率", Icons.Default.BarChart, "/erp/production/metrics/defect-rate"),
+                            ),
+                        ),
+                        AppMenuNode.Group(
+                            code = "ERP_PRODUCTION_RESULT",
+                            label = "生産実績",
+                            icon = Icons.Default.Description,
+                            children = listOf(
+                                AppMenuNode.Leaf("ERP_PRODUCTION_ACTUAL", "生産実績管理", Icons.Default.Analytics, "/erp/production/actual-management"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_CONSUME", "材料消費実績", Icons.Default.Inventory2, "/erp/production/consumption"),
+                                AppMenuNode.Leaf("ERP_PRODUCTION_PROCESS_ACTUAL", "工程別実績", Icons.Default.Timeline, "/erp/production/process-actual"),
+                            ),
+                        ),
                     ),
                 ),
                 AppMenuNode.Group(

@@ -50,6 +50,20 @@ import com.example.smart_emap.ui.erp.production.planning.ProcessMachinePlanScree
 import com.example.smart_emap.ui.erp.production.planning.ProcessMachinePlanViewModel
 import com.example.smart_emap.ui.erp.production.planning.ProductionDataManagementScreen
 import com.example.smart_emap.ui.erp.production.planning.ProductionDataManagementViewModel
+import com.example.smart_emap.ui.erp.production.metrics.UtilizationRateScreen
+import com.example.smart_emap.ui.erp.production.metrics.DefectRateScreen
+import com.example.smart_emap.ui.erp.production.requirements.MaterialRequirementsScreen
+import com.example.smart_emap.ui.erp.production.requirements.MaterialRequirementsViewModel
+import com.example.smart_emap.ui.erp.production.requirements.ComponentRequirementsScreen
+import com.example.smart_emap.ui.erp.production.requirements.ComponentRequirementsViewModel
+import com.example.smart_emap.ui.erp.production.actual.MaterialConsumptionScreen
+import com.example.smart_emap.ui.erp.production.actual.MaterialConsumptionViewModel
+import com.example.smart_emap.ui.erp.production.actual.ProcessActualScreen
+import com.example.smart_emap.ui.erp.production.actual.ProcessActualViewModel
+import com.example.smart_emap.ui.erp.production.actual.ProductionActualManagementScreen
+import com.example.smart_emap.ui.erp.production.actual.ProductionActualManagementViewModel
+import com.example.smart_emap.ui.erp.production.actual.ScrapRateScreen
+import com.example.smart_emap.ui.erp.production.actual.ScrapRateViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialForecastScreen
 import com.example.smart_emap.ui.erp.purchase.material.MaterialForecastViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialOrderScreen
@@ -58,9 +72,69 @@ import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingHistoryS
 import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingHistoryViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingInspectionScreen
 import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingInspectionViewModel
-import com.example.smart_emap.ui.erp.purchase.part.PartHomeScreen
 import com.example.smart_emap.ui.erp.purchase.part.PartOrderScreen
 import com.example.smart_emap.ui.erp.purchase.part.PartOrderViewModel
+import com.example.smart_emap.ui.erp.purchase.part.PartReceivingHistoryScreen
+import com.example.smart_emap.ui.erp.purchase.part.PartReceivingHistoryViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingHomeScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingHomeViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingProcessProductsScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingProcessProductsViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingSuppliersScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingSuppliersViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.MaterialIssueScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.MaterialIssueViewModel
+import com.example.smart_emap.ui.erp.inventory.InventoryHomeScreen
+import com.example.smart_emap.ui.erp.inventory.InventoryHomeViewModel
+import com.example.smart_emap.ui.erp.inventory.MaterialInventoryListScreen
+import com.example.smart_emap.ui.erp.inventory.MaterialInventoryListViewModel
+import com.example.smart_emap.ui.erp.inventory.PartInventoryListScreen
+import com.example.smart_emap.ui.erp.inventory.PartInventoryListViewModel
+import com.example.smart_emap.ui.erp.inventory.ProductInventoryListScreen
+import com.example.smart_emap.ui.erp.inventory.ProductInventoryListViewModel
+import com.example.smart_emap.ui.erp.inventory.StockEntryScreen
+import com.example.smart_emap.ui.erp.inventory.StockEntryViewModel
+import com.example.smart_emap.ui.erp.inventory.StockTransactionLogScreen
+import com.example.smart_emap.ui.erp.inventory.StockTransactionLogViewModel
+import com.example.smart_emap.ui.erp.inventory.StocktakeEntryScreen
+import com.example.smart_emap.ui.erp.inventory.StocktakeEntryViewModel
+import com.example.smart_emap.ui.erp.inventory.StocktakeHomeScreen
+import com.example.smart_emap.ui.erp.inventory.StocktakeListScreen
+import com.example.smart_emap.ui.erp.inventory.StocktakeListViewModel
+import com.example.smart_emap.ui.erp.inventory.StocktakePlaceholderScreen
+import com.example.smart_emap.ui.erp.shipping.AbcAnalysisScreen
+import com.example.smart_emap.ui.erp.shipping.AbcAnalysisViewModel
+import com.example.smart_emap.ui.erp.shipping.InventoryKpiScreen
+import com.example.smart_emap.ui.erp.shipping.InventoryKpiViewModel
+import com.example.smart_emap.ui.erp.shipping.InventoryShortageScreen
+import com.example.smart_emap.ui.erp.shipping.InventoryShortageViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingDocumentMode
+import com.example.smart_emap.ui.erp.shipping.ShippingDocumentScreen
+import com.example.smart_emap.ui.erp.shipping.ShippingDocumentViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingHomeScreen
+import com.example.smart_emap.ui.erp.shipping.ShippingHomeViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingListScreen
+import com.example.smart_emap.ui.erp.shipping.ShippingListViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingPickingScreen
+import com.example.smart_emap.ui.erp.shipping.ShippingPickingViewModel
+import com.example.smart_emap.ui.erp.shipping.WarehouseDailyScreen
+import com.example.smart_emap.ui.erp.shipping.WarehouseDailyViewModel
+import com.example.smart_emap.ui.erp.shipping.WeldingShippingScreen
+import com.example.smart_emap.ui.erp.shipping.WeldingShippingViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.SuppliedMaterialStockScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.SuppliedMaterialStockViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.UsageManagementScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.UsageManagementViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.plating.PlatingOrderScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.plating.PlatingOrderViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.plating.PlatingReceivingScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.plating.PlatingReceivingViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.stock.OutsourcingStockScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.stock.OutsourcingStockViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingOrderScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingOrderViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingReceivingScreen
+import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingReceivingViewModel
 import com.example.smart_emap.ui.master.MasterHomeScreen
 import com.example.smart_emap.ui.master.MasterScreen
 import com.example.smart_emap.ui.master.MasterViewModel
@@ -275,6 +349,137 @@ fun MainShellScreen(
         ),
     )
 
+    val partReceivingHistoryViewModel: PartReceivingHistoryViewModel = viewModel(
+        factory = PartReceivingHistoryViewModel.Factory(
+            repository = appContainer.partRepository,
+        ),
+    )
+
+    val outsourcingHomeViewModel: OutsourcingHomeViewModel = viewModel(
+        factory = OutsourcingHomeViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val platingOrderViewModel: PlatingOrderViewModel = viewModel(
+        factory = PlatingOrderViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val platingReceivingViewModel: PlatingReceivingViewModel = viewModel(
+        factory = PlatingReceivingViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val weldingOrderViewModel: WeldingOrderViewModel = viewModel(
+        factory = WeldingOrderViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val weldingReceivingViewModel: WeldingReceivingViewModel = viewModel(
+        factory = WeldingReceivingViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val outsourcingSuppliersViewModel: OutsourcingSuppliersViewModel = viewModel(
+        factory = OutsourcingSuppliersViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val outsourcingProcessProductsViewModel: OutsourcingProcessProductsViewModel = viewModel(
+        factory = OutsourcingProcessProductsViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val outsourcingStockViewModel: OutsourcingStockViewModel = viewModel(
+        factory = OutsourcingStockViewModel.Factory(
+            repository = appContainer.outsourcingRepository,
+        ),
+    )
+    val suppliedMaterialStockViewModel: SuppliedMaterialStockViewModel = viewModel(
+        factory = SuppliedMaterialStockViewModel.Factory(),
+    )
+    val usageManagementViewModel: UsageManagementViewModel = viewModel(
+        factory = UsageManagementViewModel.Factory(),
+    )
+    val materialIssueViewModel: MaterialIssueViewModel = viewModel(
+        factory = MaterialIssueViewModel.Factory(),
+    )
+
+    val inventoryHomeViewModel: InventoryHomeViewModel = viewModel(
+        factory = InventoryHomeViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val productInventoryListViewModel: ProductInventoryListViewModel = viewModel(
+        factory = ProductInventoryListViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val materialInventoryListViewModel: MaterialInventoryListViewModel = viewModel(
+        factory = MaterialInventoryListViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val partInventoryListViewModel: PartInventoryListViewModel = viewModel(
+        factory = PartInventoryListViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val stockEntryViewModel: StockEntryViewModel = viewModel(
+        factory = StockEntryViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val stockTransactionLogViewModel: StockTransactionLogViewModel = viewModel(
+        factory = StockTransactionLogViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val stocktakeListViewModel: StocktakeListViewModel = viewModel(
+        factory = StocktakeListViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+    val stocktakeEntryViewModel: StocktakeEntryViewModel = viewModel(
+        factory = StocktakeEntryViewModel.Factory(
+            repository = appContainer.inventoryRepository,
+        ),
+    )
+
+    val shippingHomeViewModel: ShippingHomeViewModel = viewModel(
+        factory = ShippingHomeViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val shippingListViewModel: ShippingListViewModel = viewModel(
+        factory = ShippingListViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val shippingReportViewModel: ShippingDocumentViewModel = viewModel(
+        factory = ShippingDocumentViewModel.Factory(appContainer.shippingRepository, ShippingDocumentMode.REPORT),
+    )
+    val shippingOverviewViewModel: ShippingDocumentViewModel = viewModel(
+        factory = ShippingDocumentViewModel.Factory(appContainer.shippingRepository, ShippingDocumentMode.OVERVIEW),
+    )
+    val shippingConfirmViewModel: ShippingDocumentViewModel = viewModel(
+        factory = ShippingDocumentViewModel.Factory(appContainer.shippingRepository, ShippingDocumentMode.CONFIRM),
+    )
+    val shippingPickingViewModel: ShippingPickingViewModel = viewModel(
+        factory = ShippingPickingViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val weldingShippingViewModel: WeldingShippingViewModel = viewModel(
+        factory = WeldingShippingViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val inventoryShortageViewModel: InventoryShortageViewModel = viewModel(
+        factory = InventoryShortageViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val inventoryKpiViewModel: InventoryKpiViewModel = viewModel(
+        factory = InventoryKpiViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val warehouseDailyViewModel: WarehouseDailyViewModel = viewModel(
+        factory = WarehouseDailyViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+    val abcAnalysisViewModel: AbcAnalysisViewModel = viewModel(
+        factory = AbcAnalysisViewModel.Factory(repository = appContainer.shippingRepository),
+    )
+
     val masterViewModel: MasterViewModel = viewModel(
         factory = MasterViewModel.Factory(
             repository = appContainer.masterRepository,
@@ -400,6 +605,42 @@ fun MainShellScreen(
         ),
     )
 
+    val materialRequirementsViewModel: MaterialRequirementsViewModel = viewModel(
+        factory = MaterialRequirementsViewModel.Factory(
+            repository = appContainer.productionRequirementsRepository,
+        ),
+    )
+
+    val componentRequirementsViewModel: ComponentRequirementsViewModel = viewModel(
+        factory = ComponentRequirementsViewModel.Factory(
+            repository = appContainer.productionRequirementsRepository,
+        ),
+    )
+
+    val materialConsumptionViewModel: MaterialConsumptionViewModel = viewModel(
+        factory = MaterialConsumptionViewModel.Factory(
+            repository = appContainer.productionActualRepository,
+        ),
+    )
+
+    val processActualViewModel: ProcessActualViewModel = viewModel(
+        factory = ProcessActualViewModel.Factory(
+            repository = appContainer.productionActualRepository,
+        ),
+    )
+
+    val scrapRateViewModel: ScrapRateViewModel = viewModel(
+        factory = ScrapRateViewModel.Factory(
+            repository = appContainer.productionActualRepository,
+        ),
+    )
+
+    val productionActualManagementViewModel: ProductionActualManagementViewModel = viewModel(
+        factory = ProductionActualManagementViewModel.Factory(
+            repository = appContainer.productionActualRepository,
+        ),
+    )
+
     val productionDataManagementViewModel: ProductionDataManagementViewModel = viewModel(
         factory = ProductionDataManagementViewModel.Factory(
             repository = appContainer.productionSummaryRepository,
@@ -499,6 +740,37 @@ fun MainShellScreen(
             materialForecastViewModel = materialForecastViewModel,
             materialOrderViewModel = materialOrderViewModel,
             partOrderViewModel = partOrderViewModel,
+            partReceivingHistoryViewModel = partReceivingHistoryViewModel,
+            outsourcingHomeViewModel = outsourcingHomeViewModel,
+            platingOrderViewModel = platingOrderViewModel,
+            platingReceivingViewModel = platingReceivingViewModel,
+            weldingOrderViewModel = weldingOrderViewModel,
+            weldingReceivingViewModel = weldingReceivingViewModel,
+            outsourcingSuppliersViewModel = outsourcingSuppliersViewModel,
+            outsourcingProcessProductsViewModel = outsourcingProcessProductsViewModel,
+            outsourcingStockViewModel = outsourcingStockViewModel,
+            suppliedMaterialStockViewModel = suppliedMaterialStockViewModel,
+            usageManagementViewModel = usageManagementViewModel,
+            materialIssueViewModel = materialIssueViewModel,
+            inventoryHomeViewModel = inventoryHomeViewModel,
+            productInventoryListViewModel = productInventoryListViewModel,
+            materialInventoryListViewModel = materialInventoryListViewModel,
+            partInventoryListViewModel = partInventoryListViewModel,
+            stockEntryViewModel = stockEntryViewModel,
+            stockTransactionLogViewModel = stockTransactionLogViewModel,
+            stocktakeListViewModel = stocktakeListViewModel,
+            stocktakeEntryViewModel = stocktakeEntryViewModel,
+            shippingHomeViewModel = shippingHomeViewModel,
+            shippingListViewModel = shippingListViewModel,
+            shippingReportViewModel = shippingReportViewModel,
+            shippingOverviewViewModel = shippingOverviewViewModel,
+            shippingConfirmViewModel = shippingConfirmViewModel,
+            shippingPickingViewModel = shippingPickingViewModel,
+            weldingShippingViewModel = weldingShippingViewModel,
+            inventoryShortageViewModel = inventoryShortageViewModel,
+            inventoryKpiViewModel = inventoryKpiViewModel,
+            warehouseDailyViewModel = warehouseDailyViewModel,
+            abcAnalysisViewModel = abcAnalysisViewModel,
             masterViewModel = masterViewModel,
             productMasterViewModel = productMasterViewModel,
             materialMasterViewModel = materialMasterViewModel,
@@ -522,6 +794,12 @@ fun MainShellScreen(
             planScheduleViewModel = planScheduleViewModel,
             processMachinePlanViewModel = processMachinePlanViewModel,
             productionDataManagementViewModel = productionDataManagementViewModel,
+            materialRequirementsViewModel = materialRequirementsViewModel,
+            componentRequirementsViewModel = componentRequirementsViewModel,
+            materialConsumptionViewModel = materialConsumptionViewModel,
+            processActualViewModel = processActualViewModel,
+            scrapRateViewModel = scrapRateViewModel,
+            productionActualManagementViewModel = productionActualManagementViewModel,
             userListViewModel = userListViewModel,
             organizationListViewModel = organizationListViewModel,
             rolePermissionViewModel = rolePermissionViewModel,
@@ -560,6 +838,37 @@ private fun MainShellContent(
     materialForecastViewModel: MaterialForecastViewModel,
     materialOrderViewModel: MaterialOrderViewModel,
     partOrderViewModel: PartOrderViewModel,
+    partReceivingHistoryViewModel: PartReceivingHistoryViewModel,
+    outsourcingHomeViewModel: OutsourcingHomeViewModel,
+    platingOrderViewModel: PlatingOrderViewModel,
+    platingReceivingViewModel: PlatingReceivingViewModel,
+    weldingOrderViewModel: WeldingOrderViewModel,
+    weldingReceivingViewModel: WeldingReceivingViewModel,
+    outsourcingSuppliersViewModel: OutsourcingSuppliersViewModel,
+    outsourcingProcessProductsViewModel: OutsourcingProcessProductsViewModel,
+    outsourcingStockViewModel: OutsourcingStockViewModel,
+    suppliedMaterialStockViewModel: SuppliedMaterialStockViewModel,
+    usageManagementViewModel: UsageManagementViewModel,
+    materialIssueViewModel: MaterialIssueViewModel,
+    inventoryHomeViewModel: InventoryHomeViewModel,
+    productInventoryListViewModel: ProductInventoryListViewModel,
+    materialInventoryListViewModel: MaterialInventoryListViewModel,
+    partInventoryListViewModel: PartInventoryListViewModel,
+    stockEntryViewModel: StockEntryViewModel,
+    stockTransactionLogViewModel: StockTransactionLogViewModel,
+    stocktakeListViewModel: StocktakeListViewModel,
+    stocktakeEntryViewModel: StocktakeEntryViewModel,
+    shippingHomeViewModel: ShippingHomeViewModel,
+    shippingListViewModel: ShippingListViewModel,
+    shippingReportViewModel: ShippingDocumentViewModel,
+    shippingOverviewViewModel: ShippingDocumentViewModel,
+    shippingConfirmViewModel: ShippingDocumentViewModel,
+    shippingPickingViewModel: ShippingPickingViewModel,
+    weldingShippingViewModel: WeldingShippingViewModel,
+    inventoryShortageViewModel: InventoryShortageViewModel,
+    inventoryKpiViewModel: InventoryKpiViewModel,
+    warehouseDailyViewModel: WarehouseDailyViewModel,
+    abcAnalysisViewModel: AbcAnalysisViewModel,
     masterViewModel: MasterViewModel,
     productMasterViewModel: ProductMasterViewModel,
     materialMasterViewModel: MaterialMasterViewModel,
@@ -583,6 +892,12 @@ private fun MainShellContent(
     planScheduleViewModel: PlanScheduleViewModel,
     processMachinePlanViewModel: ProcessMachinePlanViewModel,
     productionDataManagementViewModel: ProductionDataManagementViewModel,
+    materialRequirementsViewModel: MaterialRequirementsViewModel,
+    componentRequirementsViewModel: ComponentRequirementsViewModel,
+    materialConsumptionViewModel: MaterialConsumptionViewModel,
+    processActualViewModel: ProcessActualViewModel,
+    scrapRateViewModel: ScrapRateViewModel,
+    productionActualManagementViewModel: ProductionActualManagementViewModel,
     userListViewModel: UserListViewModel,
     organizationListViewModel: OrganizationListViewModel,
     rolePermissionViewModel: RolePermissionViewModel,
@@ -693,6 +1008,37 @@ private fun MainShellContent(
                             "/erp/purchase/material/forecast" -> materialForecastViewModel.refreshAll()
                             "/erp/purchase/material/order" -> materialOrderViewModel.refreshAll()
                             "/erp/purchase/part/order" -> partOrderViewModel.refreshAll()
+                            "/erp/purchase/part/receiving-history" -> partReceivingHistoryViewModel.refreshAll()
+                            "/erp/purchase/outsourcing" -> outsourcingHomeViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/plating-order" -> platingOrderViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/plating-receiving" -> platingReceivingViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/welding-order" -> weldingOrderViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/welding-receiving" -> weldingReceivingViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/suppliers" -> outsourcingSuppliersViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/process-products" -> outsourcingProcessProductsViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/stock" -> outsourcingStockViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/supplied-material-stock" -> suppliedMaterialStockViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/usage" -> usageManagementViewModel.refreshAll()
+                            "/erp/purchase/outsourcing/material-issue" -> materialIssueViewModel.refreshAll()
+                            "/erp/inventory" -> inventoryHomeViewModel.refreshAll()
+                            "/erp/inventory/list" -> productInventoryListViewModel.refreshAll()
+                            "/erp/inventory/material-list" -> materialInventoryListViewModel.refreshAll()
+                            "/erp/inventory/part-list" -> partInventoryListViewModel.refreshAll()
+                            "/erp/inventory/stock-entry" -> stockEntryViewModel.refreshOptions()
+                            "/erp/inventory/stock-transaction-logs" -> stockTransactionLogViewModel.refreshAll()
+                            "/erp/inventory/stocktake/list" -> stocktakeListViewModel.refreshAll()
+                            "/erp/inventory/stocktake/entry" -> stocktakeEntryViewModel.refreshOptions()
+                            "/erp/shipping" -> shippingHomeViewModel.refreshAll()
+                            "/erp/shipping/list" -> shippingListViewModel.search()
+                            "/erp/shipping/report" -> shippingReportViewModel.search()
+                            "/erp/shipping/overview" -> shippingOverviewViewModel.search()
+                            "/erp/shipping/confirm" -> shippingConfirmViewModel.search()
+                            "/erp/shipping/picking" -> shippingPickingViewModel.refresh()
+                            "/erp/shipping/welding" -> weldingShippingViewModel.search()
+                            "/erp/shipping/inventory-shortage" -> inventoryShortageViewModel.search()
+                            "/erp/shipping/inventory-kpi" -> inventoryKpiViewModel.search()
+                            "/erp/shipping/warehouse-daily" -> warehouseDailyViewModel.search()
+                            "/erp/shipping/abc-analysis" -> abcAnalysisViewModel.search()
                             "/aps/scheduling" -> schedulingViewModel.refreshAll()
                             "/erp/production/plan-baseline" -> planBaselineViewModel.loadComparison()
                             "/erp/production/plan-schedules" -> planScheduleViewModel.fetchData()
@@ -747,6 +1093,37 @@ private fun MainShellContent(
                     materialForecastViewModel = materialForecastViewModel,
                     materialOrderViewModel = materialOrderViewModel,
                     partOrderViewModel = partOrderViewModel,
+                    partReceivingHistoryViewModel = partReceivingHistoryViewModel,
+                    outsourcingHomeViewModel = outsourcingHomeViewModel,
+                    platingOrderViewModel = platingOrderViewModel,
+                    platingReceivingViewModel = platingReceivingViewModel,
+                    weldingOrderViewModel = weldingOrderViewModel,
+                    weldingReceivingViewModel = weldingReceivingViewModel,
+                    outsourcingSuppliersViewModel = outsourcingSuppliersViewModel,
+                    outsourcingProcessProductsViewModel = outsourcingProcessProductsViewModel,
+                    outsourcingStockViewModel = outsourcingStockViewModel,
+                    suppliedMaterialStockViewModel = suppliedMaterialStockViewModel,
+                    usageManagementViewModel = usageManagementViewModel,
+                    materialIssueViewModel = materialIssueViewModel,
+                    inventoryHomeViewModel = inventoryHomeViewModel,
+                    productInventoryListViewModel = productInventoryListViewModel,
+                    materialInventoryListViewModel = materialInventoryListViewModel,
+                    partInventoryListViewModel = partInventoryListViewModel,
+                    stockEntryViewModel = stockEntryViewModel,
+                    stockTransactionLogViewModel = stockTransactionLogViewModel,
+                    stocktakeListViewModel = stocktakeListViewModel,
+                    stocktakeEntryViewModel = stocktakeEntryViewModel,
+                    shippingHomeViewModel = shippingHomeViewModel,
+                    shippingListViewModel = shippingListViewModel,
+                    shippingReportViewModel = shippingReportViewModel,
+                    shippingOverviewViewModel = shippingOverviewViewModel,
+                    shippingConfirmViewModel = shippingConfirmViewModel,
+                    shippingPickingViewModel = shippingPickingViewModel,
+                    weldingShippingViewModel = weldingShippingViewModel,
+                    inventoryShortageViewModel = inventoryShortageViewModel,
+                    inventoryKpiViewModel = inventoryKpiViewModel,
+                    warehouseDailyViewModel = warehouseDailyViewModel,
+                    abcAnalysisViewModel = abcAnalysisViewModel,
                     masterViewModel = masterViewModel,
                     productMasterViewModel = productMasterViewModel,
                     materialMasterViewModel = materialMasterViewModel,
@@ -770,6 +1147,8 @@ private fun MainShellContent(
                     planScheduleViewModel = planScheduleViewModel,
                     processMachinePlanViewModel = processMachinePlanViewModel,
                     productionDataManagementViewModel = productionDataManagementViewModel,
+                    materialRequirementsViewModel = materialRequirementsViewModel,
+                    componentRequirementsViewModel = componentRequirementsViewModel,
                     userListViewModel = userListViewModel,
                     organizationListViewModel = organizationListViewModel,
                     rolePermissionViewModel = rolePermissionViewModel,
@@ -807,6 +1186,37 @@ private fun MainShellContent(
                             materialForecastViewModel = materialForecastViewModel,
                             materialOrderViewModel = materialOrderViewModel,
                             partOrderViewModel = partOrderViewModel,
+                            partReceivingHistoryViewModel = partReceivingHistoryViewModel,
+                            outsourcingHomeViewModel = outsourcingHomeViewModel,
+                            platingOrderViewModel = platingOrderViewModel,
+                            platingReceivingViewModel = platingReceivingViewModel,
+                            weldingOrderViewModel = weldingOrderViewModel,
+                            weldingReceivingViewModel = weldingReceivingViewModel,
+                            outsourcingSuppliersViewModel = outsourcingSuppliersViewModel,
+                            outsourcingProcessProductsViewModel = outsourcingProcessProductsViewModel,
+                            outsourcingStockViewModel = outsourcingStockViewModel,
+                            suppliedMaterialStockViewModel = suppliedMaterialStockViewModel,
+                            usageManagementViewModel = usageManagementViewModel,
+                            materialIssueViewModel = materialIssueViewModel,
+                            inventoryHomeViewModel = inventoryHomeViewModel,
+                            productInventoryListViewModel = productInventoryListViewModel,
+                            materialInventoryListViewModel = materialInventoryListViewModel,
+                            partInventoryListViewModel = partInventoryListViewModel,
+                            stockEntryViewModel = stockEntryViewModel,
+                            stockTransactionLogViewModel = stockTransactionLogViewModel,
+                            stocktakeListViewModel = stocktakeListViewModel,
+                            stocktakeEntryViewModel = stocktakeEntryViewModel,
+                            shippingHomeViewModel = shippingHomeViewModel,
+                            shippingListViewModel = shippingListViewModel,
+                            shippingReportViewModel = shippingReportViewModel,
+                            shippingOverviewViewModel = shippingOverviewViewModel,
+                            shippingConfirmViewModel = shippingConfirmViewModel,
+                            shippingPickingViewModel = shippingPickingViewModel,
+                            weldingShippingViewModel = weldingShippingViewModel,
+                            inventoryShortageViewModel = inventoryShortageViewModel,
+                            inventoryKpiViewModel = inventoryKpiViewModel,
+                            warehouseDailyViewModel = warehouseDailyViewModel,
+                            abcAnalysisViewModel = abcAnalysisViewModel,
                             masterViewModel = masterViewModel,
                             productMasterViewModel = productMasterViewModel,
                             materialMasterViewModel = materialMasterViewModel,
@@ -830,6 +1240,12 @@ private fun MainShellContent(
                             planScheduleViewModel = planScheduleViewModel,
                             processMachinePlanViewModel = processMachinePlanViewModel,
                             productionDataManagementViewModel = productionDataManagementViewModel,
+                            materialRequirementsViewModel = materialRequirementsViewModel,
+                            componentRequirementsViewModel = componentRequirementsViewModel,
+                            materialConsumptionViewModel = materialConsumptionViewModel,
+                            processActualViewModel = processActualViewModel,
+                            scrapRateViewModel = scrapRateViewModel,
+                            productionActualManagementViewModel = productionActualManagementViewModel,
                             userListViewModel = userListViewModel,
                             organizationListViewModel = organizationListViewModel,
                             rolePermissionViewModel = rolePermissionViewModel,
@@ -866,6 +1282,37 @@ private fun ShellRouteContent(
     materialForecastViewModel: MaterialForecastViewModel,
     materialOrderViewModel: MaterialOrderViewModel,
     partOrderViewModel: PartOrderViewModel,
+    partReceivingHistoryViewModel: PartReceivingHistoryViewModel,
+    outsourcingHomeViewModel: OutsourcingHomeViewModel,
+    platingOrderViewModel: PlatingOrderViewModel,
+    platingReceivingViewModel: PlatingReceivingViewModel,
+    weldingOrderViewModel: WeldingOrderViewModel,
+    weldingReceivingViewModel: WeldingReceivingViewModel,
+    outsourcingSuppliersViewModel: OutsourcingSuppliersViewModel,
+    outsourcingProcessProductsViewModel: OutsourcingProcessProductsViewModel,
+    outsourcingStockViewModel: OutsourcingStockViewModel,
+    suppliedMaterialStockViewModel: SuppliedMaterialStockViewModel,
+    usageManagementViewModel: UsageManagementViewModel,
+    materialIssueViewModel: MaterialIssueViewModel,
+    inventoryHomeViewModel: InventoryHomeViewModel,
+    productInventoryListViewModel: ProductInventoryListViewModel,
+    materialInventoryListViewModel: MaterialInventoryListViewModel,
+    partInventoryListViewModel: PartInventoryListViewModel,
+    stockEntryViewModel: StockEntryViewModel,
+    stockTransactionLogViewModel: StockTransactionLogViewModel,
+    stocktakeListViewModel: StocktakeListViewModel,
+    stocktakeEntryViewModel: StocktakeEntryViewModel,
+    shippingHomeViewModel: ShippingHomeViewModel,
+    shippingListViewModel: ShippingListViewModel,
+    shippingReportViewModel: ShippingDocumentViewModel,
+    shippingOverviewViewModel: ShippingDocumentViewModel,
+    shippingConfirmViewModel: ShippingDocumentViewModel,
+    shippingPickingViewModel: ShippingPickingViewModel,
+    weldingShippingViewModel: WeldingShippingViewModel,
+    inventoryShortageViewModel: InventoryShortageViewModel,
+    inventoryKpiViewModel: InventoryKpiViewModel,
+    warehouseDailyViewModel: WarehouseDailyViewModel,
+    abcAnalysisViewModel: AbcAnalysisViewModel,
     masterViewModel: MasterViewModel,
     productMasterViewModel: ProductMasterViewModel,
     materialMasterViewModel: MaterialMasterViewModel,
@@ -889,6 +1336,12 @@ private fun ShellRouteContent(
     planScheduleViewModel: PlanScheduleViewModel,
     processMachinePlanViewModel: ProcessMachinePlanViewModel,
     productionDataManagementViewModel: ProductionDataManagementViewModel,
+    materialRequirementsViewModel: MaterialRequirementsViewModel,
+    componentRequirementsViewModel: ComponentRequirementsViewModel,
+    materialConsumptionViewModel: MaterialConsumptionViewModel,
+    processActualViewModel: ProcessActualViewModel,
+    scrapRateViewModel: ScrapRateViewModel,
+    productionActualManagementViewModel: ProductionActualManagementViewModel,
     userListViewModel: UserListViewModel,
     organizationListViewModel: OrganizationListViewModel,
     rolePermissionViewModel: RolePermissionViewModel,
@@ -930,8 +1383,48 @@ private fun ShellRouteContent(
         "/erp/purchase/material/receiving-inspection" -> MaterialReceivingInspectionScreen(viewModel = materialReceivingInspectionViewModel)
         "/erp/purchase/material/forecast" -> MaterialForecastScreen(viewModel = materialForecastViewModel)
         "/erp/purchase/material/order" -> MaterialOrderScreen(viewModel = materialOrderViewModel)
-        "/erp/purchase/part" -> PartHomeScreen(onNavigate = onNavigate)
         "/erp/purchase/part/order" -> PartOrderScreen(viewModel = partOrderViewModel)
+        "/erp/purchase/part/receiving-history" -> PartReceivingHistoryScreen(viewModel = partReceivingHistoryViewModel)
+        "/erp/purchase/outsourcing" -> OutsourcingHomeScreen(
+            viewModel = outsourcingHomeViewModel,
+            onNavigate = onNavigate,
+        )
+        "/erp/purchase/outsourcing/plating-order" -> PlatingOrderScreen(viewModel = platingOrderViewModel)
+        "/erp/purchase/outsourcing/plating-receiving" -> PlatingReceivingScreen(viewModel = platingReceivingViewModel)
+        "/erp/purchase/outsourcing/welding-order" -> WeldingOrderScreen(viewModel = weldingOrderViewModel)
+        "/erp/purchase/outsourcing/welding-receiving" -> WeldingReceivingScreen(viewModel = weldingReceivingViewModel)
+        "/erp/purchase/outsourcing/suppliers" -> OutsourcingSuppliersScreen(viewModel = outsourcingSuppliersViewModel)
+        "/erp/purchase/outsourcing/process-products" -> OutsourcingProcessProductsScreen(viewModel = outsourcingProcessProductsViewModel)
+        "/erp/purchase/outsourcing/stock" -> OutsourcingStockScreen(viewModel = outsourcingStockViewModel)
+        "/erp/purchase/outsourcing/supplied-material-stock" -> SuppliedMaterialStockScreen(viewModel = suppliedMaterialStockViewModel)
+        "/erp/purchase/outsourcing/usage" -> UsageManagementScreen(viewModel = usageManagementViewModel)
+        "/erp/purchase/outsourcing/material-issue" -> MaterialIssueScreen(viewModel = materialIssueViewModel)
+        "/erp/inventory" -> InventoryHomeScreen(
+            viewModel = inventoryHomeViewModel,
+            onNavigate = onNavigate,
+        )
+        "/erp/inventory/list" -> ProductInventoryListScreen(viewModel = productInventoryListViewModel)
+        "/erp/inventory/material-list" -> MaterialInventoryListScreen(viewModel = materialInventoryListViewModel)
+        "/erp/inventory/part-list" -> PartInventoryListScreen(viewModel = partInventoryListViewModel)
+        "/erp/inventory/stock-entry" -> StockEntryScreen(viewModel = stockEntryViewModel)
+        "/erp/inventory/stock-transaction-logs" -> StockTransactionLogScreen(viewModel = stockTransactionLogViewModel)
+        "/erp/inventory/stocktake" -> StocktakeHomeScreen(onNavigate = onNavigate)
+        "/erp/inventory/stocktake/list" -> StocktakeListScreen(viewModel = stocktakeListViewModel)
+        "/erp/inventory/stocktake/entry" -> StocktakeEntryScreen(viewModel = stocktakeEntryViewModel)
+        "/erp/inventory/stocktake/statistics" -> StocktakePlaceholderScreen(title = "棚卸分析")
+        "/erp/inventory/stocktake/value" -> StocktakePlaceholderScreen(title = "棚卸金額管理")
+        "/erp/inventory/stocktake/carryover" -> StocktakePlaceholderScreen(title = "棚卸繰越管理")
+        "/erp/shipping" -> ShippingHomeScreen(viewModel = shippingHomeViewModel, onNavigate = onNavigate)
+        "/erp/shipping/list" -> ShippingListScreen(viewModel = shippingListViewModel)
+        "/erp/shipping/report" -> ShippingDocumentScreen(viewModel = shippingReportViewModel)
+        "/erp/shipping/overview" -> ShippingDocumentScreen(viewModel = shippingOverviewViewModel)
+        "/erp/shipping/confirm" -> ShippingDocumentScreen(viewModel = shippingConfirmViewModel)
+        "/erp/shipping/welding" -> WeldingShippingScreen(viewModel = weldingShippingViewModel)
+        "/erp/shipping/picking" -> ShippingPickingScreen(viewModel = shippingPickingViewModel)
+        "/erp/shipping/inventory-shortage" -> InventoryShortageScreen(viewModel = inventoryShortageViewModel)
+        "/erp/shipping/inventory-kpi" -> InventoryKpiScreen(viewModel = inventoryKpiViewModel)
+        "/erp/shipping/warehouse-daily" -> WarehouseDailyScreen(viewModel = warehouseDailyViewModel)
+        "/erp/shipping/abc-analysis" -> AbcAnalysisScreen(viewModel = abcAnalysisViewModel)
         "/mes/actualDataCollection/inspection" -> InspectionActualScreen(viewModel = inspectionViewModel)
         "/mes/actualCollectionRegistration/inspection" -> InspectionManualRegistrationScreen(
             viewModel = inspectionManualRegistrationViewModel,
@@ -971,6 +1464,14 @@ private fun ShellRouteContent(
         "/erp/production/plan-baseline" -> PlanBaselineScreen(viewModel = planBaselineViewModel)
         "/erp/production/plan-schedules" -> PlanScheduleScreen(viewModel = planScheduleViewModel)
         "/erp/production/process-machine-plan" -> ProcessMachinePlanScreen(viewModel = processMachinePlanViewModel)
+        "/erp/production/metrics/utilization-rate" -> UtilizationRateScreen()
+        "/erp/production/metrics/defect-rate" -> DefectRateScreen()
+        "/erp/production/metrics/scrap-rate" -> ScrapRateScreen(viewModel = scrapRateViewModel)
+        "/erp/production-requirements/material" -> MaterialRequirementsScreen(viewModel = materialRequirementsViewModel)
+        "/erp/production-requirements/component" -> ComponentRequirementsScreen(viewModel = componentRequirementsViewModel)
+        "/erp/production/consumption" -> MaterialConsumptionScreen(viewModel = materialConsumptionViewModel)
+        "/erp/production/process-actual" -> ProcessActualScreen(viewModel = processActualViewModel)
+        "/erp/production/actual-management" -> ProductionActualManagementScreen(viewModel = productionActualManagementViewModel)
         "/system/users" -> UserListScreen(viewModel = userListViewModel)
         "/system/organization" -> OrganizationListScreen(viewModel = organizationListViewModel)
         "/system/roles" -> RolePermissionScreen(viewModel = rolePermissionViewModel)

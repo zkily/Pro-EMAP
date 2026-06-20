@@ -1194,19 +1194,31 @@ private fun QuickAccessSection(
                     color = Color(0xFF000000),
                 )
             }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(QuickAccessColumns),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(quickAccessGridHeight(itemCount = items.size)),
-                contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(QuickAccessGridSpacing),
-                verticalArrangement = Arrangement.spacedBy(QuickAccessGridSpacing),
-                userScrollEnabled = false,
-            ) {
-                itemsIndexed(items, key = { _, item -> item.route }) { index, item ->
-                    StaggeredReveal(index = 4 + index) {
-                        QuickAccessCard(item = item, onClick = { onNavigate(item.route) })
+            if (items.isEmpty()) {
+                Text(
+                    text = "利用可能なクイックアクセスがありません",
+                    color = LoginColors.TextMuted,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    textAlign = TextAlign.Center,
+                )
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(QuickAccessColumns),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(quickAccessGridHeight(itemCount = items.size)),
+                    contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(QuickAccessGridSpacing),
+                    verticalArrangement = Arrangement.spacedBy(QuickAccessGridSpacing),
+                    userScrollEnabled = false,
+                ) {
+                    itemsIndexed(items, key = { _, item -> item.route }) { index, item ->
+                        StaggeredReveal(index = 4 + index) {
+                            QuickAccessCard(item = item, onClick = { onNavigate(item.route) })
+                        }
                     }
                 }
             }
@@ -1215,8 +1227,9 @@ private fun QuickAccessSection(
 }
 
 private fun quickAccessGridHeight(itemCount: Int): Dp {
+    if (itemCount <= 0) return 0.dp
     val rows = (itemCount + QuickAccessColumns - 1) / QuickAccessColumns
-    return (rows * QuickAccessCardHeight.value + (rows - 1) * QuickAccessGridSpacing.value).dp
+    return (rows * QuickAccessCardHeight.value + (rows - 1).coerceAtLeast(0) * QuickAccessGridSpacing.value).dp
 }
 
 @Composable

@@ -18,7 +18,9 @@ import com.example.smart_emap.data.model.ProductMachineConfigUpdateBody
 import com.example.smart_emap.data.model.ProductProcessBomRowDto
 import com.example.smart_emap.data.model.ProductionSummaryFullRowDto
 import com.example.smart_emap.data.model.ProductionSummaryProductOptionDto
+import com.example.smart_emap.data.model.StockTransactionLogRowDto
 import com.example.smart_emap.data.model.UpdateProductProcessBomBody
+import com.example.smart_emap.data.model.toInventoryBody
 import com.example.smart_emap.ui.erp.production.planning.PlanCreateFormState
 import com.example.smart_emap.ui.erp.production.planning.PlanCreateKind
 import com.example.smart_emap.ui.erp.production.planning.PlanCreateResultRow
@@ -90,12 +92,15 @@ class ProductionSummaryRepository(
         var page = 1
         var reportedTotal: Int? = null
         while (page <= 20) {
-            val res = api.listProductionSummarys(
-                page = page,
-                limit = pageSize,
-                startDate = startDate,
-                endDate = endDate,
-            )
+            val res = runCatching {
+                api.listProductionSummarys(
+                    page = page,
+                    limit = pageSize,
+                    startDate = startDate,
+                    endDate = endDate,
+                )
+            }.getOrNull() ?: break
+
             val list = res.data?.list.orEmpty()
             reportedTotal = res.data?.pagination?.total ?: reportedTotal
             pageHandler(list)
@@ -293,7 +298,14 @@ class ProductionSummaryRepository(
                 dateStart = "$monthFirst 00:00:00",
                 dateEnd = monthFirst,
             )
-            res.data?.list ?: res.list.orEmpty()
+            res.list.orEmpty().map {
+                StockTransactionLogRowDto(
+                    id = it.id,
+                    targetCd = it.targetCd,
+                    quantity = it.quantity?.toInt(),
+                    transactionTime = it.transactionTime,
+                )
+            }
         }.getOrElse { emptyList() }
         return DataMgmtBatchLogic.buildInitialStockRows(products, logs)
     }
@@ -308,8 +320,8 @@ class ProductionSummaryRepository(
             return "変更がありません"
         }
         val api = apiClient.stockTransactionLogApiLong()
-        inserts.forEach { api.createStockLog(it) }
-        updates.forEach { (id, body) -> api.updateStockLog(id, body) }
+        inserts.forEach { api.createStockLog(it.toInventoryBody()) }
+        updates.forEach { (id, body) -> api.updateStockLog(id, body.toInventoryBody()) }
         return "更新 ${updates.size} 件、追加 ${inserts.size} 件"
     }
 

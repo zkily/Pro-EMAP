@@ -1,51 +1,37 @@
 package com.example.smart_emap.ui.erp.purchase.part
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.smart_emap.ui.erp.order.OrderDailyCalendarRangeField
-import com.example.smart_emap.ui.erp.purchase.PurchaseDataRowCard
-import com.example.smart_emap.ui.erp.purchase.PurchaseEmptyHint
-import com.example.smart_emap.ui.erp.purchase.PurchaseHeroHeader
-import com.example.smart_emap.ui.erp.purchase.PurchaseLoadingOverlay
+import com.example.smart_emap.core.system.HtmlPrintHelper
+import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.ui.erp.purchase.PurchasePageBackground
-import com.example.smart_emap.ui.erp.purchase.PurchaseStatGrid
-import com.example.smart_emap.ui.erp.purchase.PurchaseTabChipRow
+import com.example.smart_emap.ui.erp.purchase.PurchaseShellWindowInsets
 import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
 fun PartOrderScreen(viewModel: PartOrderViewModel) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
-    val tabs = listOf(
-        PartOrderTab.Daily to "日別在庫",
-        PartOrderTab.Usage to "使用管理",
-        PartOrderTab.Order to "注文",
-        PartOrderTab.OrderHistory to "注文履歴",
-    )
-    val selectedTabIndex = tabs.indexOfFirst { it.first == uiState.tab }.coerceAtLeast(0)
+    val tableScroll = rememberScrollState()
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
@@ -53,116 +39,198 @@ fun PartOrderScreen(viewModel: PartOrderViewModel) {
         viewModel.clearSnackbar()
     }
 
-    uiState.editingItem?.let {
-        AlertDialog(
-            onDismissRequest = viewModel::closeEdit,
-            title = { Text("注文数量編集") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(it.partName.orEmpty())
-                    OutlinedTextField(
-                        value = uiState.editOrderQty,
-                        onValueChange = viewModel::setEditOrderQty,
-                        label = { Text("注文数量") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = uiState.editRemarks,
-                        onValueChange = viewModel::setEditRemarks,
-                        label = { Text("備考") },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-            confirmButton = { TextButton(onClick = viewModel::saveEdit) { Text("保存") } },
-            dismissButton = { TextButton(onClick = viewModel::closeEdit) { Text("取消") } },
+    LaunchedEffect(uiState.pendingPrintHtml) {
+        val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
+        val deliveryYmd = uiState.startDate.replace("-", "")
+        val jobName = if (deliveryYmd.isNotBlank()) "${deliveryYmd}注文書_丸一鋼管" else "注文書"
+        val opened = HtmlPrintHelper.printHtml(
+            context = context,
+            html = html,
+            jobName = jobName,
+            layout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+        )
+        if (!opened) {
+            snackbarHostState.showSnackbar("印刷を開始できませんでした")
+        }
+        viewModel.clearPendingPrintHtml()
+    }
+
+    if (uiState.showManualOrderDialog) {
+        PartManualOrderDialog(
+            form = uiState.manualOrderForm,
+            partOptions = uiState.partOptions,
+            selectedPart = uiState.selectedMasterPart,
+            loading = uiState.manualOrderLoading,
+            onDateChange = viewModel::setManualOrderDate,
+            onPartChange = viewModel::setManualOrderPart,
+            onOrderQuantityChange = viewModel::setManualOrderQuantity,
+            onRemarksChange = viewModel::setManualOrderRemarks,
+            onConfirm = viewModel::confirmManualOrder,
+            onDismiss = viewModel::dismissManualOrderDialog,
+        )
+    }
+
+    if (uiState.showPrintConfirmDialog) {
+        PartPrintOrderConfirmDialog(
+            form = uiState.printForm,
+            orderCount = uiState.printOrderCount,
+            loading = uiState.printLoading,
+            onRecipientCompanyChange = viewModel::setPrintRecipientCompany,
+            onRecipientPersonsChange = viewModel::setPrintRecipientPersons,
+            onApproverChange = viewModel::setPrintApprover,
+            onIssuerChange = viewModel::setPrintIssuer,
+            onNote1Change = viewModel::setPrintNote1,
+            onNote2Change = viewModel::setPrintNote2,
+            onConfirm = viewModel::confirmPrintOrder,
+            onDismiss = viewModel::dismissPrintOrderDialog,
+        )
+    }
+
+    if (uiState.showDataGenerationDialog) {
+        PartDataGenerationDialog(
+            startDate = uiState.dataGenStartDate,
+            endDate = uiState.dataGenEndDate,
+            loading = uiState.actionLoading,
+            onStartDateChange = viewModel::setDataGenStartDate,
+            onEndDateChange = viewModel::setDataGenEndDate,
+            onConfirm = viewModel::confirmDataGeneration,
+            onDismiss = viewModel::dismissDataGenerationDialog,
+        )
+    }
+
+    if (uiState.showSyncMasterConfirm) {
+        PartSyncMasterConfirmDialog(
+            startDate = uiState.startDate,
+            endDate = uiState.endDate,
+            loading = uiState.actionLoading,
+            onConfirm = viewModel::confirmSyncMaster,
+            onDismiss = viewModel::dismissSyncMasterConfirm,
         )
     }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = LayoutColors.ShellBg,
+        contentWindowInsets = PurchaseShellWindowInsets,
     ) { padding ->
         PurchasePageBackground {
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .imePadding()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item {
-                    PurchaseHeroHeader(
-                        title = "部品在庫管理(発注・使用)",
-                        subtitle = "Part Stock & Order",
-                    )
-                }
-                item {
-                    PurchaseStatGrid(
-                        listOf(
-                            "部品种类" to uiState.stats.totalParts.toString(),
-                            "在庫合計" to uiState.stats.totalCurrentStock.toString(),
-                            "注文数量" to uiState.stats.totalOrderQuantity.toString(),
-                            "注文金額" to "%.0f".format(uiState.stats.totalOrderAmount),
-                        ),
-                    )
-                }
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(onClick = viewModel::syncMaster, enabled = !uiState.actionLoading, modifier = Modifier.weight(1f)) {
-                            Text("マスタ更新", maxLines = 1)
+                PartOrderHeroBar(
+                    actionLoading = uiState.actionLoading,
+                    onSyncMaster = viewModel::syncMaster,
+                    onGenerateData = viewModel::openDataGenerationDialog,
+                    onCalculateStock = viewModel::calculateStock,
+                )
+                PartOrderKpiStrip(stats = uiState.stats)
+                PartOrderFilterBar(
+                    showDateFilter = true,
+                    startDate = uiState.startDate,
+                    endDate = uiState.endDate,
+                    keyword = uiState.keyword,
+                    supplierOptions = uiState.supplierOptions,
+                    selectedSuppliers = uiState.selectedSuppliers,
+                    onStartChange = viewModel::setStartDate,
+                    onEndChange = viewModel::setEndDate,
+                    onShiftDate = viewModel::shiftDateByDays,
+                    onToday = viewModel::setTodayRange,
+                    onKeywordChange = viewModel::setKeyword,
+                    onSupplierChange = viewModel::setSelectedSuppliers,
+                    onSearch = viewModel::search,
+                )
+                PartOrderTablePanel(
+                    selectedTab = uiState.tab,
+                    onTabSelect = viewModel::setTab,
+                    isLoading = uiState.isLoading,
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(tableScroll),
+                    headerActions = if (uiState.tab == PartOrderTab.Order) {
+                        {
+                            PartOrderTabActionButtons(
+                                actionLoading = uiState.actionLoading || uiState.printLoading || uiState.manualOrderLoading,
+                                onAddManualOrder = viewModel::openManualOrderDialog,
+                                onPrintOrder = viewModel::openPrintOrderDialog,
+                            )
                         }
-                        OutlinedButton(onClick = viewModel::generateData, enabled = !uiState.actionLoading, modifier = Modifier.weight(1f)) {
-                            Text("データ生成", maxLines = 1)
+                    } else {
+                        null
+                    },
+                ) {
+                    when (uiState.tab) {
+                        PartOrderTab.Initial -> {
+                            if (uiState.stockItems.isEmpty()) {
+                                Text(
+                                    "在庫データがありません",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = Color(0xFF94A3B8),
+                                )
+                            } else {
+                                PartOrderInitialStockTable(
+                                    items = uiState.stockItems,
+                                    onInitialStockChange = viewModel::updateInitialStock,
+                                    onAdjustmentChange = viewModel::updateAdjustmentQuantity,
+                                )
+                            }
                         }
-                        OutlinedButton(onClick = viewModel::calculateStock, enabled = !uiState.actionLoading, modifier = Modifier.weight(1f)) {
-                            Text("在庫計算", maxLines = 1)
+                        PartOrderTab.Usage -> {
+                            if (uiState.stockItems.isEmpty()) {
+                                Text(
+                                    "在庫データがありません",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = Color(0xFF94A3B8),
+                                )
+                            } else {
+                                PartOrderUsageTable(items = uiState.stockItems)
+                            }
+                        }
+                        PartOrderTab.Order -> {
+                            if (uiState.stockItems.isEmpty()) {
+                                Text(
+                                    "在庫データがありません",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = Color(0xFF94A3B8),
+                                )
+                            } else {
+                                PartOrderPurchaseTable(
+                                    items = uiState.stockItems,
+                                    onOrderChange = viewModel::updateOrderQuantity,
+                                    onRemarksChange = viewModel::updateStockRemarks,
+                                )
+                            }
+                        }
+                        PartOrderTab.OrderHistory -> {
+                            if (uiState.stockItems.isEmpty()) {
+                                Text(
+                                    "在庫データがありません",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = Color(0xFF94A3B8),
+                                )
+                            } else {
+                                PartOrderHistoryTable(items = uiState.stockItems)
+                            }
+                        }
+                        PartOrderTab.Daily -> {
+                            if (uiState.stockItems.isEmpty()) {
+                                Text(
+                                    "在庫データがありません",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = Color(0xFF94A3B8),
+                                )
+                            } else {
+                                PartOrderStockTable(
+                                    items = uiState.stockItems,
+                                    onOrderChange = viewModel::updateOrderQuantity,
+                                )
+                            }
                         }
                     }
-                }
-                item {
-                    PurchaseTabChipRow(
-                        tabs = tabs.map { it.second },
-                        selectedIndex = selectedTabIndex,
-                        onSelect = { index -> viewModel.setTab(tabs[index].first) },
-                    )
-                }
-                item {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = uiState.keyword,
-                            onValueChange = viewModel::setKeyword,
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("キーワード") },
-                            singleLine = true,
-                        )
-                        OrderDailyCalendarRangeField(
-                            startDate = uiState.startDate,
-                            endDate = uiState.endDate,
-                            accent = androidx.compose.ui.graphics.Color(0xFF667EEA),
-                            onStartChange = viewModel::setStartDate,
-                            onEndChange = viewModel::setEndDate,
-                        )
-                        Button(onClick = viewModel::search, modifier = Modifier.fillMaxWidth()) {
-                            Text("検索")
-                        }
-                    }
-                }
-                if (uiState.isLoading || uiState.actionLoading) item { PurchaseLoadingOverlay(true) }
-                if (!uiState.isLoading && uiState.items.isEmpty()) {
-                    item { PurchaseEmptyHint("在庫データがありません") }
-                }
-                items(uiState.items, key = { it.id ?: it.hashCode() }) { row ->
-                    PurchaseDataRowCard(
-                        title = row.partName.orEmpty(),
-                        subtitle = "${row.date.orEmpty()} · ${row.supplierName.orEmpty()}",
-                        chips = listOf(
-                            "在庫 ${row.currentStock ?: 0}",
-                            "使用 ${row.plannedUsage ?: 0}",
-                            "注文 ${row.orderQuantity ?: 0}",
-                        ),
-                        modifier = Modifier.clickable { viewModel.openEdit(row) },
-                    )
                 }
             }
         }

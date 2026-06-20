@@ -52,10 +52,10 @@ fun PartHomeScreen(onNavigate: (String) -> Unit) {
                 PurchaseModuleItem(
                     "/erp/purchase/part/order",
                     "部品在庫管理",
-                    "部品の在庫状況と将来使用量を参考に発注数量を決定",
+                    "部品の在庫・発注・使用（材料在庫管理と同様の操作）",
                     Icons.Default.ShoppingCart,
-                    Color(0xFF667EEA),
-                    Color(0xFF764BA2),
+                    Color(0xFFA18CD1),
+                    Color(0xFFFBC2EB),
                 ),
             ) { onNavigate("/erp/purchase/part/order") }
         }

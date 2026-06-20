@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.ui.erp.purchase.PurchasePageBackground
+import com.example.smart_emap.ui.erp.purchase.PurchaseShellWindowInsets
 import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
@@ -65,13 +66,14 @@ fun MaterialReceivingInspectionScreen(viewModel: MaterialReceivingInspectionView
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = LayoutColors.ShellBg,
+        contentWindowInsets = PurchaseShellWindowInsets,
     ) { padding ->
         PurchasePageBackground {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
                     .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {

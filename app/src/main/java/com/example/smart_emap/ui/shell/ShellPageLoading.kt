@@ -19,11 +19,42 @@ import com.example.smart_emap.ui.erp.production.planning.PlanBaselineViewModel
 import com.example.smart_emap.ui.erp.production.planning.PlanScheduleViewModel
 import com.example.smart_emap.ui.erp.production.planning.ProcessMachinePlanViewModel
 import com.example.smart_emap.ui.erp.production.planning.ProductionDataManagementViewModel
+import com.example.smart_emap.ui.erp.production.requirements.MaterialRequirementsViewModel
+import com.example.smart_emap.ui.erp.production.requirements.ComponentRequirementsViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialForecastViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialOrderViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingHistoryViewModel
 import com.example.smart_emap.ui.erp.purchase.material.MaterialReceivingInspectionViewModel
 import com.example.smart_emap.ui.erp.purchase.part.PartOrderViewModel
+import com.example.smart_emap.ui.erp.purchase.part.PartReceivingHistoryViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingHomeViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingProcessProductsViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.OutsourcingSuppliersViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.MaterialIssueViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.SuppliedMaterialStockViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.material.UsageManagementViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.plating.PlatingOrderViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.plating.PlatingReceivingViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.stock.OutsourcingStockViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingOrderViewModel
+import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingReceivingViewModel
+import com.example.smart_emap.ui.erp.inventory.InventoryHomeViewModel
+import com.example.smart_emap.ui.erp.inventory.MaterialInventoryListViewModel
+import com.example.smart_emap.ui.erp.inventory.PartInventoryListViewModel
+import com.example.smart_emap.ui.erp.inventory.ProductInventoryListViewModel
+import com.example.smart_emap.ui.erp.inventory.StockEntryViewModel
+import com.example.smart_emap.ui.erp.inventory.StockTransactionLogViewModel
+import com.example.smart_emap.ui.erp.inventory.StocktakeEntryViewModel
+import com.example.smart_emap.ui.erp.inventory.StocktakeListViewModel
+import com.example.smart_emap.ui.erp.shipping.AbcAnalysisViewModel
+import com.example.smart_emap.ui.erp.shipping.InventoryKpiViewModel
+import com.example.smart_emap.ui.erp.shipping.InventoryShortageViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingDocumentViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingHomeViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingListViewModel
+import com.example.smart_emap.ui.erp.shipping.ShippingPickingViewModel
+import com.example.smart_emap.ui.erp.shipping.WarehouseDailyViewModel
+import com.example.smart_emap.ui.erp.shipping.WeldingShippingViewModel
 import com.example.smart_emap.ui.master.MasterViewModel
 import com.example.smart_emap.ui.master.carrier.CarrierMasterViewModel
 import com.example.smart_emap.ui.master.companycalendar.CompanyWorkCalendarViewModel
@@ -107,6 +138,37 @@ fun rememberShellPageLoading(
     materialForecastViewModel: MaterialForecastViewModel,
     materialOrderViewModel: MaterialOrderViewModel,
     partOrderViewModel: PartOrderViewModel,
+    partReceivingHistoryViewModel: PartReceivingHistoryViewModel,
+    outsourcingHomeViewModel: OutsourcingHomeViewModel,
+    platingOrderViewModel: PlatingOrderViewModel,
+    platingReceivingViewModel: PlatingReceivingViewModel,
+    weldingOrderViewModel: WeldingOrderViewModel,
+    weldingReceivingViewModel: WeldingReceivingViewModel,
+    outsourcingSuppliersViewModel: OutsourcingSuppliersViewModel,
+    outsourcingProcessProductsViewModel: OutsourcingProcessProductsViewModel,
+    outsourcingStockViewModel: OutsourcingStockViewModel,
+    suppliedMaterialStockViewModel: SuppliedMaterialStockViewModel,
+    usageManagementViewModel: UsageManagementViewModel,
+    materialIssueViewModel: MaterialIssueViewModel,
+    inventoryHomeViewModel: InventoryHomeViewModel,
+    productInventoryListViewModel: ProductInventoryListViewModel,
+    materialInventoryListViewModel: MaterialInventoryListViewModel,
+    partInventoryListViewModel: PartInventoryListViewModel,
+    stockEntryViewModel: StockEntryViewModel,
+    stockTransactionLogViewModel: StockTransactionLogViewModel,
+    stocktakeListViewModel: StocktakeListViewModel,
+    stocktakeEntryViewModel: StocktakeEntryViewModel,
+    shippingHomeViewModel: ShippingHomeViewModel,
+    shippingListViewModel: ShippingListViewModel,
+    shippingReportViewModel: ShippingDocumentViewModel,
+    shippingOverviewViewModel: ShippingDocumentViewModel,
+    shippingConfirmViewModel: ShippingDocumentViewModel,
+    shippingPickingViewModel: ShippingPickingViewModel,
+    weldingShippingViewModel: WeldingShippingViewModel,
+    inventoryShortageViewModel: InventoryShortageViewModel,
+    inventoryKpiViewModel: InventoryKpiViewModel,
+    warehouseDailyViewModel: WarehouseDailyViewModel,
+    abcAnalysisViewModel: AbcAnalysisViewModel,
     masterViewModel: MasterViewModel,
     productMasterViewModel: ProductMasterViewModel,
     materialMasterViewModel: MaterialMasterViewModel,
@@ -130,6 +192,8 @@ fun rememberShellPageLoading(
     planScheduleViewModel: PlanScheduleViewModel,
     processMachinePlanViewModel: ProcessMachinePlanViewModel,
     productionDataManagementViewModel: ProductionDataManagementViewModel,
+    materialRequirementsViewModel: MaterialRequirementsViewModel,
+    componentRequirementsViewModel: ComponentRequirementsViewModel,
     userListViewModel: UserListViewModel,
     organizationListViewModel: OrganizationListViewModel,
     rolePermissionViewModel: RolePermissionViewModel,
@@ -154,6 +218,39 @@ fun rememberShellPageLoading(
     val materialForecast by materialForecastViewModel.uiState.collectAsState()
     val materialOrder by materialOrderViewModel.uiState.collectAsState()
     val partOrder by partOrderViewModel.uiState.collectAsState()
+    val partReceivingHistory by partReceivingHistoryViewModel.uiState.collectAsState()
+    val outsourcingHome by outsourcingHomeViewModel.uiState.collectAsState()
+    val platingOrder by platingOrderViewModel.uiState.collectAsState()
+    val platingReceiving by platingReceivingViewModel.uiState.collectAsState()
+    val weldingOrder by weldingOrderViewModel.uiState.collectAsState()
+    val weldingReceiving by weldingReceivingViewModel.uiState.collectAsState()
+    val outsourcingSuppliers by outsourcingSuppliersViewModel.uiState.collectAsState()
+    val outsourcingProcessProducts by outsourcingProcessProductsViewModel.uiState.collectAsState()
+    val outsourcingStock by outsourcingStockViewModel.uiState.collectAsState()
+    val suppliedMaterialStock by suppliedMaterialStockViewModel.uiState.collectAsState()
+    val usageManagement by usageManagementViewModel.uiState.collectAsState()
+    val materialIssue by materialIssueViewModel.uiState.collectAsState()
+    val inventoryHome by inventoryHomeViewModel.uiState.collectAsState()
+    val productInventoryList by productInventoryListViewModel.uiState.collectAsState()
+    val materialInventoryList by materialInventoryListViewModel.uiState.collectAsState()
+    val partInventoryList by partInventoryListViewModel.uiState.collectAsState()
+    val stockEntry by stockEntryViewModel.uiState.collectAsState()
+    val stockTransactionLog by stockTransactionLogViewModel.uiState.collectAsState()
+    val stocktakeList by stocktakeListViewModel.uiState.collectAsState()
+    val stocktakeEntry by stocktakeEntryViewModel.uiState.collectAsState()
+    val shippingHome by shippingHomeViewModel.uiState.collectAsState()
+    val shippingList by shippingListViewModel.uiState.collectAsState()
+    val shippingReport by shippingReportViewModel.uiState.collectAsState()
+    val shippingOverview by shippingOverviewViewModel.uiState.collectAsState()
+    val shippingConfirm by shippingConfirmViewModel.uiState.collectAsState()
+    val shippingPicking by shippingPickingViewModel.uiState.collectAsState()
+    val weldingShipping by weldingShippingViewModel.uiState.collectAsState()
+    val inventoryShortage by inventoryShortageViewModel.uiState.collectAsState()
+    val inventoryKpi by inventoryKpiViewModel.uiState.collectAsState()
+    val warehouseDaily by warehouseDailyViewModel.uiState.collectAsState()
+    val abcAnalysis by abcAnalysisViewModel.uiState.collectAsState()
+    val materialRequirements by materialRequirementsViewModel.uiState.collectAsState()
+    val componentRequirements by componentRequirementsViewModel.uiState.collectAsState()
     val master by masterViewModel.uiState.collectAsState()
     val productMaster by productMasterViewModel.uiState.collectAsState()
     val materialMaster by materialMasterViewModel.uiState.collectAsState()
@@ -217,6 +314,37 @@ fun rememberShellPageLoading(
         materialForecast.isLoading,
         materialOrder.isLoading,
         partOrder.isLoading,
+        partReceivingHistory.isLoading,
+        outsourcingHome.isLoading,
+        platingOrder.isLoading,
+        platingReceiving.isLoading,
+        weldingOrder.isLoading,
+        weldingReceiving.isLoading,
+        outsourcingSuppliers.isLoading,
+        outsourcingProcessProducts.isLoading,
+        outsourcingStock.isLoading,
+        suppliedMaterialStock.isLoading,
+        usageManagement.isLoading,
+        materialIssue.isLoading,
+        inventoryHome.isLoading,
+        productInventoryList.isLoading,
+        materialInventoryList.isLoading,
+        partInventoryList.isLoading,
+        stockEntry.isLoading,
+        stockTransactionLog.isLoading,
+        stocktakeList.isLoading,
+        stocktakeEntry.isLoading,
+        shippingHome.isLoading,
+        shippingList.isLoading,
+        shippingReport.isLoading,
+        shippingOverview.isLoading,
+        shippingConfirm.isLoading,
+        shippingPicking.isLoading,
+        weldingShipping.isLoading,
+        inventoryShortage.isLoading,
+        inventoryKpi.isLoading,
+        warehouseDaily.isLoading,
+        abcAnalysis.isLoading,
         master.path,
         master.isLoading,
         productMaster.isLoading,
@@ -241,6 +369,8 @@ fun rememberShellPageLoading(
         planSchedule.isLoading,
         processMachinePlan.isLoading,
         productionDataManagement.isLoading,
+        materialRequirements.loading,
+        componentRequirements.loading,
         userList.isLoading,
         organizationList.isTreeLoading,
         organizationList.isDetailLoading,
@@ -276,7 +406,40 @@ fun rememberShellPageLoading(
             "/erp/purchase/material/forecast" -> materialForecast.isLoading
             "/erp/purchase/material/order" -> materialOrder.isLoading
             "/erp/purchase/part/order" -> partOrder.isLoading
+            "/erp/purchase/part/receiving-history" -> partReceivingHistory.isLoading
+            "/erp/purchase/outsourcing" -> outsourcingHome.isLoading
+            "/erp/purchase/outsourcing/plating-order" -> platingOrder.isLoading
+            "/erp/purchase/outsourcing/plating-receiving" -> platingReceiving.isLoading
+            "/erp/purchase/outsourcing/welding-order" -> weldingOrder.isLoading
+            "/erp/purchase/outsourcing/welding-receiving" -> weldingReceiving.isLoading
+            "/erp/purchase/outsourcing/suppliers" -> outsourcingSuppliers.isLoading
+            "/erp/purchase/outsourcing/process-products" -> outsourcingProcessProducts.isLoading
+            "/erp/purchase/outsourcing/stock" -> outsourcingStock.isLoading
+            "/erp/purchase/outsourcing/supplied-material-stock" -> suppliedMaterialStock.isLoading
+            "/erp/purchase/outsourcing/usage" -> usageManagement.isLoading
+            "/erp/purchase/outsourcing/material-issue" -> materialIssue.isLoading
+            "/erp/inventory" -> inventoryHome.isLoading
+            "/erp/inventory/list" -> productInventoryList.isLoading
+            "/erp/inventory/material-list" -> materialInventoryList.isLoading
+            "/erp/inventory/part-list" -> partInventoryList.isLoading
+            "/erp/inventory/stock-entry" -> stockEntry.isLoading
+            "/erp/inventory/stock-transaction-logs" -> stockTransactionLog.isLoading
+            "/erp/inventory/stocktake/list" -> stocktakeList.isLoading
+            "/erp/inventory/stocktake/entry" -> stocktakeEntry.isLoading
+            "/erp/shipping" -> shippingHome.isLoading
+            "/erp/shipping/list" -> shippingList.isLoading
+            "/erp/shipping/report" -> shippingReport.isLoading
+            "/erp/shipping/overview" -> shippingOverview.isLoading
+            "/erp/shipping/confirm" -> shippingConfirm.isLoading
+            "/erp/shipping/welding" -> weldingShipping.isLoading
+            "/erp/shipping/picking" -> shippingPicking.isLoading
+            "/erp/shipping/inventory-shortage" -> inventoryShortage.isLoading
+            "/erp/shipping/inventory-kpi" -> inventoryKpi.isLoading
+            "/erp/shipping/warehouse-daily" -> warehouseDaily.isLoading
+            "/erp/shipping/abc-analysis" -> abcAnalysis.isLoading
             "/erp/production/data-management" -> productionDataManagement.isLoading
+            "/erp/production-requirements/material" -> materialRequirements.loading
+            "/erp/production-requirements/component" -> componentRequirements.loading
             "/erp/production/plan-baseline" -> planBaseline.isLoading
             "/erp/production/plan-schedules" -> planSchedule.isLoading
             "/erp/production/process-machine-plan" -> processMachinePlan.isLoading

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -21,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.core.system.PrintPageLayout
-import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
 fun ProcessMachinePlanScreen(viewModel: ProcessMachinePlanViewModel) {
@@ -68,13 +66,12 @@ fun ProcessMachinePlanScreen(viewModel: ProcessMachinePlanViewModel) {
         )
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = LayoutColors.ShellBg) { padding ->
+    ProductionScaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
         ProcessMachinePlanPageBackground {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .productionPageScaffoldPadding(padding, horizontal = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 ProcessMachinePlanToolbar(

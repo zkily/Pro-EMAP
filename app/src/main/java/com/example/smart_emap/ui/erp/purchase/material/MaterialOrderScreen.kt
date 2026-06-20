@@ -29,6 +29,7 @@ import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.ui.erp.purchase.PurchaseEmptyHint
 import com.example.smart_emap.ui.erp.purchase.PurchasePageBackground
+import com.example.smart_emap.ui.erp.purchase.PurchaseShellWindowInsets
 import com.example.smart_emap.ui.shell.LayoutColors
 
 @Composable
@@ -142,6 +143,7 @@ fun MaterialOrderScreen(viewModel: MaterialOrderViewModel) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = LayoutColors.ShellBg,
+        contentWindowInsets = PurchaseShellWindowInsets,
     ) { padding ->
         PurchasePageBackground {
             Column(
@@ -149,7 +151,7 @@ fun MaterialOrderScreen(viewModel: MaterialOrderViewModel) {
                     .fillMaxSize()
                     .padding(padding)
                     .imePadding()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 MaterialOrderHeroBar(
