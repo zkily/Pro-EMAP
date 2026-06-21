@@ -1,25 +1,5 @@
 package com.example.smart_emap.ui.master
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Factory
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PrecisionManufacturing
-import androidx.compose.material.icons.filled.Route
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Timeline
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-
 data class MasterTableRow(
     val id: Int?,
     val cells: List<String?>,
@@ -47,7 +27,6 @@ data class MasterPageDef(
 )
 
 enum class MasterPageKind {
-    Home,
     Product,
     Material,
     MaterialInspection,
@@ -65,35 +44,7 @@ enum class MasterPageKind {
     DestinationHoliday,
 }
 
-data class MasterHomeModule(
-    val path: String,
-    val title: String,
-    val description: String,
-    val gradientStart: Color,
-    val gradientEnd: Color,
-    val icon: ImageVector,
-)
-
 object MasterPageRegistry {
-    val homeModules: List<MasterHomeModule> = listOf(
-        MasterHomeModule("/master/product", "製品マスタ", "製品情報の登録・編集・管理", Color(0xFF667EEA), Color(0xFF764BA2), Icons.Default.Inventory2),
-        MasterHomeModule("/master/material", "材料マスタ", "材料情報の登録・編集・管理", Color(0xFF11998E), Color(0xFF38EF7D), Icons.Default.Category),
-        MasterHomeModule("/master/material-inspection", "材料検品マスタ", "仕入先材料検品基準の管理", Color(0xFF909399), Color(0xFFB1B3B8), Icons.Default.CheckCircle),
-        MasterHomeModule("/master/part", "部品マスタ", "部品情報の登録・編集・管理", Color(0xFF6366F1), Color(0xFF8B5CF6), Icons.Default.GridView),
-        MasterHomeModule("/master/supplier", "仕入先マスタ", "仕入先情報の登録・編集", Color(0xFFF093FB), Color(0xFFF5576C), Icons.Default.AccountBalance),
-        MasterHomeModule("/master/process", "工程マスタ", "工程情報の登録・編集", Color(0xFF4FACFE), Color(0xFF00F2FE), Icons.Default.Settings),
-        MasterHomeModule("/master/process-route", "工程ルートマスタ", "工程ルートの登録・編集", Color(0xFFFA709A), Color(0xFFFEE140), Icons.Default.Route),
-        MasterHomeModule("/master/product-process-route", "製品ルートマスタ", "製品別工程ステップ・設備設定", Color(0xFF4FACFE), Color(0xFF00F2FE), Icons.Default.Timeline),
-        MasterHomeModule("/master/bom/process-processing-fee", "工程加工費マスタ", "工程×加工方法の単価管理", Color(0xFF6366F1), Color(0xFF8B5CF6), Icons.Default.Build),
-        MasterHomeModule("/master/customer", "顧客マスタ", "顧客情報の登録・編集", Color(0xFFA18CD1), Color(0xFFFBC2EB), Icons.Default.People),
-        MasterHomeModule("/master/carrier", "運送便マスタ", "運送便情報の登録・編集", Color(0xFFD299C2), Color(0xFFFEF9D7), Icons.Default.LocalShipping),
-        MasterHomeModule("/master/machine", "設備マスタ", "設備情報の登録・編集", Color(0xFF89F7FE), Color(0xFF66A6FF), Icons.Default.PrecisionManufacturing),
-        MasterHomeModule("/master/roller-master", "ローラーマスタ", "ローラー情報の登録・編集", Color(0xFF43E97B), Color(0xFF38F9D7), Icons.Default.Factory),
-        MasterHomeModule("/master/destination", "納入先マスタ", "納入先情報の登録・編集", Color(0xFFFDDB92), Color(0xFFD1FDFF), Icons.Default.DirectionsCar),
-        MasterHomeModule("/master/destination/holiday", "納入先休日設定", "納入先休日・臨時出勤の設定", Color(0xFFE6A23C), Color(0xFFF7BA2A), Icons.Default.CalendarMonth),
-        MasterHomeModule("/master/company-work-calendar", "会社稼働カレンダー", "祝日・有給・会社休・臨時出勤", Color(0xFF2563EB), Color(0xFF60A5FA), Icons.Default.CalendarMonth),
-    )
-
     private val pages: Map<String, MasterPageDef> = mapOf(
         "/master/product" to MasterPageDef(
             path = "/master/product",
@@ -349,9 +300,8 @@ object MasterPageRegistry {
     fun pageForPath(path: String): MasterPageDef? = pages[path]
 
     fun kindForPath(path: String): MasterPageKind = when (path) {
-        "/master" -> MasterPageKind.Home
         "/master/product-process-route" -> MasterPageKind.ProductProcessRoute
         "/master/destination/holiday" -> MasterPageKind.DestinationHoliday
-        else -> pageForPath(path)?.kind ?: MasterPageKind.Home
+        else -> pageForPath(path)?.kind ?: MasterPageKind.Product
     }
 }

@@ -34,6 +34,7 @@ import com.example.smart_emap.data.api.ShortcutsApiService
 import com.example.smart_emap.data.api.SystemApiService
 import com.example.smart_emap.data.api.SystemUsersApiService
 import com.example.smart_emap.data.api.WeldingApiService
+import com.example.smart_emap.data.model.FlexibleIntAdapterFactory
 import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
@@ -58,6 +59,7 @@ class ApiClient(
 ) {
     val moshi = Moshi.Builder()
         .add(MesDefectByItemAdapterFactory)
+        .add(FlexibleIntAdapterFactory)
         .add(object : JsonAdapter.Factory {
             override fun create(type: Type, annotations: Set<Annotation>, moshi: Moshi): JsonAdapter<*>? {
                 return moshi.nextAdapter<Any>(this, type, annotations).lenient()

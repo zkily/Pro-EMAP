@@ -16,7 +16,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -28,8 +30,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.Delete
@@ -53,53 +53,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import com.example.smart_emap.ui.erp.purchase.PurchaseModuleCard
-import com.example.smart_emap.ui.erp.purchase.PurchaseModuleItem
-import com.example.smart_emap.ui.erp.purchase.PurchaseSectionTitle
 import com.example.smart_emap.ui.shell.LayoutColors
-
-@Composable
-fun MasterHomeScreen(onNavigate: (String) -> Unit) {
-    MasterPageScaffold {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            MasterHeroBar(
-                title = "マスタホーム",
-                subtitle = "Master Data Management",
-                icon = Icons.Default.Folder,
-                stats = listOf("モジュール数" to MasterPageRegistry.homeModules.size.toString()),
-            )
-            PurchaseSectionTitle("マスタ一覧")
-            MasterPageRegistry.homeModules.forEach { module ->
-                PurchaseModuleCard(
-                    PurchaseModuleItem(
-                        path = module.path,
-                        title = module.title,
-                        description = module.description,
-                        icon = module.icon,
-                        gradientStart = module.gradientStart,
-                        gradientEnd = module.gradientEnd,
-                    ),
-                ) { onNavigate(module.path) }
-            }
-            PurchaseSectionTitle("クイックアクション")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                listOf("/master/product" to "製品追加", "/master/material" to "材料追加", "/master/supplier" to "仕入先追加").forEach { (path, label) ->
-                    Button(
-                        onClick = { onNavigate(path) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6366F1)),
-                    ) { Text(label, fontSize = 11.sp) }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun MasterScreen(path: String, viewModel: MasterViewModel) {

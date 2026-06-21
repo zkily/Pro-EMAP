@@ -44,7 +44,19 @@ class MesDefectByItemMapAdapter : JsonAdapter<Map<String, Int>?>() {
                     var qty = 0
                     while (reader.hasNext()) {
                         when (reader.nextName()) {
-                            "qty", "quantity", "count" -> qty = reader.nextInt().coerceAtLeast(0)
+                            "qty", "quantity", "count" -> {
+                                qty = when (reader.peek()) {
+                                    JsonReader.Token.NULL -> {
+                                        reader.nextNull<Any>()
+                                        0
+                                    }
+                                    JsonReader.Token.NUMBER -> reader.nextInt().coerceAtLeast(0)
+                                    else -> {
+                                        reader.skipValue()
+                                        0
+                                    }
+                                }
+                            }
                             else -> reader.skipValue()
                         }
                     }

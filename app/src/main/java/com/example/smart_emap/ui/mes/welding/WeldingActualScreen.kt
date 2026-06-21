@@ -49,6 +49,17 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.FreeBreakfast
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.CloudOff
@@ -142,9 +153,98 @@ fun WeldingActualScreen(
         EndProductionDialog(
             uiState = uiState,
             s = s,
-            onQtyChange = viewModel::onEndDialogQtyChange,
+            onBoxesChange = viewModel::onEndDialogBoxesChange,
+            onPieceQtyChange = viewModel::onEndDialogPieceQtyChange,
             onDismiss = viewModel::closeEndDialog,
             onConfirm = viewModel::submitProductionEnd,
+        )
+    }
+
+    uiState.endDialogQtyMismatchConfirm?.let { mismatch ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissProductionEndQtyMismatch,
+            title = { Text(s.qtyMismatchTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(formatEndDialogQtyMismatchText(s.qtyMismatchConfirm, mismatch))
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmProductionEndQtyMismatch) {
+                    Text(s.qtyMismatchConfirmBtn, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissProductionEndQtyMismatch) {
+                    Text(s.cancel)
+                }
+            },
+        )
+    }
+
+    if (uiState.helpDialogVisible) {
+        AlertDialog(
+            onDismissRequest = viewModel::closeHelpDialog,
+            title = { Text(s.helpDialogTitle, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(s.helpDialogBody, fontSize = 13.sp, lineHeight = 18.sp)
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::closeHelpDialog) {
+                    Text(s.btnDismiss)
+                }
+            },
+        )
+    }
+
+    if (uiState.inProgressPanelVisible) {
+        InProgressPanelSheet(
+            rows = uiState.inProgressRows,
+            activePlanId = uiState.activePlanId,
+            s = s,
+            operatorName = viewModel::operatorNameForInProgressRow,
+            statusLabel = viewModel::inProgressRowStatusLabel,
+            canResume = viewModel::canResumeSession,
+            canForceRelease = viewModel::canForceReleaseSession,
+            resumeButtonLabel = viewModel::resumeSessionButtonLabel,
+            onDismiss = viewModel::closeInProgressPanel,
+            onRowClick = viewModel::onInProgressPanelRowClick,
+            onResume = viewModel::onInProgressPanelResume,
+            onForceRelease = viewModel::requestForceReleaseSession,
+        )
+    }
+
+    uiState.reclaimConfirmRowId?.let {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissReclaimConfirm,
+            title = { Text(s.reclaimSessionConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(s.reclaimSessionConfirm, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmReclaimSession) {
+                    Text(s.btnReclaimSession)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissReclaimConfirm) {
+                    Text(s.cancel)
+                }
+            },
+        )
+    }
+
+    uiState.forceReleaseConfirmRowId?.let {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissForceReleaseConfirm,
+            title = { Text(s.forceReleaseLockConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(s.forceReleaseLockConfirm, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmForceReleaseSession) {
+                    Text(s.btnForceReleaseLock)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissForceReleaseConfirm) {
+                    Text(s.cancel)
+                }
+            },
         )
     }
 
@@ -189,8 +289,10 @@ fun WeldingActualScreen(
                 PageHeader(
                     s = s,
                     locale = uiState.locale,
+                    inProgressCount = uiState.inProgressRows.size,
+                    onOpenInProgressPanel = viewModel::openInProgressPanel,
                     onLocale = viewModel::setLocale,
-                    onHelp = {},
+                    onHelp = viewModel::openHelpDialog,
                 )
                 WeldingNetworkBanners(
                     uiState = uiState,
@@ -204,6 +306,7 @@ fun WeldingActualScreen(
                     onPrevDay = { viewModel.shiftProductionDay(-1) },
                     onNextDay = { viewModel.shiftProductionDay(1) },
                     onToday = viewModel::setProductionDayToday,
+                    onMachineSelected = viewModel::onWeldingMachineSelected,
                     onProductSelected = viewModel::onProductSelected,
                     onScan = viewModel::openScanDialog,
                 )
@@ -229,10 +332,22 @@ fun WeldingActualScreen(
                             )
                         }
                     }
+                    uiState.selectedWeldingMachineId == null -> {
+                        EmptyProductHint(s.emptySelectMachine)
+                    }
                     uiState.selectedProductCode.isNullOrBlank() -> {
                         EmptyProductHint(s.emptySelectProduct)
                     }
                     uiState.showPlanCard -> {
+                        if (uiState.showOtherTerminalLockBanner) {
+                            OtherTerminalLockBanner(
+                                s = s,
+                                reclaimable = uiState.canReclaimFromOtherTerminal,
+                                canForceRelease = uiState.canForceReleaseLock,
+                                onReclaim = viewModel::resumeActiveSession,
+                                onForceRelease = viewModel::requestForceReleaseActiveRow,
+                            )
+                        }
                         if (uiState.showSessionRecoveryAlert) {
                             SessionRecoveryAlert(
                                 s = s,
@@ -246,6 +361,8 @@ fun WeldingActualScreen(
                             onStart = viewModel::onStartProduction,
                             onPause = viewModel::onPauseProduction,
                             onResume = viewModel::onResumeProduction,
+                            onBreak = viewModel::onBreakProduction,
+                            onResumeBreak = viewModel::onResumeBreakProduction,
                             onEnd = viewModel::openEndDialog,
                             onBumpDefect = viewModel::bumpDefect,
                         )
@@ -324,6 +441,15 @@ private fun WeldingNetworkBanners(
                 dismissLabel = s.btnDismiss,
                 onRetry = { onRetry(WeldRetryAction.ReloadDefects) },
                 onDismiss = { onDismiss(WeldRetryAction.ReloadDefects) },
+            )
+        }
+        uiState.machinesLoadError?.let { message ->
+            LoadErrorBanner(
+                message = message,
+                retryLabel = s.btnRetry,
+                dismissLabel = s.btnDismiss,
+                onRetry = { onRetry(WeldRetryAction.ReloadMachines) },
+                onDismiss = { onDismiss(WeldRetryAction.ReloadMachines) },
             )
         }
     }
@@ -508,6 +634,8 @@ private fun PageScrollbar(scrollState: ScrollState, modifier: Modifier = Modifie
 private fun PageHeader(
     s: WeldStrings,
     locale: WeldLocale,
+    inProgressCount: Int,
+    onOpenInProgressPanel: () -> Unit,
     onLocale: (WeldLocale) -> Unit,
     onHelp: () -> Unit,
 ) {
@@ -536,7 +664,30 @@ private fun PageHeader(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            if (inProgressCount > 0) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(onClick = onOpenInProgressPanel, modifier = Modifier.size(28.dp)) {
+                    BadgedBox(
+                        badge = {
+                            Badge(containerColor = Color(0xFF10B981)) {
+                                Text(
+                                    inProgressCount.coerceAtMost(99).toString(),
+                                    fontSize = 9.sp,
+                                    color = Color.White,
+                                )
+                            }
+                        },
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.List,
+                            contentDescription = s.inProgressPanelOpen,
+                            tint = Color(0xFF059669),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.width(2.dp))
             IconButton(onClick = onHelp, modifier = Modifier.size(28.dp)) {
                 Icon(
                     Icons.AutoMirrored.Filled.HelpOutline,
@@ -597,12 +748,20 @@ private object ToolbarMetrics {
 private object PlanOpsMetrics {
     val BlockHeight = 84.dp
     val ButtonWidth = 100.dp
-    val TimerWidth = 248.dp
+    val TimerWidth = 292.dp
     val CornerRadius = 10.dp
     val Gap = 8.dp
 }
 
-private enum class PlanActionVariant { Start, Pause, Resume, End, Disabled }
+/** 稼働開始後は累積メトリクス行が増えるため、固定高さだと主計測が clip される */
+private fun timerPanelMinHeight(uiState: WeldingUiState): androidx.compose.ui.unit.Dp =
+    when {
+        uiState.wallEndDisplay != "—" -> 108.dp
+        uiState.wallStartClockDisplay != "—" -> 100.dp
+        else -> PlanOpsMetrics.BlockHeight
+    }
+
+private enum class PlanActionVariant { Start, Pause, Resume, End, Break, BreakResume, Disabled }
 
 private data class TimerPhaseStyle(
     val background: Brush,
@@ -721,6 +880,20 @@ private fun planActionStyle(variant: PlanActionVariant, enabled: Boolean): PlanA
             content = Color.White,
             shadow = Color(0x40EF4444),
         )
+        PlanActionVariant.Break -> PlanActionStyle(
+            top = Color(0xFFC4B5FD),
+            bottom = Color(0xFF8B5CF6),
+            border = Color(0xFF7C3AED),
+            content = Color.White,
+            shadow = Color(0x338B5CF6),
+        )
+        PlanActionVariant.BreakResume -> PlanActionStyle(
+            top = Color(0xFFA78BFA),
+            bottom = Color(0xFF7C3AED),
+            border = Color(0xFF6D28D9),
+            content = Color.White,
+            shadow = Color(0x337C3AED),
+        )
         PlanActionVariant.Disabled -> PlanActionStyle(
             top = Color(0xFFF8FAFC),
             bottom = Color(0xFFE2E8F0),
@@ -745,13 +918,19 @@ private fun ToolbarCard(
     onPrevDay: () -> Unit,
     onNextDay: () -> Unit,
     onToday: () -> Unit,
+    onMachineSelected: (Int?) -> Unit,
     onProductSelected: (String?) -> Unit,
     onScan: () -> Unit,
 ) {
+    var machineExpanded by remember { mutableStateOf(false) }
     var productExpanded by remember { mutableStateOf(false) }
     val products = uiState.products
+    val selectedMachineLabel = uiState.weldingMachines.find { it.id == uiState.selectedWeldingMachineId }?.label ?: ""
     val selectedLabel = products.find { it.productCode == uiState.selectedProductCode }
         ?.let { it.productName.trim().ifEmpty { it.productCode } } ?: ""
+    val productEnabled = uiState.selectedWeldingMachineId != null &&
+        !uiState.productSelectionLocked &&
+        !uiState.isLoadingProducts
 
     Box(
         modifier = Modifier
@@ -804,6 +983,44 @@ private fun ToolbarCard(
                 GlassCircleButton(Icons.AutoMirrored.Filled.ArrowForward, s.dayNext, onNextDay)
             }
 
+            ToolbarFieldGroup(icon = Icons.Default.Build, label = s.weldingMachine) {
+                ExposedDropdownMenuBox(
+                    expanded = machineExpanded,
+                    onExpandedChange = { if (!uiState.productSelectionLocked) machineExpanded = it },
+                ) {
+                    GlassProductSelect(
+                        text = selectedMachineLabel.ifBlank { s.weldingMachinePlaceholder },
+                        isPlaceholder = selectedMachineLabel.isBlank(),
+                        expanded = machineExpanded,
+                        enabled = !uiState.productSelectionLocked && !uiState.isLoadingMachines,
+                        modifier = Modifier
+                            .menuAnchor(
+                                type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                enabled = !uiState.productSelectionLocked,
+                            )
+                            .widthIn(min = 88.dp, max = 120.dp),
+                    )
+                    ExposedDropdownMenu(expanded = machineExpanded, onDismissRequest = { machineExpanded = false }) {
+                        uiState.weldingMachines.forEach { machine ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        machine.label,
+                                        style = ToolbarTextStyle,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                },
+                                onClick = {
+                                    machineExpanded = false
+                                    onMachineSelected(machine.id)
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+
             ToolbarFieldGroup(icon = Icons.Default.Person, label = s.inspector) {
                 GlassValueChip(
                     text = uiState.operatorLabel.ifBlank { "—" },
@@ -817,7 +1034,6 @@ private fun ToolbarCard(
                 label = s.selectProduct,
                 labelMinWidth = 56.dp,
             ) {
-                val productEnabled = !uiState.productSelectionLocked && !uiState.isLoadingProducts
                 ExposedDropdownMenuBox(
                     expanded = productExpanded,
                     onExpandedChange = { if (productEnabled) productExpanded = it },
@@ -1426,6 +1642,8 @@ private fun PlanProductionCard(
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
+    onBreak: () -> Unit,
+    onResumeBreak: () -> Unit,
     onEnd: () -> Unit,
     onBumpDefect: (String, Int) -> Unit,
 ) {
@@ -1443,7 +1661,8 @@ private fun PlanProductionCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                    .horizontalScroll(rememberScrollState())
+                    .height(IntrinsicSize.Min),
                 horizontalArrangement = Arrangement.spacedBy(PlanOpsMetrics.Gap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1485,6 +1704,29 @@ private fun PlanProductionCard(
                     enabled = uiState.canEnd,
                     onClick = onEnd,
                 )
+                when {
+                    uiState.canBreak -> GlassPlanActionButton(
+                        label = s.btnBreak,
+                        icon = Icons.Default.FreeBreakfast,
+                        variant = PlanActionVariant.Break,
+                        enabled = true,
+                        onClick = onBreak,
+                    )
+                    uiState.canResumeBreak -> GlassPlanActionButton(
+                        label = s.btnResumeBreak,
+                        icon = Icons.Default.PlayArrow,
+                        variant = PlanActionVariant.BreakResume,
+                        enabled = true,
+                        onClick = onResumeBreak,
+                    )
+                    else -> GlassPlanActionButton(
+                        label = s.btnBreak,
+                        icon = Icons.Default.FreeBreakfast,
+                        variant = PlanActionVariant.Disabled,
+                        enabled = false,
+                        onClick = {},
+                    )
+                }
             }
 
             HorizontalDivider(color = WeldingActualColors.Border)
@@ -1543,10 +1785,11 @@ private fun PlanProductionCard(
 @Composable
 private fun TimerPanel(uiState: WeldingUiState, s: WeldStrings, phaseLabel: String) {
     val style = timerPhaseStyle(uiState.timerPhase)
+    val minHeight = timerPanelMinHeight(uiState)
     Box(
         modifier = Modifier
             .width(PlanOpsMetrics.TimerWidth)
-            .height(PlanOpsMetrics.BlockHeight)
+            .heightIn(min = minHeight)
             .shadow(
                 elevation = 4.dp,
                 shape = RoundedCornerShape(PlanOpsMetrics.CornerRadius),
@@ -1571,8 +1814,8 @@ private fun TimerPanel(uiState: WeldingUiState, s: WeldStrings, phaseLabel: Stri
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 7.dp, vertical = 5.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1607,37 +1850,165 @@ private fun TimerPanel(uiState: WeldingUiState, s: WeldStrings, phaseLabel: Stri
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom,
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = 28.dp),
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = uiState.elapsedDisplay,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
                     fontFamily = FontFamily.Monospace,
                     color = style.readoutColor,
                     maxLines = 1,
+                    letterSpacing = 0.5.sp,
                 )
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(5.dp))
-                        .background(Color.White.copy(alpha = 0.55f))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
+            }
+            if (uiState.wallStartClockDisplay != "—") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text(s.pausedAccum, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = WeldingActualColors.TextMuted)
-                    Text(uiState.pausedDisplay, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = style.readoutColor)
+                    TimerMetricChip(
+                        label = s.productionStart,
+                        value = uiState.wallStartClockDisplay,
+                        valueColor = Color(0xFF1D4ED8),
+                        borderColor = Color(0xFF93C5FD),
+                        background = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.92f), Color(0xFFEFF6FF).copy(alpha = 0.85f)),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TimerMetricChip(
+                        label = s.pausedAccum,
+                        value = uiState.pausedDisplay,
+                        valueColor = Color(0xFFB45309),
+                        borderColor = Color(0xFFFCD34D),
+                        background = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.92f), Color(0xFFFFFBEB).copy(alpha = 0.85f)),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    TimerMetricChip(
+                        label = s.breakAccum,
+                        value = uiState.breakDisplay,
+                        valueColor = Color(0xFF6D28D9),
+                        borderColor = Color(0xFFC4B5FD),
+                        background = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.92f), Color(0xFFF5F3FF).copy(alpha = 0.85f)),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
+            if (uiState.wallEndDisplay != "—") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(Color.White.copy(alpha = 0.45f))
+                        .border(0.5.dp, Color(0xFFCBD5E1), RoundedCornerShape(5.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(s.productionEnd, fontSize = 7.sp, fontWeight = FontWeight.Bold, color = WeldingActualColors.TextMuted)
+                    Text(
+                        uiState.wallEndDisplay,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = style.wallsColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimerMetricChip(
+    label: String,
+    value: String,
+    valueColor: Color,
+    borderColor: Color,
+    background: Brush,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(background)
+            .border(0.5.dp, borderColor, RoundedCornerShape(6.dp))
+            .padding(horizontal = 3.dp, vertical = 3.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(1.dp),
+    ) {
+        Text(
+            label,
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            color = WeldingActualColors.TextMuted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            value,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontFamily = FontFamily.Monospace,
+            color = valueColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun OtherTerminalLockBanner(
+    s: WeldStrings,
+    reclaimable: Boolean,
+    canForceRelease: Boolean,
+    onReclaim: () -> Unit,
+    onForceRelease: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7ED)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             Text(
-                text = "${uiState.wallStartDisplay} → ${uiState.wallEndDisplay}",
-                fontSize = 8.sp,
-                color = style.wallsColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                if (reclaimable) s.otherTerminalLockBannerReclaimable else s.otherTerminalLockBanner,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = Color(0xFF9A3412),
             )
+            when {
+                reclaimable -> {
+                    Button(
+                        onClick = onReclaim,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(s.btnReclaimSession, fontSize = 12.sp)
+                    }
+                }
+                canForceRelease -> {
+                    OutlinedButton(
+                        onClick = onForceRelease,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB45309)),
+                    ) {
+                        Text(s.btnForceReleaseLock, fontSize = 12.sp)
+                    }
+                }
+            }
         }
     }
 }
@@ -1649,13 +2020,15 @@ private fun GlassPlanActionButton(
     variant: PlanActionVariant,
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val style = planActionStyle(variant, enabled)
     val shape = RoundedCornerShape(PlanOpsMetrics.CornerRadius)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(PlanOpsMetrics.ButtonWidth)
-            .height(PlanOpsMetrics.BlockHeight)
+            .fillMaxHeight()
+            .heightIn(min = PlanOpsMetrics.BlockHeight)
             .shadow(
                 elevation = if (enabled) 5.dp else 1.dp,
                 shape = shape,
@@ -1778,29 +2151,35 @@ private enum class HistoryColumnGroup {
 
 private data class HistoryColumnSpec(
     val header: String,
-    val width: Dp,
+    val weight: Float,
+    val minWidth: Dp = 0.dp,
     val align: TextAlign = TextAlign.Start,
     val group: HistoryColumnGroup = HistoryColumnGroup.Product,
 )
 
-/** 製品 → 実績数値 → 時間 → 付帯 → 操作 */
+/** Web 履歴列順：生産日 → 作業者 → 取得元 → 製品 → 実績 → 時間 → 操作 */
 private val HistoryTableColumns: (WeldStrings) -> List<HistoryColumnSpec> = { s ->
     listOf(
-        HistoryColumnSpec(s.productCd, 66.dp, group = HistoryColumnGroup.Product),
-        HistoryColumnSpec(s.productName, 132.dp, group = HistoryColumnGroup.Product),
-        HistoryColumnSpec(s.productionQty, 54.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.defectQty, 48.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.defectRate, 50.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.efficiencyRate, 58.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.productionStart, 90.dp, group = HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.productionEnd, 90.dp, group = HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.elapsedMinutes, 58.dp, TextAlign.End, HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.pausedAccumMinutes, 58.dp, TextAlign.End, HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.productionDay, 76.dp, group = HistoryColumnGroup.Meta),
-        HistoryColumnSpec(s.inspector, 64.dp, group = HistoryColumnGroup.Meta),
-        HistoryColumnSpec(s.historyActions, 52.dp, TextAlign.Center, HistoryColumnGroup.Action),
+        HistoryColumnSpec(s.productionDay, 0.88f, 68.dp, group = HistoryColumnGroup.Meta),
+        HistoryColumnSpec(s.inspector, 0.88f, 56.dp, group = HistoryColumnGroup.Meta),
+        HistoryColumnSpec(s.dataSource, 0.72f, 48.dp, group = HistoryColumnGroup.Meta),
+        HistoryColumnSpec(s.productName, 2.4f, 88.dp, group = HistoryColumnGroup.Product),
+        HistoryColumnSpec(s.productionQty, 0.65f, 44.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.defectQty, 0.58f, 40.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.defectRate, 0.68f, 44.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.efficiencyRate, 0.72f, 46.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.productionStart, 1.15f, 76.dp, group = HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.productionEnd, 1.15f, 76.dp, group = HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.elapsedMinutes, 0.72f, 46.dp, TextAlign.End, HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.pausedAccumMinutes, 0.78f, 48.dp, TextAlign.End, HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.historyActions, 0.48f, 40.dp, TextAlign.Center, HistoryColumnGroup.Action),
     )
 }
+
+private fun RowScope.historyTableColumn(col: HistoryColumnSpec): Modifier =
+    Modifier
+        .weight(col.weight, fill = true)
+        .then(if (col.minWidth > 0.dp) Modifier.widthIn(min = col.minWidth) else Modifier)
 
 @Composable
 private fun CompletedHistorySection(
@@ -1813,7 +2192,6 @@ private fun CompletedHistorySection(
 ) {
     val nf = remember { NumberFormat.getNumberInstance(Locale.JAPAN) }
     val columns = remember(s) { HistoryTableColumns(s) }
-    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
@@ -1853,8 +2231,7 @@ private fun CompletedHistorySection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
-                        .horizontalScroll(scrollState),
+                        .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.85f), RoundedCornerShape(12.dp)),
                 ) {
                     HistoryTableHeaderRow(columns)
                     rows.forEachIndexed { index, row ->
@@ -1863,6 +2240,7 @@ private fun CompletedHistorySection(
                             index = index,
                             columns = columns,
                             nf = nf,
+                            s = s,
                             operatorLabel = operatorLabelForRow(row),
                             canEdit = canEditRow(row),
                             onEdit = { onEditRow(row) },
@@ -1987,7 +2365,7 @@ private fun HistoryTableHeaderRow(columns: List<HistoryColumnSpec>) {
             }
             Text(
                 text = col.header,
-                modifier = Modifier.width(col.width),
+                modifier = historyTableColumn(col),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFECFDF5),
@@ -2020,6 +2398,7 @@ private fun HistoryTableDataRow(
     index: Int,
     columns: List<HistoryColumnSpec>,
     nf: NumberFormat,
+    s: WeldStrings,
     operatorLabel: String,
     canEdit: Boolean,
     onEdit: () -> Unit,
@@ -2053,42 +2432,42 @@ private fun HistoryTableDataRow(
                 HistoryGroupDivider()
             }
             when (colIndex) {
-                0 -> HistoryCodeCell(row.productCd ?: "—", col.width)
-                1 -> HistoryProductNameCell(row.productName ?: "—", col.width)
-                2 -> HistoryQtyCell(nf.format(prod), col.width, positive = true)
-                3 -> HistoryQtyCell(
+                0 -> HistoryDayCell(WeldingManagementRowExt.formatHistoryProductionDay(row), historyTableColumn(col))
+                1 -> HistoryNameCell(operatorLabel, historyTableColumn(col))
+                2 -> HistoryDataSourceCell(historyDataSourceLabel(row, s), historyTableColumn(col))
+                3 -> HistoryProductNameCell(row.productName ?: "—", historyTableColumn(col))
+                4 -> HistoryQtyCell(nf.format(prod), historyTableColumn(col), positive = true)
+                5 -> HistoryQtyCell(
                     if (defects > 0) nf.format(defects) else "—",
-                    col.width,
+                    historyTableColumn(col),
                     positive = defects > 0,
                     warn = true,
                 )
-                4 -> HistoryRateCell(defectRateStr, col.width, warn = defects > 0 && prod > 0)
-                5 -> HistoryRateCell(efficiencyStr, col.width, efficiency = true)
-                6 -> HistoryTimeCell(WeldingHistoryRowFormat.formatProductionStart(row), col.width)
-                7 -> HistoryTimeCell(WeldingHistoryRowFormat.formatProductionEnd(row), col.width)
-                8 -> HistoryDurationCell(
+                6 -> HistoryRateCell(defectRateStr, historyTableColumn(col), warn = defects > 0 && prod > 0)
+                7 -> HistoryRateCell(efficiencyStr, historyTableColumn(col), efficiency = true)
+                8 -> HistoryTimeCell(WeldingHistoryRowFormat.formatProductionStart(row), historyTableColumn(col))
+                9 -> HistoryTimeCell(WeldingHistoryRowFormat.formatProductionEnd(row), historyTableColumn(col))
+                10 -> HistoryDurationCell(
                     WeldingHistoryRowFormat.formatSecondsAsMinutes(wallSec),
-                    col.width,
+                    historyTableColumn(col),
                     active = wallSec > 0,
                 )
-                9 -> HistoryDurationCell(
+                11 -> HistoryDurationCell(
                     WeldingHistoryRowFormat.formatSecondsAsMinutes(pauseSec),
-                    col.width,
+                    historyTableColumn(col),
                     active = pauseSec > 0,
                     muted = pauseSec <= 0,
                 )
-                10 -> HistoryDayCell(WeldingManagementRowExt.formatHistoryProductionDay(row), col.width)
-                11 -> HistoryNameCell(operatorLabel, col.width)
-                12 -> HistoryActionCell(col.width, canEdit, col.header, onEdit)
+                12 -> HistoryActionCell(historyTableColumn(col), canEdit, col.header, onEdit)
             }
         }
     }
 }
 
 @Composable
-private fun HistoryProductNameCell(text: String, width: Dp) {
+private fun HistoryProductNameCell(text: String, modifier: Modifier) {
     Row(
-        modifier = Modifier.width(width),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -2103,7 +2482,7 @@ private fun HistoryProductNameCell(text: String, width: Dp) {
         )
         Text(
             text = text,
-            modifier = Modifier.width(width - 7.dp),
+            modifier = Modifier.weight(1f),
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF1E293B),
@@ -2114,32 +2493,34 @@ private fun HistoryProductNameCell(text: String, width: Dp) {
 }
 
 @Composable
-private fun HistoryCodeCell(text: String, width: Dp) {
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterStart) {
+private fun HistoryDataSourceCell(text: String, modifier: Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Text(
             text = text,
             modifier = Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFFF5F3FF), Color(0xFFEDE9FE)),
-                    ),
-                )
-                .border(0.5.dp, Color(0xFFC4B5FD).copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                .background(Color(0xFFF8FAFC))
+                .border(0.5.dp, Color(0xFFCBD5E1), RoundedCornerShape(6.dp))
                 .padding(horizontal = 6.dp, vertical = 3.dp),
             fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF6D28D9),
-            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF475569),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
+private fun historyDataSourceLabel(row: WeldingManagementRowDto, s: WeldStrings): String =
+    when (resolveWeldingDataSource(row)) {
+        WeldingDataSourceKind.Mes -> s.dataSourceMes
+        WeldingDataSourceKind.Excel -> s.dataSourceExcel
+        WeldingDataSourceKind.Csv -> s.dataSourceCsv
+    }
+
 @Composable
-private fun HistoryDayCell(text: String, width: Dp) {
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterStart) {
+private fun HistoryDayCell(text: String, modifier: Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Text(
             text = text,
             modifier = Modifier
@@ -2157,10 +2538,10 @@ private fun HistoryDayCell(text: String, width: Dp) {
 }
 
 @Composable
-private fun HistoryNameCell(text: String, width: Dp) {
+private fun HistoryNameCell(text: String, modifier: Modifier) {
     Text(
         text = text,
-        modifier = Modifier.width(width),
+        modifier = modifier,
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
         color = Color(0xFF475569),
@@ -2172,12 +2553,12 @@ private fun HistoryNameCell(text: String, width: Dp) {
 @Composable
 private fun HistoryQtyCell(
     text: String,
-    width: Dp,
+    modifier: Modifier,
     positive: Boolean = false,
     warn: Boolean = false,
 ) {
     val showChip = positive && text != "—"
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterEnd) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterEnd) {
         if (showChip) {
             val bgColors = if (warn) {
                 listOf(Color(0xFFFFF7ED), Color(0xFFFFEDD5))
@@ -2217,7 +2598,7 @@ private fun HistoryQtyCell(
 @Composable
 private fun HistoryRateCell(
     text: String,
-    width: Dp,
+    modifier: Modifier,
     warn: Boolean = false,
     efficiency: Boolean = false,
 ) {
@@ -2233,7 +2614,7 @@ private fun HistoryRateCell(
         warn -> Brush.linearGradient(listOf(Color(0xFFFFF7ED), Color(0xFFFFEDD5).copy(alpha = 0.6f)))
         else -> null
     }
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterEnd) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterEnd) {
         if (bg != null) {
             Text(
                 text = text,
@@ -2262,9 +2643,9 @@ private fun HistoryRateCell(
 }
 
 @Composable
-private fun HistoryTimeCell(text: String, width: Dp) {
+private fun HistoryTimeCell(text: String, modifier: Modifier) {
     val empty = text == "—"
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterStart) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         if (empty) {
             Text(text, fontSize = 10.sp, color = WeldingActualColors.TextMuted)
         } else {
@@ -2300,7 +2681,7 @@ private fun HistoryTimeCell(text: String, width: Dp) {
 @Composable
 private fun HistoryDurationCell(
     text: String,
-    width: Dp,
+    modifier: Modifier,
     active: Boolean = false,
     muted: Boolean = false,
 ) {
@@ -2311,7 +2692,7 @@ private fun HistoryDurationCell(
     }
     Text(
         text = if (text == "0" && muted) "—" else text,
-        modifier = Modifier.width(width),
+        modifier = modifier,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         color = color,
@@ -2322,13 +2703,13 @@ private fun HistoryDurationCell(
 
 @Composable
 private fun HistoryActionCell(
-    width: Dp,
+    modifier: Modifier,
     canEdit: Boolean,
     editLabel: String,
     onEdit: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.width(width),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         if (canEdit) {
@@ -2769,219 +3150,257 @@ private fun ConfirmedEditDefectChip(
 private fun EndProductionDialog(
     uiState: WeldingUiState,
     s: WeldStrings,
-    onQtyChange: (String) -> Unit,
+    onBoxesChange: (String) -> Unit,
+    onPieceQtyChange: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
 ) {
-    val qtyFocusRequester = remember { FocusRequester() }
-    val qtyBorderColor = Color(0xFFDC2626)
-    val qtyBorderMuted = Color(0xFFEF4444)
+    val boxMode = uiState.endDialogUnitPerBox > 0
+    val boxFocusRequester = remember { FocusRequester() }
+    val pieceFocusRequester = remember { FocusRequester() }
+    val qtyRed = Color(0xFF059669)
     val submitting = uiState.endDialogSubmitting
+    val boxDerived = boxMode && uiState.endDialogQtyInputSource == EndDialogQtyInputSource.Piece
+    val pieceDerived = boxMode && uiState.endDialogQtyInputSource == EndDialogQtyInputSource.Box
+    val bodyScroll = rememberScrollState()
 
-    LaunchedEffect(Unit) {
-        qtyFocusRequester.requestFocus()
+    LaunchedEffect(boxMode) {
+        if (boxMode) boxFocusRequester.requestFocus() else pieceFocusRequester.requestFocus()
     }
 
     Dialog(onDismissRequest = { if (!submitting) onDismiss() }) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .widthIn(max = 420.dp)
-                .shadow(
-                    elevation = 28.dp,
-                    shape = RoundedCornerShape(22.dp),
-                    ambientColor = Color(0x40EF4444),
-                    spotColor = Color(0x40EF4444),
-                ),
-            shape = RoundedCornerShape(22.dp),
+                .widthIn(max = 440.dp)
+                .shadow(24.dp, RoundedCornerShape(12.dp), ambientColor = Color(0x330D9488)),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(
-                                    Color(0xFFFFF1F2),
-                                    Color(0xFFFFF7ED),
-                                    Color.White,
-                                ),
-                            ),
-                        )
-                        .padding(horizontal = 22.dp, vertical = 20.dp),
+                        .background(Brush.linearGradient(listOf(Color(0xFF047857), Color(0xFF059669), Color(0xFF34D399))))
+                        .padding(start = 12.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .shadow(6.dp, CircleShape, spotColor = Color(0x40EF4444))
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(Color(0xFFFECACA), Color(0xFFFEE2E2)),
-                                    ),
-                                )
-                                .border(1.dp, Color(0xFFFCA5A5), CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                modifier = Modifier.size(26.dp),
-                                tint = Color(0xFFDC2626),
-                            )
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(s.endDialogTitle, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                            Text(s.endDialogIntro, fontSize = 11.sp, lineHeight = 15.sp, color = Color.White.copy(alpha = 0.92f))
                         }
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                s.endDialogTitle,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp,
-                                color = WeldingActualColors.TextPrimary,
-                            )
-                            Text(
-                                s.endDialogIntro,
-                                fontSize = 12.sp,
-                                lineHeight = 17.sp,
-                                color = WeldingActualColors.TextMuted,
-                            )
+                        IconButton(onClick = onDismiss, enabled = !submitting, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = s.cancel, tint = Color.White.copy(alpha = 0.9f))
                         }
                     }
                 }
-
-                HorizontalDivider(color = WeldingActualColors.Border.copy(alpha = 0.6f))
-
                 Column(
-                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 18.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.verticalScroll(bodyScroll).padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    EndDialogSummaryCard(
-                        icon = Icons.Default.Inventory2,
-                        iconTint = Color(0xFF0D9488),
-                        iconBg = WeldingActualColors.TealLight,
-                        label = s.productName,
-                        value = "${uiState.displayProductCd} · ${uiState.displayProductName}",
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Brush.linearGradient(listOf(Color(0xFFECFDF5), Color.White)))
+                            .border(1.dp, Color(0xFFA7F3D0), RoundedCornerShape(8.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        EndDialogSummaryCard(
-                            icon = Icons.Default.AccessTime,
-                            iconTint = Color(0xFF2563EB),
-                            iconBg = Color(0xFFEFF6FF),
-                            label = s.elapsed,
-                            value = uiState.elapsedDisplay,
-                            modifier = Modifier.weight(1f),
-                        )
-                        EndDialogSummaryCard(
-                            icon = Icons.Default.ErrorOutline,
-                            iconTint = Color(0xFFB45309),
-                            iconBg = WeldingActualColors.AmberLight,
-                            label = s.defectTotal,
-                            value = uiState.defectTotal.toString(),
-                            modifier = Modifier.weight(1f),
-                        )
+                        Text(uiState.displayProductCd, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF047857), fontFamily = FontFamily.Monospace)
+                        Text(uiState.displayProductName, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = WeldingActualColors.TextPrimary)
                     }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        WeldEndDialogStat(s.inspector, uiState.operatorLabel.ifBlank { "—" }, Modifier.weight(1f))
+                        WeldEndDialogStat(s.productionStart, uiState.wallStartDisplay, Modifier.weight(1f))
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        WeldEndDialogStat(s.productionEnd, uiState.endDialogWallEndDisplay, Modifier.weight(1f))
+                        WeldEndDialogStat(s.elapsed, uiState.elapsedDisplay, Modifier.weight(1f))
+                    }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White)
+                            .border(1.dp, Color(0xFFE4E7ED), RoundedCornerShape(8.dp))
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         Text(
-                            s.productionQty,
-                            fontSize = 13.sp,
+                            if (boxMode) s.unitPerBoxHint.replace("{n}", uiState.endDialogUnitPerBox.toString()) else s.unitPerBoxUnset,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = qtyBorderColor,
+                            color = if (boxMode) WeldingActualColors.TextMuted else Color(0xFFB45309),
                         )
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(2.dp, qtyBorderMuted, RoundedCornerShape(14.dp))
-                                .clip(RoundedCornerShape(14.dp)),
-                        ) {
-                            OutlinedTextField(
-                                value = uiState.endDialogQty,
-                                onValueChange = onQtyChange,
-                                singleLine = true,
-                                enabled = !submitting,
-                                placeholder = {
-                                    Text("0", color = Color(0xFFFCA5A5))
-                                },
-                                textStyle = TextStyle(
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    color = WeldingActualColors.TextPrimary,
-                                    fontFamily = FontFamily.Monospace,
-                                ),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Done,
-                                ),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent,
-                                    unfocusedBorderColor = Color.Transparent,
-                                    disabledBorderColor = Color.Transparent,
-                                    focusedContainerColor = Color(0xFFFFF5F5),
-                                    unfocusedContainerColor = Color(0xFFFFFBFB),
-                                    disabledContainerColor = Color(0xFFF8FAFC),
-                                    cursorColor = qtyBorderColor,
-                                    focusedTextColor = WeldingActualColors.TextPrimary,
-                                ),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(qtyFocusRequester),
-                            )
+                        if (boxMode) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+                                WeldEndDialogQtyCell(s.boxQty, boxDerived, Modifier.weight(1f)) {
+                                    WeldEndDialogQtyInput(uiState.endDialogBoxes, onBoxesChange, !submitting, s.boxQty, boxFocusRequester, boxDerived)
+                                }
+                                Text("×${uiState.endDialogUnitPerBox}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = WeldingActualColors.TextMuted)
+                                WeldEndDialogQtyCell(s.productionQty, pieceDerived, Modifier.weight(1f)) {
+                                    WeldEndDialogQtyInput(uiState.endDialogPieceQty, onPieceQtyChange, !submitting, s.productionQty, pieceFocusRequester, pieceDerived)
+                                }
+                            }
+                            uiState.endDialogQtyMismatch?.let { mismatch ->
+                                Text(
+                                    formatEndDialogQtyMismatchText(s.qtyMismatchWarn, mismatch),
+                                    fontSize = 10.sp,
+                                    color = Color(0xFFB45309),
+                                )
+                            }
+                        } else {
+                            WeldEndDialogQtyCell(s.productionQty, false, Modifier.fillMaxWidth()) {
+                                WeldEndDialogQtyInput(uiState.endDialogPieceQty, onPieceQtyChange, !submitting, s.productionQty, pieceFocusRequester, false)
+                            }
                         }
                     }
                 }
-
-                HorizontalDivider(color = WeldingActualColors.Border.copy(alpha = 0.6f))
-
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 22.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.End,
                 ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        enabled = !submitting,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, WeldingActualColors.Border),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = WeldingActualColors.TextSecondary,
-                        ),
-                    ) {
-                        Text(s.cancel, fontWeight = FontWeight.SemiBold)
+                    OutlinedButton(onClick = onDismiss, enabled = !submitting, modifier = Modifier.height(36.dp)) {
+                        Text(s.cancel)
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = onConfirm,
-                        enabled = !submitting && uiState.endDialogQty.isNotBlank(),
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .shadow(8.dp, RoundedCornerShape(12.dp), spotColor = Color(0x40EF4444)),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEF4444),
-                            disabledContainerColor = Color(0xFFFCA5A5),
-                        ),
+                        enabled = !submitting && uiState.endDialogCanSubmit,
+                        modifier = Modifier.height(36.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = qtyRed),
                     ) {
                         if (submitting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White,
-                            )
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Color.White)
                         } else {
-                            Text(s.btnConfirmEnd, fontWeight = FontWeight.Bold)
+                            Text(s.btnConfirmEnd, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WeldEndDialogStat(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(Color(0xFFF5F7FA))
+            .border(1.dp, Color(0xFFE4E7ED), RoundedCornerShape(7.dp))
+            .padding(8.dp),
+    ) {
+        Text(label, fontSize = 10.sp, color = WeldingActualColors.TextMuted, maxLines = 1)
+        Text(value, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 2)
+    }
+}
+
+@Composable
+private fun WeldEndDialogQtyCell(label: String, derived: Boolean, modifier: Modifier, content: @Composable () -> Unit) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (derived) Color(0xFFF8FAFC) else Color.White)
+            .border(1.dp, if (derived) Color(0xFFCBD5E1) else Color(0xFF6EE7B7), RoundedCornerShape(7.dp))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = WeldingActualColors.TextSecondary)
+        content()
+    }
+}
+
+@Composable
+private fun WeldEndDialogQtyInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    enabled: Boolean,
+    placeholder: String,
+    focusRequester: FocusRequester,
+    derived: Boolean,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        enabled = enabled,
+        placeholder = { Text(placeholder, fontSize = 12.sp) },
+        textStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontFamily = FontFamily.Monospace),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+        shape = RoundedCornerShape(7.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = if (derived) Color(0xFFF8FAFC) else Color(0xFFECFDF5),
+            unfocusedContainerColor = if (derived) Color(0xFFF8FAFC) else Color(0xFFECFDF5),
+        ),
+        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 38.dp).focusRequester(focusRequester),
+    )
+}
+
+private fun formatEndDialogQtyMismatchText(template: String, mismatch: EndDialogQtyMismatch): String =
+    template.replace("{piece}", mismatch.piece.toString()).replace("{upb}", mismatch.upb.toString())
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InProgressPanelSheet(
+    rows: List<WeldingManagementRowDto>,
+    activePlanId: Int?,
+    s: WeldStrings,
+    operatorName: (WeldingManagementRowDto) -> String,
+    statusLabel: (WeldingManagementRowDto) -> String,
+    canResume: (WeldingManagementRowDto) -> Boolean,
+    canForceRelease: (WeldingManagementRowDto) -> Boolean,
+    resumeButtonLabel: (WeldingManagementRowDto) -> String,
+    onDismiss: () -> Unit,
+    onRowClick: (WeldingManagementRowDto) -> Unit,
+    onResume: (WeldingManagementRowDto) -> Unit,
+    onForceRelease: (WeldingManagementRowDto) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = Color.White) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(s.inProgressStripTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            rows.forEach { row ->
+                val active = row.id != null && row.id == activePlanId
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, if (active) Color(0xFF10B981) else Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                        .background(if (active) Color(0xFFF0FDF4) else Color(0xFFF8FAFC))
+                        .clickable { onRowClick(row) }
+                        .padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            row.productName?.trim()?.takeIf { it.isNotEmpty() } ?: row.productCd ?: "—",
+                            modifier = Modifier.weight(1f),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        StatusChip(statusLabel(row), Color(0xFFE2E8F0), Color(0xFF475569))
+                    }
+                    Text(operatorName(row), fontSize = 12.sp, color = WeldingActualColors.TextMuted)
+                    if (canResume(row)) {
+                        OutlinedButton(onClick = { onResume(row) }, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                            Text(resumeButtonLabel(row), fontSize = 12.sp)
+                        }
+                    }
+                    if (canForceRelease(row)) {
+                        OutlinedButton(
+                            onClick = { onForceRelease(row) },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFB45309)),
+                        ) {
+                            Text(s.btnForceReleaseLock, fontSize = 12.sp)
                         }
                     }
                 }
@@ -3053,6 +3472,6 @@ private fun phaseLabel(phase: TimerPhase, s: WeldStrings): String = when (phase)
     TimerPhase.Idle -> s.timerIdle
     TimerPhase.Running -> s.timerRunning
     TimerPhase.Paused -> s.timerPaused
-    TimerPhase.Break -> s.timerPaused
+    TimerPhase.Break -> s.timerBreak
     TimerPhase.Ended -> s.timerEnded
 }

@@ -9,6 +9,8 @@ import com.example.smart_emap.data.model.PatchWeldingBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.example.smart_emap.data.model.WeldingManagementRowDto
 import com.example.smart_emap.data.model.WeldingProductivityAnalysisDataDto
+import com.example.smart_emap.data.model.FlexibleIntAdapterFactory
+import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import retrofit2.HttpException
@@ -23,7 +25,8 @@ class WeldingRepository(
     private val mesClientIdStore: MesClientIdStore,
 ) {
     private val moshi = Moshi.Builder()
-        .add(com.example.smart_emap.data.model.MesDefectByItemAdapterFactory)
+        .add(MesDefectByItemAdapterFactory)
+        .add(FlexibleIntAdapterFactory)
         .add(KotlinJsonAdapterFactory())
         .build()
 
@@ -31,9 +34,33 @@ class WeldingRepository(
 
     suspend fun getClientInstanceId(): String = mesClientIdStore.getWeldingClientInstanceId()
 
+    /** 溶接設備一覧（名称が「溶接」+2 文字） */
+    suspend fun loadWeldingMesMachines(): List<MachineDto> = loadWeldingMesMachinesInternal()
+
+    /** 選択設備に紐づく製品（Web fetchWeldingMesProducts） */
+    suspend fun loadProductsForMachine(machineId: Int): List<ErpProductDto> {
+        val rows = apiClient.apsApi().getEquipmentEfficiencyProducts(machineId)
+        val seen = linkedSetOf<String>()
+        val products = mutableListOf<ErpProductDto>()
+        for (row in rows) {
+            val code = row.productCd?.trim().orEmpty()
+            if (code.isEmpty() || !seen.add(code)) continue
+            val name = row.productName?.trim().orEmpty().ifEmpty { code }
+            products.add(
+                ErpProductDto(
+                    id = row.id,
+                    productCode = code,
+                    productName = name,
+                    isActive = true,
+                    unitPerBox = 0,
+                ),
+            )
+        }
+        return products.sortedBy { it.productName }
+    }
+
     /**
-     * Web fetchWeldingMesProducts と同趣旨：
-     * 溶接設備（名称が「溶接」+2 文字）の equipment_efficiency に登録された製品のみ。
+     * 全溶接設備の製品をマージ（後方互換・モニタ等）
      */
     suspend fun loadProducts(): List<ErpProductDto> {
         val machines = loadWeldingMesMachinesInternal()
@@ -43,19 +70,8 @@ class WeldingRepository(
         val products = mutableListOf<ErpProductDto>()
         for (machine in machines) {
             val machineId = machine.id ?: continue
-            val rows = apiClient.apsApi().getEquipmentEfficiencyProducts(machineId)
-            for (row in rows) {
-                val code = row.productCd?.trim().orEmpty()
-                if (code.isEmpty() || !seen.add(code)) continue
-                val name = row.productName?.trim().orEmpty().ifEmpty { code }
-                products.add(
-                    ErpProductDto(
-                        id = row.id,
-                        productCode = code,
-                        productName = name,
-                        isActive = true,
-                    ),
-                )
+            for (p in loadProductsForMachine(machineId)) {
+                if (seen.add(p.productCode)) products.add(p)
             }
         }
         return products.sortedBy { it.productName }
@@ -74,7 +90,7 @@ class WeldingRepository(
             .sortedBy { pickWeldingMesMachineLabel(it).orEmpty() }
     }
 
-    private fun pickWeldingMesMachineLabel(row: MachineDto): String? {
+    fun pickWeldingMesMachineLabel(row: MachineDto): String? {
         val name = row.machineName?.trim().orEmpty()
         if (WELDING_MES_MACHINE_NAME_RE.matches(name)) return name
         val cd = row.machineCd?.trim().orEmpty()
@@ -84,7 +100,7 @@ class WeldingRepository(
 
     suspend fun loadDefectItems(): List<ProcessDefectItemDto> {
         val res = apiClient.processDefectApi().getOptions(WELDING_DEFECT_DETECTION_PROCESS_CD)
-        return res.data.orEmpty()
+        return res.data.orEmpty().filter { !it.defectCd.isNullOrBlank() }
     }
 
     suspend fun loadProductivityAnalysis(
@@ -107,12 +123,17 @@ class WeldingRepository(
         res.data
     }
 
-    suspend fun loadPlans(productionDay: String): List<WeldingManagementRowDto> {
-        val res = apiClient.weldingApi().list(productionDay = productionDay, limit = 2000)
+    suspend fun loadPlans(
+        productionDay: String,
+        weldingMachine: String? = null,
+    ): List<WeldingManagementRowDto> {
+        val res = apiClient.weldingApi().list(
+            productionDay = productionDay,
+            weldingMachine = weldingMachine?.trim()?.ifBlank { null },
+            limit = 2000,
+        )
         return res.data.orEmpty().filter { it.id != null }
     }
-
-    suspend fun loadWeldingMesMachines(): List<MachineDto> = loadWeldingMesMachinesInternal()
 
     /** 溶接モニタ：設備別 list をマージして当日行を取得 */
     suspend fun loadMonitorPlans(productionDay: String): List<WeldingManagementRowDto> {
@@ -120,12 +141,7 @@ class WeldingRepository(
         loadPlans(productionDay).forEach { row -> row.id?.let { merged[it] = row } }
         for (machine in loadWeldingMesMachinesInternal()) {
             val label = pickWeldingMesMachineLabel(machine) ?: continue
-            val res = apiClient.weldingApi().list(
-                productionDay = productionDay,
-                weldingMachine = label,
-                limit = 2000,
-            )
-            res.data.orEmpty().forEach { row -> row.id?.let { merged[it] = row } }
+            loadPlans(productionDay, label).forEach { row -> row.id?.let { merged[it] = row } }
         }
         return merged.values.toList()
     }
@@ -135,12 +151,14 @@ class WeldingRepository(
         productCd: String,
         productName: String,
         operatorUserId: Int,
+        weldingMachine: String? = null,
     ): Int {
         val res = apiClient.weldingApi().create(
             CreateWeldingBody(
                 productionDay = productionDay,
                 productCd = productCd,
                 productName = productName,
+                weldingMachine = weldingMachine?.trim()?.ifBlank { null },
                 mesOperatorUserId = operatorUserId,
             ),
         )

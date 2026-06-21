@@ -15,6 +15,7 @@ import com.example.smart_emap.core.mes.TimerPhase
 import com.example.smart_emap.core.network.NetworkErrors
 import com.example.smart_emap.core.network.NetworkMonitor
 import com.example.smart_emap.data.model.ErpProductDto
+import com.example.smart_emap.data.model.defectCdKeys
 import com.example.smart_emap.data.model.InspectionManagementRowDto
 import com.example.smart_emap.data.model.InspectionNextAssignmentDto
 import com.example.smart_emap.data.model.ProcessDefectItemDto
@@ -626,7 +627,7 @@ class InspectionActualViewModel(
                     return@launch
                 }
                 if (session.wallStart != null) {
-                    session = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+                    session = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
                     sessions[planId] = session
                 }
                 val now = System.currentTimeMillis()
@@ -1124,7 +1125,7 @@ class InspectionActualViewModel(
                 }
                 updateLocalRowCompleted(planId, session, qty, now)
                 locallyOperated.remove(planId)
-                sessions[planId] = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+                sessions[planId] = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
                 val savedMsg = inspStringsFor(_uiState.value.locale).endProductionSaved
                 _uiState.update {
                     it.copy(
@@ -1552,7 +1553,7 @@ class InspectionActualViewModel(
                     rows.forEach { row ->
                         val id = row.id ?: return@forEach
                         if (id !in sessions) {
-                            sessions[id] = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+                            sessions[id] = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
                         }
                         if (shouldHydrateSessionFromServer(id)) {
                             syncSessionFromRow(id, row)
@@ -1838,7 +1839,7 @@ class InspectionActualViewModel(
 
     private fun ensureSession(planId: Int): PlanSession {
         return sessions.getOrPut(planId) {
-            InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+            InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
         }
     }
 
@@ -2262,7 +2263,14 @@ class InspectionActualViewModel(
                     DefectGroupUi(
                         processCd = cd,
                         processName = list.firstOrNull()?.attributableProcessName?.trim().orEmpty().ifEmpty { cd },
-                        items = list.map { DefectItemUi(id = it.defectCd, label = it.defectName) },
+                        items = list.mapNotNull { item ->
+                            val id = item.defectCd?.trim().orEmpty()
+                            if (id.isEmpty()) return@mapNotNull null
+                            DefectItemUi(
+                                id = id,
+                                label = item.defectName?.trim().orEmpty().ifEmpty { id },
+                            )
+                        },
                     )
                 }
         }

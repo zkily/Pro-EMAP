@@ -6,14 +6,16 @@ import androidx.lifecycle.viewModelScope
 import com.example.smart_emap.core.mes.WeldingOfflineStore
 import com.example.smart_emap.core.mes.InspectionRowSnapshot
 import com.example.smart_emap.core.mes.InspectionSessionLogic
+import com.example.smart_emap.core.mes.MesDateTime
 import com.example.smart_emap.core.mes.WeldingPendingCreatePlan
 import com.example.smart_emap.core.mes.PlanSession
 import com.example.smart_emap.core.mes.TimerPhase
 import com.example.smart_emap.core.network.NetworkErrors
 import com.example.smart_emap.core.network.NetworkMonitor
 import com.example.smart_emap.data.model.ErpProductDto
-import com.example.smart_emap.data.model.WeldingManagementRowDto
 import com.example.smart_emap.data.model.ProcessDefectItemDto
+import com.example.smart_emap.data.model.WeldingManagementRowDto
+import com.example.smart_emap.data.model.defectCdKeys
 import com.example.smart_emap.data.model.PatchWeldingBody
 import com.example.smart_emap.data.repository.WeldingPatchException
 import com.example.smart_emap.data.repository.WeldingRepository
@@ -32,8 +34,15 @@ import java.util.Locale
 
 enum class MesLockOwner { Unclaimed, Mine, Other }
 
+enum class EndDialogQtyInputSource { Box, Piece }
+
+data class EndDialogQtyMismatch(val piece: Int, val upb: Int)
+
+data class WeldMesMachineOption(val id: Int, val label: String)
+
 enum class WeldRetryAction {
     RefreshAll,
+    ReloadMachines,
     ReloadProducts,
     ReloadPlans,
     ReloadDefects,
@@ -60,6 +69,11 @@ data class WeldingUiState(
     val locale: WeldLocale = WeldLocale.Ja,
     val productionDay: String = jstToday(),
     val operatorLabel: String = "",
+    val weldingMachines: List<WeldMesMachineOption> = emptyList(),
+    val selectedWeldingMachineId: Int? = null,
+    val selectedWeldingMachineLabel: String? = null,
+    val machinesLoadError: String? = null,
+    val isLoadingMachines: Boolean = false,
     val products: List<ErpProductDto> = emptyList(),
     val selectedProductCode: String? = null,
     val inProgressRows: List<WeldingManagementRowDto> = emptyList(),
@@ -78,24 +92,42 @@ data class WeldingUiState(
     val snackbarMessage: String? = null,
     val scanDialogVisible: Boolean = false,
     val endDialogVisible: Boolean = false,
-    val endDialogQty: String = "",
+    val endDialogBoxes: String = "",
+    val endDialogPieceQty: String = "",
+    val endDialogUnitPerBox: Int = 0,
+    val endDialogQtyInputSource: EndDialogQtyInputSource? = null,
+    val endDialogQtyMismatch: EndDialogQtyMismatch? = null,
+    val endDialogQtyMismatchConfirm: EndDialogQtyMismatch? = null,
+    val endDialogCanSubmit: Boolean = false,
     val endDialogSubmitting: Boolean = false,
+    val endDialogWallEndDisplay: String = "—",
     val timerPhase: TimerPhase = TimerPhase.Idle,
     val timerPhaseLabel: String = "未開始",
-    val elapsedDisplay: String = "00:00",
-    val pausedDisplay: String = "00:00",
+    val elapsedDisplay: String = "00:00:00",
+    val pausedDisplay: String = "00:00:00",
+    val breakDisplay: String = "00:00:00",
     val wallStartDisplay: String = "—",
+    val wallStartClockDisplay: String = "—",
     val wallEndDisplay: String = "—",
     val defectTotal: Int = 0,
     val canStart: Boolean = false,
     val canPause: Boolean = false,
     val canResume: Boolean = false,
+    val canBreak: Boolean = false,
+    val canResumeBreak: Boolean = false,
     val canEnd: Boolean = false,
     val showPlanCard: Boolean = false,
     val productSelectionLocked: Boolean = false,
     val canEditDefects: Boolean = false,
     val completedQtyTotal: Int = 0,
     val showSessionRecoveryAlert: Boolean = false,
+    val showOtherTerminalLockBanner: Boolean = false,
+    val canReclaimFromOtherTerminal: Boolean = false,
+    val canForceReleaseLock: Boolean = false,
+    val reclaimConfirmRowId: Int? = null,
+    val forceReleaseConfirmRowId: Int? = null,
+    val inProgressPanelVisible: Boolean = false,
+    val helpDialogVisible: Boolean = false,
     val confirmedEditVisible: Boolean = false,
     val confirmedEditPlanId: Int? = null,
     val confirmedEditProductLabel: String = "",
@@ -147,6 +179,7 @@ class WeldingActualViewModel(
             clientInstanceId = repository.getClientInstanceId()
             hydrateFromOfflineCache()
             refreshPendingSyncState()
+            loadMachines(showSnackbarOnError = false)
             loadInitial()
             startTickLoop()
             startSyncLoop()
@@ -181,6 +214,10 @@ class WeldingActualViewModel(
 
     fun openScanDialog() {
         val s = weldStringsFor(_uiState.value.locale)
+        if (_uiState.value.selectedWeldingMachineId == null) {
+            _uiState.update { it.copy(snackbarMessage = s.emptySelectMachine) }
+            return
+        }
         if (_uiState.value.productSelectionLocked) {
             _uiState.update { it.copy(snackbarMessage = s.switchProductBlocked) }
             return
@@ -232,6 +269,7 @@ class WeldingActualViewModel(
         viewModelScope.launch {
             when (action) {
                 WeldRetryAction.RefreshAll -> loadInitial()
+                WeldRetryAction.ReloadMachines -> loadMachines(showSnackbarOnError = true)
                 WeldRetryAction.ReloadProducts -> fetchProducts(showSnackbarOnError = false)
                 WeldRetryAction.ReloadPlans -> loadPlans(showLoading = true)
                 WeldRetryAction.ReloadDefects -> loadDefectItems(showLoading = true)
@@ -246,11 +284,13 @@ class WeldingActualViewModel(
     fun dismissLoadError(action: WeldRetryAction) {
         _uiState.update { state ->
             when (action) {
+                WeldRetryAction.ReloadMachines -> state.copy(machinesLoadError = null)
                 WeldRetryAction.ReloadProducts -> state.copy(productsLoadError = null)
                 WeldRetryAction.ReloadPlans -> state.copy(plansLoadError = null)
                 WeldRetryAction.ReloadDefects -> state.copy(defectsLoadError = null)
                 WeldRetryAction.ReloadSync -> state.copy(syncStaleMessage = null)
                 WeldRetryAction.RefreshAll -> state.copy(
+                    machinesLoadError = null,
                     productsLoadError = null,
                     plansLoadError = null,
                     defectsLoadError = null,
@@ -272,12 +312,81 @@ class WeldingActualViewModel(
 
     fun onProductSelected(code: String?) {
         if (_uiState.value.productSelectionLocked && code != _uiState.value.selectedProductCode) {
-            _uiState.update { it.copy(snackbarMessage = "生産中は製品を変更できません。先に生産終了してください。") }
+            _uiState.update { it.copy(snackbarMessage = weldStringsFor(it.locale).switchProductBlocked) }
             return
         }
         _uiState.update { it.copy(selectedProductCode = code) }
         bindActivePlanFromSelection()
         publishUi()
+    }
+
+    fun onWeldingMachineSelected(machineId: Int?) {
+        if (_uiState.value.productSelectionLocked) {
+            _uiState.update { it.copy(snackbarMessage = weldStringsFor(it.locale).switchProductBlocked) }
+            return
+        }
+        val machine = _uiState.value.weldingMachines.find { it.id == machineId }
+        _uiState.update {
+            it.copy(
+                selectedWeldingMachineId = machineId,
+                selectedWeldingMachineLabel = machine?.label,
+                selectedProductCode = null,
+                activePlanId = null,
+            )
+        }
+        viewModelScope.launch {
+            if (machineId != null) {
+                fetchProducts(showSnackbarOnError = false)
+            } else {
+                _uiState.update { it.copy(products = emptyList()) }
+            }
+            loadPlans(showLoading = true)
+        }
+    }
+
+    fun openInProgressPanel() {
+        _uiState.update { it.copy(inProgressPanelVisible = true) }
+    }
+
+    fun closeInProgressPanel() {
+        _uiState.update { it.copy(inProgressPanelVisible = false) }
+    }
+
+    fun onInProgressPanelRowClick(row: WeldingManagementRowDto) {
+        focusInProgressRow(row)
+        closeInProgressPanel()
+    }
+
+    fun requestForceReleaseActiveRow() {
+        val planId = _uiState.value.activePlanId ?: return
+        val row = managementRows.find { it.id == planId } ?: return
+        requestForceReleaseSession(row)
+    }
+
+    fun onInProgressPanelResume(row: WeldingManagementRowDto) {
+        requestResumeSession(row)
+        closeInProgressPanel()
+    }
+
+    fun openHelpDialog() {
+        _uiState.update { it.copy(helpDialogVisible = true) }
+    }
+
+    fun closeHelpDialog() {
+        _uiState.update { it.copy(helpDialogVisible = false) }
+    }
+
+    fun operatorNameForInProgressRow(row: WeldingManagementRowDto): String =
+        operatorLabelForHistoryRow(row)
+
+    fun inProgressRowStatusLabel(row: WeldingManagementRowDto): String {
+        val s = weldStringsFor(_uiState.value.locale)
+        if (rowMesLockOwner(row) == MesLockOwner.Other) return s.sessionLockedByOtherTerminalShort
+        return when (row.mesProductionIsPaused) {
+            1 -> s.timerPaused
+            2 -> s.timerBreak
+            else -> s.timerRunning
+        }
     }
 
     fun focusInProgressRow(row: WeldingManagementRowDto) {
@@ -291,19 +400,91 @@ class WeldingActualViewModel(
 
     fun canResumeSession(row: WeldingManagementRowDto): Boolean {
         if (row.id == null || !isRowMesActive(row)) return false
-        return rowMesLockOwner(row) != MesLockOwner.Other
+        if (rowMesLockOwner(row) == MesLockOwner.Other) return canOperatorReclaimRow(row)
+        return true
+    }
+
+    fun canForceReleaseSession(row: WeldingManagementRowDto): Boolean {
+        if (row.id == null || !isRowMesActive(row)) return false
+        return rowMesLockOwner(row) == MesLockOwner.Other
+    }
+
+    fun resumeSessionButtonLabel(row: WeldingManagementRowDto): String {
+        val s = weldStringsFor(_uiState.value.locale)
+        return if (rowMesLockOwner(row) == MesLockOwner.Other && canOperatorReclaimRow(row)) {
+            s.btnReclaimSession
+        } else {
+            s.btnResumeSession
+        }
+    }
+
+    private fun canOperatorReclaimRow(row: WeldingManagementRowDto): Boolean {
+        if (row.id == null || !isRowMesActive(row)) return false
+        val op = row.mesOperatorUserId
+        return op == null || op == userId
+    }
+
+    /** サーバー上で既に MES 生産中の行：再開/引き継ぎへ誘導（生産開始 PATCH の 409 を避ける） */
+    private fun handleActiveRowOnStart(row: WeldingManagementRowDto, s: WeldStrings): Boolean {
+        if (!isRowMesActive(row)) return false
+        when (rowMesLockOwner(row)) {
+            MesLockOwner.Other -> {
+                if (canOperatorReclaimRow(row)) {
+                    requestResumeSession(row)
+                } else {
+                    _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
+                }
+            }
+            MesLockOwner.Unclaimed, MesLockOwner.Mine -> resumeInProgressSession(row)
+        }
+        return true
+    }
+
+    fun requestResumeSession(row: WeldingManagementRowDto) {
+        if (rowMesLockOwner(row) == MesLockOwner.Other && canOperatorReclaimRow(row)) {
+            _uiState.update { it.copy(reclaimConfirmRowId = row.id) }
+            return
+        }
+        resumeInProgressSession(row)
+    }
+
+    fun dismissReclaimConfirm() {
+        _uiState.update { it.copy(reclaimConfirmRowId = null) }
+    }
+
+    fun confirmReclaimSession() {
+        val planId = _uiState.value.reclaimConfirmRowId ?: return
+        val row = managementRows.find { it.id == planId } ?: return
+        _uiState.update { it.copy(reclaimConfirmRowId = null) }
+        resumeInProgressSession(row)
+    }
+
+    fun requestForceReleaseSession(row: WeldingManagementRowDto) {
+        if (!canForceReleaseSession(row)) return
+        _uiState.update { it.copy(forceReleaseConfirmRowId = row.id) }
+    }
+
+    fun dismissForceReleaseConfirm() {
+        _uiState.update { it.copy(forceReleaseConfirmRowId = null) }
+    }
+
+    fun confirmForceReleaseSession() {
+        val planId = _uiState.value.forceReleaseConfirmRowId ?: return
+        val row = managementRows.find { it.id == planId } ?: return
+        _uiState.update { it.copy(forceReleaseConfirmRowId = null) }
+        forceReleaseMesClientLock(row)
     }
 
     fun resumeActiveSession() {
         val planId = _uiState.value.activePlanId ?: return
         val row = managementRows.find { it.id == planId } ?: return
-        resumeInProgressSession(row)
+        requestResumeSession(row)
     }
 
     /** 切回当前检验员正在生产的计划并恢复操作 */
     fun resumeMyActiveProduction() {
         val row = findMyActiveProductionRow() ?: return
-        resumeInProgressSession(row)
+        requestResumeSession(row)
     }
 
     private fun findMyActiveProductionRow(): WeldingManagementRowDto? =
@@ -320,11 +501,12 @@ class WeldingActualViewModel(
                 _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
                 return@launch
             }
-            if (rowMesLockOwner(row) == MesLockOwner.Other) {
+            val owner = rowMesLockOwner(row)
+            if (owner == MesLockOwner.Other && !canOperatorReclaimRow(row)) {
                 _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
                 return@launch
             }
-            if (rowMesLockOwner(row) != MesLockOwner.Mine) {
+            if (owner != MesLockOwner.Mine) {
                 val ok = patchWithConflictHandling(
                     planId,
                     PatchWeldingBody(
@@ -347,8 +529,28 @@ class WeldingActualViewModel(
                 _uiState.update { it.copy(selectedProductCode = code, activePlanId = planId) }
             }
             syncSessionFromRow(planId)
+            alignSessionElapsedFromWallClock(planId, row)
             publishUi()
             _uiState.update { it.copy(snackbarMessage = s.sessionResumed) }
+        }
+    }
+
+    private fun forceReleaseMesClientLock(row: WeldingManagementRowDto) {
+        viewModelScope.launch {
+            val s = weldStringsFor(_uiState.value.locale)
+            val planId = row.id ?: return@launch
+            if (!canForceReleaseSession(row)) return@launch
+            val ok = patchWithConflictHandling(
+                planId,
+                PatchWeldingBody(
+                    mesForceRelease = true,
+                    mesReleaseClientLock = true,
+                ),
+            )
+            if (!ok) return@launch
+            if (networkMonitor.currentOnline()) loadPlans()
+            publishUi()
+            _uiState.update { it.copy(snackbarMessage = s.forceReleaseLockSuccess) }
         }
     }
 
@@ -356,32 +558,50 @@ class WeldingActualViewModel(
         viewModelScope.launch {
             val state = _uiState.value
             val s = weldStringsFor(state.locale)
+            val machineLabel = state.selectedWeldingMachineLabel?.trim().orEmpty()
+            if (machineLabel.isEmpty()) {
+                _uiState.update { it.copy(snackbarMessage = s.emptySelectMachine) }
+                return@launch
+            }
             val code = state.selectedProductCode ?: return@launch
             val product = state.products.find { it.productCode == code } ?: return@launch
             try {
+                findInProgressRowForMachine()?.let { machineRow ->
+                    if (machineRow.productCd == code) {
+                        if (handleActiveRowOnStart(machineRow, s)) return@launch
+                    } else if (machineRow.id != null) {
+                        _uiState.update {
+                            it.copy(
+                                snackbarMessage = s.machineAlreadyProducing.replace(
+                                    "{label}",
+                                    rowShortLabel(machineRow),
+                                ),
+                            )
+                        }
+                        return@launch
+                    }
+                }
                 val existingRow = findOpenRow(code)
                 var planId = existingRow?.id
-                if (existingRow != null && isRowMesActive(existingRow)) {
-                    when (rowMesLockOwner(existingRow)) {
-                        MesLockOwner.Other -> {
-                            _uiState.update { it.copy(snackbarMessage = s.sessionLockedByOtherTerminal) }
-                            return@launch
-                        }
-                        MesLockOwner.Unclaimed, MesLockOwner.Mine -> {
-                            resumeInProgressSession(existingRow)
-                            return@launch
-                        }
-                    }
+                if (existingRow != null && handleActiveRowOnStart(existingRow, s)) {
+                    return@launch
                 }
                 if (planId == null) {
                     planId = createPlanResilient(
                         productionDay = state.productionDay,
                         productCd = code,
                         productName = product.productName.trim().ifEmpty { code },
+                        weldingMachine = machineLabel,
                     )
-                    if (planId > 0) {
-                        loadPlans(rebindSelection = false)
+                    if (planId > 0 && networkMonitor.currentOnline()) {
+                        applyPlansFromServer(showLoading = false, rebindSelection = false)
                     }
+                } else if (networkMonitor.currentOnline()) {
+                    applyPlansFromServer(showLoading = false, rebindSelection = false)
+                }
+                planId = planId ?: return@launch
+                managementRows.find { it.id == planId }?.let { freshRow ->
+                    if (handleActiveRowOnStart(freshRow, s)) return@launch
                 }
                 findOtherActiveRowForOperator(userId, planId)?.let { other ->
                     when (rowMesLockOwner(other)) {
@@ -410,7 +630,7 @@ class WeldingActualViewModel(
                     return@launch
                 }
                 if (session.wallStart != null) {
-                    session = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+                    session = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
                     sessions[planId] = session
                 }
                 val now = System.currentTimeMillis()
@@ -420,6 +640,8 @@ class WeldingActualViewModel(
                 session.activeAccumMs = 0
                 session.pausedAccumMs = 0
                 session.pauseSliceStart = null
+                session.breakAccumMs = 0
+                session.breakSliceStart = null
                 session.runningSliceStart = now
                 session.wallEnd = null
                 publishUi()
@@ -427,6 +649,7 @@ class WeldingActualViewModel(
                     planId,
                     PatchWeldingBody(
                         productionDay = state.productionDay,
+                        weldingMachine = machineLabel,
                         mesProductionStartedAt = iso,
                         mesProductionIsPaused = 0,
                         mesOperatorUserId = userId,
@@ -447,6 +670,7 @@ class WeldingActualViewModel(
                     productionDay = state.productionDay,
                     productCd = code,
                     productName = product.productName.trim().ifEmpty { code },
+                    weldingMachine = machineLabel,
                     startedAt = iso,
                 )
                 _uiState.update {
@@ -486,8 +710,47 @@ class WeldingActualViewModel(
         if (!InspectionSessionLogic.isTimerPaused(session)) return
         val now = System.currentTimeMillis()
         InspectionSessionLogic.flushPauseSlice(session, now)
-        session.runningSliceStart = now
-        session.pauseSliceStart = null
+        val ws = resolveSessionWallStartMs(session, planId)
+        if (ws != null) {
+            InspectionSessionLogic.correctNetProductionFromWallClock(session, ws, now)
+        } else {
+            session.runningSliceStart = now
+            session.pauseSliceStart = null
+        }
+        viewModelScope.launch {
+            persistTimerCheckpoint(planId, session)
+            publishUi()
+        }
+    }
+
+    fun onBreakProduction() {
+        val planId = _uiState.value.activePlanId ?: return
+        if (!locallyOperated.contains(planId)) return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isTimerRunning(session)) return
+        val now = System.currentTimeMillis()
+        InspectionSessionLogic.flushRunningSlice(session, now)
+        session.breakSliceStart = now
+        viewModelScope.launch {
+            persistTimerCheckpoint(planId, session)
+            publishUi()
+        }
+    }
+
+    fun onResumeBreakProduction() {
+        val planId = _uiState.value.activePlanId ?: return
+        if (!locallyOperated.contains(planId)) return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isTimerOnBreak(session)) return
+        val now = System.currentTimeMillis()
+        InspectionSessionLogic.flushBreakSlice(session, now)
+        val ws = resolveSessionWallStartMs(session, planId)
+        if (ws != null) {
+            InspectionSessionLogic.correctNetProductionFromWallClock(session, ws, now)
+        } else {
+            session.runningSliceStart = now
+            session.breakSliceStart = null
+        }
         viewModelScope.launch {
             persistTimerCheckpoint(planId, session)
             publishUi()
@@ -496,21 +759,203 @@ class WeldingActualViewModel(
 
     fun openEndDialog() {
         val planId = _uiState.value.activePlanId ?: return
-        val session = sessions[planId] ?: return
+        if (sessions[planId] == null) return
         if (!_uiState.value.canEnd) return
         val now = System.currentTimeMillis()
-        if (InspectionSessionLogic.isTimerRunning(session)) InspectionSessionLogic.flushRunningSlice(session, now)
-        if (InspectionSessionLogic.isTimerPaused(session)) InspectionSessionLogic.flushPauseSlice(session, now)
-        _uiState.update { it.copy(endDialogVisible = true, endDialogQty = "") }
-        publishUi()
+        _uiState.update {
+            it.copy(
+                endDialogVisible = true,
+                endDialogBoxes = "",
+                endDialogPieceQty = "",
+                endDialogQtyInputSource = null,
+                endDialogQtyMismatch = null,
+                endDialogQtyMismatchConfirm = null,
+                endDialogWallEndDisplay = formatWall(now),
+            )
+        }
+        publishEndDialogQtyState()
     }
 
     fun closeEndDialog() {
-        _uiState.update { it.copy(endDialogVisible = false) }
+        resumeProductionAfterEndDialogCancel()
+        _uiState.update {
+            it.copy(
+                endDialogVisible = false,
+                endDialogQtyMismatchConfirm = null,
+            )
+        }
+        publishUi()
+    }
+
+    private fun resumeProductionAfterEndDialogCancel() {
+        val planId = _uiState.value.activePlanId ?: return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isProductionInProgress(session)) return
+        if (InspectionSessionLogic.isTimerPaused(session) ||
+            InspectionSessionLogic.isTimerOnBreak(session) ||
+            InspectionSessionLogic.isTimerRunning(session)
+        ) {
+            return
+        }
+        session.runningSliceStart = System.currentTimeMillis()
+        viewModelScope.launch { persistTimerCheckpoint(planId, session) }
+    }
+
+    fun onEndDialogBoxesChange(value: String) {
+        val filtered = value.filter { it.isDigit() }
+        val state = _uiState.value
+        val upb = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val syncedPiece = when {
+            filtered.isEmpty() -> ""
+            upb > 0 -> {
+                val boxes = filtered.toIntOrNull()
+                if (boxes != null && boxes >= 0) pieceQtyFromBoxes(boxes, upb).toString() else state.endDialogPieceQty
+            }
+            else -> state.endDialogPieceQty
+        }
+        _uiState.update {
+            it.copy(
+                endDialogBoxes = filtered,
+                endDialogPieceQty = syncedPiece,
+                endDialogQtyInputSource = EndDialogQtyInputSource.Box,
+            )
+        }
+        publishEndDialogQtyState()
+    }
+
+    fun onEndDialogPieceQtyChange(value: String) {
+        val filtered = value.filter { it.isDigit() }
+        val state = _uiState.value
+        val upb = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val syncedBoxes = when {
+            filtered.isEmpty() -> ""
+            upb > 0 -> {
+                val piece = filtered.toIntOrNull()
+                if (piece != null && piece >= 0) boxQtyFromPieces(piece, upb).toString() else state.endDialogBoxes
+            }
+            else -> state.endDialogBoxes
+        }
+        _uiState.update {
+            it.copy(
+                endDialogPieceQty = filtered,
+                endDialogBoxes = syncedBoxes,
+                endDialogQtyInputSource = EndDialogQtyInputSource.Piece,
+            )
+        }
+        publishEndDialogQtyState()
+    }
+
+    private fun publishEndDialogQtyState() {
+        val state = _uiState.value
+        val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val mismatch = resolveEndDialogQtyMismatch(state.endDialogPieceQty, unitPerBox)
+        val canSubmit = endDialogCanSubmit(state.endDialogBoxes, state.endDialogPieceQty, unitPerBox)
+        _uiState.update {
+            it.copy(
+                endDialogUnitPerBox = unitPerBox,
+                endDialogQtyMismatch = mismatch,
+                endDialogCanSubmit = canSubmit,
+            )
+        }
+    }
+
+    fun dismissProductionEndQtyMismatch() {
+        _uiState.update { it.copy(endDialogQtyMismatchConfirm = null) }
+    }
+
+    fun confirmProductionEndQtyMismatch() {
+        val confirm = _uiState.value.endDialogQtyMismatchConfirm ?: return
+        _uiState.update { it.copy(endDialogQtyMismatchConfirm = null) }
+        performProductionEnd(confirm.piece)
     }
 
     fun onEndDialogQtyChange(value: String) {
-        _uiState.update { it.copy(endDialogQty = value.filter { it.isDigit() }) }
+        onEndDialogPieceQtyChange(value)
+    }
+
+    fun submitProductionEnd() {
+        val planId = _uiState.value.activePlanId ?: return
+        if (sessions[planId] == null) return
+        val state = _uiState.value
+        val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
+        val s = weldStringsFor(state.locale)
+        val qty = state.endDialogPieceQty.trim().toIntOrNull() ?: -1
+        if (qty < 0) {
+            _uiState.update { it.copy(snackbarMessage = s.qtyInvalid) }
+            return
+        }
+        if (unitPerBox > 0 && hasPieceBoxQtyMismatch(qty, unitPerBox)) {
+            _uiState.update {
+                it.copy(endDialogQtyMismatchConfirm = EndDialogQtyMismatch(qty, unitPerBox))
+            }
+            return
+        }
+        performProductionEnd(qty)
+    }
+
+    private fun performProductionEnd(qty: Int) {
+        val planId = _uiState.value.activePlanId ?: return
+        val session = sessions[planId] ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(endDialogSubmitting = true) }
+            try {
+                val now = System.currentTimeMillis()
+                if (InspectionSessionLogic.isTimerRunning(session)) InspectionSessionLogic.flushRunningSlice(session, now)
+                if (InspectionSessionLogic.isTimerPaused(session)) InspectionSessionLogic.flushPauseSlice(session, now)
+                if (InspectionSessionLogic.isTimerOnBreak(session)) InspectionSessionLogic.flushBreakSlice(session, now)
+                session.wallEnd = now
+                val defectTotal = session.defects.values.sum()
+                val breakSec = (InspectionSessionLogic.readBreakAccumMs(session, now) / 1000).toInt()
+                val stopSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt()
+                val ok = patchWithConflictHandling(
+                    planId,
+                    PatchWeldingBody(
+                        productionDay = productionDayFromMillis(session.wallStart ?: now),
+                        mesProductionEndedAt = Instant.ofEpochMilli(now).toString(),
+                        mesNetProductionSec = (InspectionSessionLogic.readNetProductionMs(session, now) / 1000).toInt(),
+                        mesBreakSec = breakSec,
+                        mesStopSec = stopSec,
+                        mesPausedAccumSec = breakSec + stopSec,
+                        mesProductionIsPaused = 0,
+                        mesOperatorUserId = userId,
+                        mesDefectByItem = session.defects.filter { it.value > 0 },
+                        actualProductionQuantity = qty,
+                        productionCompletedCheck = true,
+                        defectQty = defectTotal,
+                    ),
+                )
+                if (!ok) {
+                    session.wallEnd = null
+                    _uiState.update { it.copy(endDialogSubmitting = false) }
+                    loadPlans()
+                    return@launch
+                }
+                updateLocalRowCompleted(planId, session, qty, now)
+                locallyOperated.remove(planId)
+                sessions[planId] = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
+                val savedMsg = weldStringsFor(_uiState.value.locale).endProductionSaved
+                _uiState.update {
+                    it.copy(
+                        activePlanId = null,
+                        endDialogVisible = false,
+                        endDialogSubmitting = false,
+                        snackbarMessage = savedMsg,
+                    )
+                }
+                if (networkMonitor.currentOnline()) {
+                    loadPlans()
+                } else {
+                    publishUi()
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        endDialogSubmitting = false,
+                        snackbarMessage = formatNetworkError(e, weldStringsFor(it.locale).saveFailed),
+                    )
+                }
+            }
+        }
     }
 
     fun canEditConfirmedHistoryRow(row: WeldingManagementRowDto): Boolean {
@@ -716,71 +1161,6 @@ class WeldingActualViewModel(
         }
     }
 
-    fun submitProductionEnd() {
-        val planId = _uiState.value.activePlanId ?: return
-        val session = sessions[planId] ?: return
-        val qty = _uiState.value.endDialogQty.toIntOrNull() ?: -1
-        if (qty < 0) {
-            _uiState.update { it.copy(snackbarMessage = "生産数を正しく入力してください") }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(endDialogSubmitting = true) }
-            try {
-                val now = System.currentTimeMillis()
-                if (InspectionSessionLogic.isTimerRunning(session)) InspectionSessionLogic.flushRunningSlice(session, now)
-                if (InspectionSessionLogic.isTimerPaused(session)) InspectionSessionLogic.flushPauseSlice(session, now)
-                session.wallEnd = now
-                val defectTotal = session.defects.values.sum()
-                val ok = patchWithConflictHandling(
-                    planId,
-                    PatchWeldingBody(
-                        productionDay = productionDayFromMillis(session.wallStart ?: now),
-                        mesProductionEndedAt = Instant.ofEpochMilli(now).toString(),
-                        mesNetProductionSec = (InspectionSessionLogic.readNetProductionMs(session, now) / 1000).toInt(),
-                        mesPausedAccumSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt(),
-                        mesProductionIsPaused = 0,
-                        mesOperatorUserId = userId,
-                        mesDefectByItem = session.defects.filter { it.value > 0 },
-                        actualProductionQuantity = qty,
-                        productionCompletedCheck = true,
-                        defectQty = defectTotal,
-                    ),
-                )
-                if (!ok) {
-                    session.wallEnd = null
-                    _uiState.update { it.copy(endDialogSubmitting = false) }
-                    loadPlans()
-                    return@launch
-                }
-                updateLocalRowCompleted(planId, session, qty, now)
-                locallyOperated.remove(planId)
-                sessions[planId] = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
-                val savedMsg = weldStringsFor(_uiState.value.locale).endProductionSaved
-                _uiState.update {
-                    it.copy(
-                        activePlanId = null,
-                        endDialogVisible = false,
-                        endDialogSubmitting = false,
-                        snackbarMessage = savedMsg,
-                    )
-                }
-                if (networkMonitor.currentOnline()) {
-                    loadPlans()
-                } else {
-                    publishUi()
-                }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        endDialogSubmitting = false,
-                        snackbarMessage = formatNetworkError(e, weldStringsFor(it.locale).saveFailed),
-                    )
-                }
-            }
-        }
-    }
-
     fun bumpDefect(itemId: String, delta: Int) {
         val planId = _uiState.value.activePlanId ?: return
         if (!locallyOperated.contains(planId)) return
@@ -789,7 +1169,7 @@ class WeldingActualViewModel(
         session.defects[itemId] = (current + delta).coerceAtLeast(0)
         publishUi()
         viewModelScope.launch {
-            if (!locallyOperated.contains(planId) && !canServerPatchPlan(planId)) return@launch
+            if (!canServerPatchPlan(planId)) return@launch
             patchWithConflictHandling(
                 planId,
                 PatchWeldingBody(
@@ -848,6 +1228,7 @@ class WeldingActualViewModel(
                         productCd = entry.productCd,
                         productName = entry.productName,
                         operatorUserId = entry.operatorUserId,
+                        weldingMachine = entry.weldingMachine,
                     )
                     remapPlanId(entry.localPlanId, serverId)
                     serverId
@@ -890,9 +1271,10 @@ class WeldingActualViewModel(
         productionDay: String,
         productCd: String,
         productName: String,
+        weldingMachine: String,
     ): Int {
         if (!networkMonitor.currentOnline()) {
-            return createLocalPlan(productionDay, productCd, productName)
+            return createLocalPlan(productionDay, productCd, productName, weldingMachine)
         }
         return try {
             repository.createPlan(
@@ -900,10 +1282,11 @@ class WeldingActualViewModel(
                 productCd = productCd,
                 productName = productName,
                 operatorUserId = userId,
+                weldingMachine = weldingMachine,
             )
         } catch (e: Exception) {
             if (NetworkErrors.isNetworkFailure(e)) {
-                createLocalPlan(productionDay, productCd, productName)
+                createLocalPlan(productionDay, productCd, productName, weldingMachine)
             } else {
                 throw e
             }
@@ -914,6 +1297,7 @@ class WeldingActualViewModel(
         productionDay: String,
         productCd: String,
         productName: String,
+        weldingMachine: String,
     ): Int {
         val localId = offlineStore.allocateLocalPlanId()
         offlineStore.enqueueCreate(
@@ -923,6 +1307,7 @@ class WeldingActualViewModel(
                 productCd = productCd,
                 productName = productName,
                 operatorUserId = userId,
+                weldingMachine = weldingMachine,
             ),
         )
         upsertLocalPlanRow(
@@ -930,6 +1315,7 @@ class WeldingActualViewModel(
             productionDay = productionDay,
             productCd = productCd,
             productName = productName,
+            weldingMachine = weldingMachine,
             startedAt = null,
         )
         refreshPendingSyncState()
@@ -941,6 +1327,7 @@ class WeldingActualViewModel(
         productionDay: String,
         productCd: String,
         productName: String,
+        weldingMachine: String? = null,
         startedAt: String?,
     ) {
         val row = WeldingManagementRowDto(
@@ -948,6 +1335,7 @@ class WeldingActualViewModel(
             productionDay = productionDay,
             productCd = productCd,
             productName = productName,
+            weldingMachine = weldingMachine,
             mesOperatorUserId = userId,
             mesClientInstanceId = clientInstanceId,
             mesProductionStartedAt = startedAt,
@@ -1025,9 +1413,14 @@ class WeldingActualViewModel(
     }
 
     private suspend fun fetchProducts(showSnackbarOnError: Boolean = false) {
+        val machineId = _uiState.value.selectedWeldingMachineId
+        if (machineId == null) {
+            _uiState.update { it.copy(products = emptyList(), isLoadingProducts = false) }
+            return
+        }
         _uiState.update { it.copy(isLoadingProducts = true) }
         val s = weldStringsFor(_uiState.value.locale)
-        runCatching { repository.loadProducts() }
+        runCatching { repository.loadProductsForMachine(machineId) }
             .onSuccess { list ->
                 _uiState.update {
                     it.copy(
@@ -1054,9 +1447,41 @@ class WeldingActualViewModel(
         viewModelScope.launch { fetchProducts(showSnackbarOnError = true) }
     }
 
+    private suspend fun loadMachines(showSnackbarOnError: Boolean = false) {
+        _uiState.update { it.copy(isLoadingMachines = true) }
+        val s = weldStringsFor(_uiState.value.locale)
+        runCatching { repository.loadWeldingMesMachines() }
+            .onSuccess { rows ->
+                val options = rows.mapNotNull { row ->
+                    val id = row.id ?: return@mapNotNull null
+                    val label = repository.pickWeldingMesMachineLabel(row) ?: return@mapNotNull null
+                    WeldMesMachineOption(id = id, label = label)
+                }
+                _uiState.update {
+                    it.copy(
+                        weldingMachines = options,
+                        isLoadingMachines = false,
+                        machinesLoadError = null,
+                    )
+                }
+            }
+            .onFailure { e ->
+                val msg = formatNetworkError(e, s.loadMachinesFailed)
+                _uiState.update {
+                    it.copy(
+                        isLoadingMachines = false,
+                        machinesLoadError = msg,
+                        snackbarMessage = if (showSnackbarOnError) msg else it.snackbarMessage,
+                    )
+                }
+            }
+    }
+
     private suspend fun loadInitial() {
         _uiState.update { it.copy(isLoadingDefects = true) }
-        fetchProducts(showSnackbarOnError = false)
+        if (_uiState.value.selectedWeldingMachineId != null) {
+            fetchProducts(showSnackbarOnError = false)
+        }
         loadDefectItems(showLoading = true)
         loadPlans(showLoading = true)
     }
@@ -1109,13 +1534,13 @@ class WeldingActualViewModel(
             _uiState.update { it.copy(isLoadingPlans = true) }
         }
         val s = weldStringsFor(_uiState.value.locale)
-        runCatching { repository.loadPlans(_uiState.value.productionDay) }
+        runCatching { repository.loadPlans(_uiState.value.productionDay, _uiState.value.selectedWeldingMachineLabel) }
             .onSuccess { rows ->
                 managementRows = rows
                 rows.forEach { row ->
                     val id = row.id ?: return@forEach
                     if (id !in sessions) {
-                        sessions[id] = InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+                        sessions[id] = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
                     }
                     if (shouldHydrateSessionFromServer(id)) {
                         syncSessionFromRow(id, row)
@@ -1156,7 +1581,7 @@ class WeldingActualViewModel(
 
     private fun bindActivePlanFromSelection() {
         val code = _uiState.value.selectedProductCode
-        if (code == null) {
+        if (code == null || _uiState.value.selectedWeldingMachineId == null) {
             _uiState.update { it.copy(activePlanId = null, showPlanCard = false) }
             return
         }
@@ -1167,7 +1592,12 @@ class WeldingActualViewModel(
                 managementRows.find { it.id == currentId }?.productCd == code -> currentId
             else -> findOpenRow(code)?.id
         }
-        _uiState.update { it.copy(activePlanId = planId, showPlanCard = true) }
+        _uiState.update {
+            it.copy(
+                activePlanId = planId,
+                showPlanCard = it.selectedWeldingMachineId != null && code.isNotEmpty(),
+            )
+        }
         planId?.let { id ->
             if (shouldHydrateSessionFromServer(id)) syncSessionFromRow(id)
         }
@@ -1183,16 +1613,33 @@ class WeldingActualViewModel(
     private fun isRowMesEnded(row: WeldingManagementRowDto): Boolean =
         !row.mesProductionEndedAt.isNullOrBlank()
 
+    private fun rowMatchesSelectedMachine(row: WeldingManagementRowDto): Boolean {
+        val name = _uiState.value.selectedWeldingMachineLabel?.trim().orEmpty()
+        if (name.isEmpty()) return true
+        val rm = row.weldingMachine?.trim().orEmpty()
+        return rm.isEmpty() || rm == name
+    }
+
+    private fun findInProgressRowForMachine(): WeldingManagementRowDto? {
+        val machine = _uiState.value.selectedWeldingMachineLabel?.trim().orEmpty()
+        if (machine.isEmpty()) return null
+        return managementRows.firstOrNull { row ->
+            isRowMesActive(row) && row.weldingMachine?.trim() == machine
+        }
+    }
+
     private fun findOpenRow(code: String): WeldingManagementRowDto? {
         val operatedId = _uiState.value.activePlanId
         if (operatedId != null && locallyOperated.contains(operatedId)) {
-            managementRows.find { it.id == operatedId && it.productCd == code }?.let { return it }
+            managementRows.find {
+                it.id == operatedId && it.productCd == code && rowMatchesSelectedMachine(it)
+            }?.let { return it }
         }
         return managementRows.firstOrNull { row ->
             row.productCd == code &&
+                rowMatchesSelectedMachine(row) &&
                 (row.productionCompletedCheck ?: 0) != 1 &&
-                row.mesOperatorUserId == userId &&
-                !isRowMesEnded(row)
+                (row.mesOperatorUserId == null || row.mesOperatorUserId == userId)
         }
     }
 
@@ -1204,7 +1651,7 @@ class WeldingActualViewModel(
         return managementRows.firstOrNull { row ->
             row.id != excludeId &&
                 isRowMesActive(row) &&
-                row.mesOperatorUserId == inspectorId
+                (row.mesOperatorUserId == null || row.mesOperatorUserId == inspectorId)
         }
     }
 
@@ -1223,10 +1670,44 @@ class WeldingActualViewModel(
                 mesProductionEndedAt = r.mesProductionEndedAt,
                 mesNetProductionSec = r.mesNetProductionSec,
                 mesPausedAccumSec = r.mesPausedAccumSec,
+                mesBreakSec = r.mesBreakSec,
+                mesStopSec = r.mesStopSec,
                 mesProductionIsPaused = r.mesProductionIsPaused,
                 mesDefectByItem = r.mesDefectByItem,
             ),
         )
+        if (InspectionSessionLogic.isProductionInProgress(session)) {
+            InspectionSessionLogic.reconcileInProgressTimer(session)
+        }
+    }
+
+    private fun alignSessionElapsedFromWallClock(planId: Int, row: WeldingManagementRowDto? = null) {
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isProductionInProgress(session)) return
+        val ws = resolveSessionWallStartMs(session, planId, row) ?: return
+        val now = System.currentTimeMillis()
+        when {
+            InspectionSessionLogic.isTimerPaused(session) || InspectionSessionLogic.isTimerOnBreak(session) -> {
+                val serverNet = row?.mesNetProductionSec ?: managementRows.find { it.id == planId }?.mesNetProductionSec
+                if ((serverNet ?: 0) == 0 && session.activeAccumMs == 0L) {
+                    val pauseMs = InspectionSessionLogic.readExplicitPausedAccumMs(session, now)
+                    val breakMs = InspectionSessionLogic.readExplicitBreakAccumMs(session, now)
+                    session.activeAccumMs = (now - ws - pauseMs - breakMs).coerceAtLeast(0)
+                }
+            }
+            else -> InspectionSessionLogic.correctNetProductionFromWallClock(session, ws, now)
+        }
+    }
+
+    private fun resolveSessionWallStartMs(
+        session: PlanSession,
+        planId: Int,
+        row: WeldingManagementRowDto? = null,
+    ): Long? {
+        session.wallStart?.let { return it }
+        val startedAt = row?.mesProductionStartedAt
+            ?: managementRows.find { it.id == planId }?.mesProductionStartedAt
+        return MesDateTime.parseToMillis(startedAt)
     }
 
     private fun rowMesLockOwner(row: WeldingManagementRowDto?): MesLockOwner {
@@ -1327,7 +1808,7 @@ class WeldingActualViewModel(
 
     private fun ensureSession(planId: Int): PlanSession {
         return sessions.getOrPut(planId) {
-            InspectionSessionLogic.emptySession(defectItems.map { it.defectCd })
+            InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
         }
     }
 
@@ -1339,14 +1820,22 @@ class WeldingActualViewModel(
     }
 
     private suspend fun persistTimerCheckpoint(planId: Int, session: PlanSession): Boolean {
-        if (!locallyOperated.contains(planId) && !canServerPatchPlan(planId)) return false
+        if (!canServerPatchPlan(planId)) return false
         val now = System.currentTimeMillis()
+        val breakSec = (InspectionSessionLogic.readBreakAccumMs(session, now) / 1000).toInt()
+        val stopSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt()
         return patchWithConflictHandling(
             planId,
             PatchWeldingBody(
                 mesNetProductionSec = (InspectionSessionLogic.readNetProductionMs(session, now) / 1000).toInt(),
-                mesPausedAccumSec = (InspectionSessionLogic.readPausedAccumMs(session, now) / 1000).toInt(),
-                mesProductionIsPaused = if (InspectionSessionLogic.isTimerPaused(session)) 1 else 0,
+                mesBreakSec = breakSec,
+                mesStopSec = stopSec,
+                mesPausedAccumSec = breakSec + stopSec,
+                mesProductionIsPaused = when {
+                    InspectionSessionLogic.isTimerOnBreak(session) -> 2
+                    InspectionSessionLogic.isTimerPaused(session) -> 1
+                    else -> 0
+                },
             ),
         )
     }
@@ -1363,10 +1852,12 @@ class WeldingActualViewModel(
         val inProgress = managementRows.filter { isRowMesActive(it) }
         val completed = managementRows.filter { row ->
             (row.productionCompletedCheck ?: 0) == 1 &&
-                row.mesOperatorUserId == userId &&
-                rowProductionDay(row) == state.productionDay
+                rowProductionDay(row) == state.productionDay &&
+                rowMatchesSelectedMachine(row) &&
+                (row.mesOperatorUserId == null || row.mesOperatorUserId == userId)
         }.sortedWith { a, b -> WeldingManagementRowExt.compareForHistory(a, b) }
         val phase = session?.let { InspectionSessionLogic.timerPhase(it) } ?: TimerPhase.Idle
+        val s = weldStringsFor(state.locale)
         val inProgressLocal = session != null && InspectionSessionLogic.isProductionInProgress(session)
         val locked = inProgressLocal && planId?.let { locallyOperated.contains(it) } == true
         val canEdit = locked
@@ -1377,6 +1868,7 @@ class WeldingActualViewModel(
             activeCode != state.selectedProductCode ||
                 (activeId != null && !locallyOperated.contains(activeId))
         } == true
+        val unitPerBox = resolveUnitPerBox(state.selectedProductCode, state.products)
 
         val next = state.copy(
             inProgressRows = inProgress,
@@ -1387,17 +1879,21 @@ class WeldingActualViewModel(
                 ?: product?.productName?.trim()?.takeIf { it.isNotEmpty() }
                 ?: "—",
             timerPhase = phase,
-            timerPhaseLabel = timerPhaseLabel(phase),
+            timerPhaseLabel = timerPhaseLabel(phase, s),
             elapsedDisplay = InspectionSessionLogic.formatDurationMs(
-                session?.let { s -> InspectionSessionLogic.readNetProductionMs(s, now) } ?: 0,
+                session?.let { sess -> InspectionSessionLogic.readNetProductionMs(sess, now) } ?: 0,
             ),
             pausedDisplay = InspectionSessionLogic.formatDurationMs(
-                session?.let { s -> InspectionSessionLogic.readPausedAccumMs(s, now) } ?: 0,
+                session?.let { sess -> InspectionSessionLogic.readPausedAccumMs(sess, now) } ?: 0,
+            ),
+            breakDisplay = InspectionSessionLogic.formatDurationMs(
+                session?.let { sess -> InspectionSessionLogic.readBreakAccumMs(sess, now) } ?: 0,
             ),
             wallStartDisplay = formatWall(session?.wallStart),
+            wallStartClockDisplay = formatWallClock(session?.wallStart),
             wallEndDisplay = formatWall(session?.wallEnd),
             defectTotal = session?.defects?.values?.sum() ?: 0,
-            canStart = state.selectedProductCode != null && run {
+            canStart = state.selectedWeldingMachineId != null && state.selectedProductCode != null && run {
                 val rowId = activeRow?.id
                 if (activeRow != null && rowId != null && isRowMesActive(activeRow) &&
                     !locallyOperated.contains(rowId)
@@ -1408,11 +1904,14 @@ class WeldingActualViewModel(
             },
             canPause = editableSession?.let { InspectionSessionLogic.isTimerRunning(it) } == true,
             canResume = editableSession?.let { InspectionSessionLogic.isTimerPaused(it) } == true,
+            canBreak = editableSession?.let { InspectionSessionLogic.isTimerRunning(it) } == true,
+            canResumeBreak = editableSession?.let { InspectionSessionLogic.isTimerOnBreak(it) } == true,
             canEnd = editableSession?.let {
                 InspectionSessionLogic.isProductionInProgress(it) &&
-                    !InspectionSessionLogic.isTimerPaused(it)
+                    !InspectionSessionLogic.isTimerPaused(it) &&
+                    !InspectionSessionLogic.isTimerOnBreak(it)
             } == true,
-            showPlanCard = state.selectedProductCode != null,
+            showPlanCard = state.selectedWeldingMachineId != null && state.selectedProductCode != null,
             productSelectionLocked = locked,
             canEditDefects = canEdit,
             showSessionRecoveryAlert = activeRow?.let { row ->
@@ -1420,8 +1919,22 @@ class WeldingActualViewModel(
                     rowMesLockOwner(row) != MesLockOwner.Other &&
                     !locallyOperated.contains(row.id)
             } == true,
+            showOtherTerminalLockBanner = activeRow?.let { row ->
+                row.id != null && isRowMesActive(row) && rowMesLockOwner(row) == MesLockOwner.Other
+            } == true,
+            canReclaimFromOtherTerminal = activeRow?.let { row ->
+                rowMesLockOwner(row) == MesLockOwner.Other && canOperatorReclaimRow(row)
+            } == true,
+            canForceReleaseLock = activeRow?.let { row -> canForceReleaseSession(row) } == true,
             showActiveProductionSwitchBanner = showActiveProductionSwitchBanner,
             activeProductionSwitchLabel = myActiveRow?.let { rowShortLabel(it) }.orEmpty(),
+            endDialogUnitPerBox = unitPerBox,
+            endDialogCanSubmit = endDialogCanSubmit(
+                state.endDialogBoxes,
+                state.endDialogPieceQty,
+                unitPerBox,
+            ),
+            endDialogQtyMismatch = resolveEndDialogQtyMismatch(state.endDialogPieceQty, unitPerBox),
         )
         if (next != state) {
             _uiState.value = next
@@ -1451,9 +1964,13 @@ class WeldingActualViewModel(
         val paused = InspectionSessionLogic.formatDurationMs(
             InspectionSessionLogic.readPausedAccumMs(session, now),
         )
-        val phaseLabel = timerPhaseLabel(phase)
+        val breakTime = InspectionSessionLogic.formatDurationMs(
+            InspectionSessionLogic.readBreakAccumMs(session, now),
+        )
+        val phaseLabel = timerPhaseLabel(phase, weldStringsFor(state.locale))
         if (elapsed == state.elapsedDisplay &&
             paused == state.pausedDisplay &&
+            breakTime == state.breakDisplay &&
             phase == state.timerPhase
         ) {
             return
@@ -1462,6 +1979,7 @@ class WeldingActualViewModel(
             it.copy(
                 elapsedDisplay = elapsed,
                 pausedDisplay = paused,
+                breakDisplay = breakTime,
                 timerPhase = phase,
                 timerPhaseLabel = phaseLabel,
             )
@@ -1483,12 +2001,53 @@ class WeldingActualViewModel(
         return _uiState.value.productionDay
     }
 
-    private fun timerPhaseLabel(phase: TimerPhase): String = when (phase) {
-        TimerPhase.Idle -> "未開始"
-        TimerPhase.Running -> "計測中"
-        TimerPhase.Paused -> "一時停止中"
-        TimerPhase.Break -> "休憩中"
-        TimerPhase.Ended -> "終了済"
+    private fun timerPhaseLabel(phase: TimerPhase, s: WeldStrings): String = when (phase) {
+        TimerPhase.Idle -> s.timerIdle
+        TimerPhase.Running -> s.timerRunning
+        TimerPhase.Paused -> s.timerPaused
+        TimerPhase.Break -> s.timerBreak
+        TimerPhase.Ended -> s.timerEnded
+    }
+
+    private fun formatWallClock(ts: Long?): String {
+        if (ts == null) return "—"
+        val fmt = DateTimeFormatter.ofPattern("HH:mm:ss", Locale.JAPAN)
+        return Instant.ofEpochMilli(ts).atZone(ZoneId.of("Asia/Tokyo")).format(fmt)
+    }
+
+    private fun resolveUnitPerBox(code: String?, products: List<ErpProductDto>): Int {
+        val hit = products.find { it.productCode == code } ?: return 0
+        return (hit.unitPerBox ?: 0).coerceAtLeast(0)
+    }
+
+    private fun pieceQtyFromBoxes(boxes: Int, unitPerBox: Int): Int = boxes * unitPerBox
+
+    private fun boxQtyFromPieces(pieces: Int, unitPerBox: Int): Int =
+        kotlin.math.round(pieces.toDouble() / unitPerBox).toInt()
+
+    private fun hasPieceBoxQtyMismatch(pieceQty: Int, unitPerBox: Int): Boolean =
+        unitPerBox > 0 && pieceQty % unitPerBox != 0
+
+    private fun resolveEndDialogQtyMismatch(pieceQtyRaw: String, unitPerBox: Int): EndDialogQtyMismatch? {
+        if (unitPerBox <= 0) return null
+        val trimmed = pieceQtyRaw.trim()
+        if (trimmed.isEmpty()) return null
+        val piece = trimmed.toIntOrNull() ?: return null
+        if (piece < 0) return null
+        if (!hasPieceBoxQtyMismatch(piece, unitPerBox)) return null
+        return EndDialogQtyMismatch(piece, unitPerBox)
+    }
+
+    private fun endDialogCanSubmit(boxesRaw: String, pieceQtyRaw: String, unitPerBox: Int): Boolean {
+        if (unitPerBox > 0) {
+            val piece = pieceQtyRaw.trim().toIntOrNull() ?: return false
+            if (piece < 0) return false
+            return boxesRaw.trim().isNotEmpty() || pieceQtyRaw.trim().isNotEmpty()
+        }
+        val raw = pieceQtyRaw.trim()
+        if (raw.isEmpty()) return false
+        val qty = raw.toIntOrNull() ?: return false
+        return qty >= 0
     }
 
     private fun formatWall(ts: Long?): String {
@@ -1540,7 +2099,14 @@ class WeldingActualViewModel(
                     DefectGroupUi(
                         processCd = cd,
                         processName = list.firstOrNull()?.attributableProcessName?.trim().orEmpty().ifEmpty { cd },
-                        items = list.map { DefectItemUi(id = it.defectCd, label = it.defectName) },
+                        items = list.mapNotNull { item ->
+                            val id = item.defectCd?.trim().orEmpty()
+                            if (id.isEmpty()) return@mapNotNull null
+                            DefectItemUi(
+                                id = id,
+                                label = item.defectName?.trim().orEmpty().ifEmpty { id },
+                            )
+                        },
                     )
                 }
         }

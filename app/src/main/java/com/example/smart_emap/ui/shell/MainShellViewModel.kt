@@ -19,6 +19,12 @@ private const val KEY_TABS = "shell_tabs"
 private val TabRecordSeparator = "\u001E"
 private val TabFieldSeparator = "\u001F"
 
+private fun normalizePath(path: String): String = when (path) {
+    "/master" -> "/master/product"
+    "/master/bom" -> "/master/bom/product-process"
+    else -> path
+}
+
 private fun encodeTabs(tabs: List<ShellTab>): String =
     tabs.joinToString(TabRecordSeparator) { tab ->
         "${tab.path}$TabFieldSeparator${tab.title}$TabFieldSeparator${tab.closable}"
@@ -53,8 +59,10 @@ class MainShellViewModel(
     val uiState: StateFlow<MainShellUiState> = _uiState.asStateFlow()
 
     private fun restoreState(): MainShellUiState {
-        val activePath = savedStateHandle.get<String>(KEY_ACTIVE_PATH) ?: "/dashboard"
+        val activePath = normalizePath(savedStateHandle.get<String>(KEY_ACTIVE_PATH) ?: "/dashboard")
         val tabs = decodeTabs(savedStateHandle.get<String>(KEY_TABS))
+            ?.map { tab -> tab.copy(path = normalizePath(tab.path)) }
+            ?.distinctBy { it.path }
             ?: listOf(ShellTab(path = "/dashboard", title = "ダッシュボード", closable = false))
         return MainShellUiState(
             activePath = activePath,
@@ -80,7 +88,7 @@ class MainShellViewModel(
     }
 
     fun navigateTo(path: String, user: UserDto) {
-        val normalizedPath = user.resolveAccessiblePath(path)
+        val normalizedPath = user.resolveAccessiblePath(normalizePath(path))
         val title = titleForAccessiblePath(normalizedPath)
         updateState { state ->
             val pathChanged = state.activePath != normalizedPath
@@ -122,10 +130,11 @@ class MainShellViewModel(
     }
 
     fun selectTab(path: String) {
+        val targetPath = normalizePath(path)
         updateState { state ->
             state.copy(
-                activePath = path,
-                isRouteLoading = state.activePath != path,
+                activePath = targetPath,
+                isRouteLoading = state.activePath != targetPath,
             )
         }
     }

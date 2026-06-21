@@ -1028,12 +1028,14 @@ private fun IarDefectsBlock(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     group.items.forEach { item ->
+                        val defectCd = item.defectCd?.trim().orEmpty()
+                        if (defectCd.isEmpty()) return@forEach
                         ImrDefectCard(
-                            label = item.defectName,
-                            qty = uiState.defects[item.defectCd] ?: 0,
+                            label = item.defectName.orEmpty().ifEmpty { defectCd },
+                            qty = uiState.defects[defectCd] ?: 0,
                             enabled = uiState.productSelected,
-                            onBump = { onBumpDefect(item.defectCd, it) },
-                            onQty = { onDefectQty(item.defectCd, it) },
+                            onBump = { onBumpDefect(defectCd, it) },
+                            onQty = { onDefectQty(defectCd, it) },
                         )
                     }
                 }

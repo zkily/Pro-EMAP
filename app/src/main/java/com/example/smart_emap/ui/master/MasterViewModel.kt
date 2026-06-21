@@ -73,7 +73,7 @@ class MasterViewModel(
 
     fun refreshAll() {
         val path = _uiState.value.path
-        if (path.isBlank() || path == "/master") return
+        if (path.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             runCatching { loadForPath(path) }

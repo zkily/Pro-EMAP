@@ -8,6 +8,7 @@ import com.example.smart_emap.data.model.InspectionManagementRowDto
 import com.example.smart_emap.data.model.InspectionNextAssignmentDto
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisDataDto
+import com.example.smart_emap.data.model.MasterProductDto
 import com.example.smart_emap.data.model.PatchInspectionBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
 import com.example.smart_emap.data.model.ProductProcessBomRowDto
@@ -42,8 +43,8 @@ class InspectionRepository(
         mesClientIdStore.getClientInstanceId(userId)
 
     suspend fun loadProducts(): List<ErpProductDto> {
-        val list = apiClient.masterApi().listProducts(pageSize = 9999, status = "active").items()
-        return list
+        val raw = fetchActiveMasterProducts()
+        return raw
             .map { p ->
                 ErpProductDto(
                     id = p.id,
@@ -62,9 +63,70 @@ class InspectionRepository(
             .sortedBy { it.productName }
     }
 
+    /** 検査 MES 用：active 製品をページ分割取得（巨大 JSON 1 回読みの解析失敗を避ける） */
+    private suspend fun fetchActiveMasterProducts(): List<MasterProductDto> {
+        val pageSize = 500
+        val all = mutableListOf<MasterProductDto>()
+        var page = 1
+        var lastJson: Exception? = null
+        while (page <= 50) {
+            try {
+                val res = withIoRetry {
+                    apiClient.masterApiLong().listProducts(
+                        page = page,
+                        pageSize = pageSize,
+                        status = "active",
+                    )
+                }
+                val list = res.items()
+                if (list.isEmpty()) break
+                all += list
+                val total = res.totalCount()
+                if (list.size < pageSize || page * pageSize >= total) break
+                page += 1
+            } catch (e: JsonDataException) {
+                lastJson = e
+                if (page == 1 && pageSize > 200) {
+                    return fetchActiveMasterProductsSmallerPages()
+                }
+                throw e
+            } catch (e: JsonEncodingException) {
+                lastJson = e
+                if (page == 1 && pageSize > 200) {
+                    return fetchActiveMasterProductsSmallerPages()
+                }
+                throw e
+            }
+        }
+        if (all.isEmpty() && lastJson != null) throw lastJson
+        return all
+    }
+
+    private suspend fun fetchActiveMasterProductsSmallerPages(): List<MasterProductDto> {
+        val pageSize = 200
+        val all = mutableListOf<MasterProductDto>()
+        var page = 1
+        while (page <= 100) {
+            val res = withIoRetry {
+                apiClient.masterApiLong().listProducts(
+                    page = page,
+                    pageSize = pageSize,
+                    status = "active",
+                )
+            }
+            val list = res.items()
+            if (list.isEmpty()) break
+            all += list
+            val total = res.totalCount()
+            if (list.size < pageSize || page * pageSize >= total) break
+            page += 1
+        }
+        return all
+    }
+
     suspend fun loadDefectItems(): List<ProcessDefectItemDto> {
         val res = apiClient.processDefectApi().getOptions(INSPECTION_DEFECT_DETECTION_PROCESS_CD)
-        return res.data.orEmpty()
+        return res.data.orEmpty().filter { !it.defectCd.isNullOrBlank() }
     }
 
     suspend fun loadPlans(productionDay: String): List<InspectionManagementRowDto> {

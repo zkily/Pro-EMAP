@@ -158,8 +158,8 @@ class InspectionProductivityViewModel(
             runCatching { inspectionRepository.loadDefectItems() }
                 .onSuccess { items ->
                     val map = items.associate { item ->
-                        val key = item.defectCd.trim().ifBlank { item.id?.toString().orEmpty() }
-                        key to item.defectName
+                        val key = item.defectCd?.trim()?.takeIf { it.isNotBlank() } ?: item.id?.toString().orEmpty()
+                        key to (item.defectName ?: "")
                     }
                     _uiState.update { it.copy(defectLabelMap = map) }
                 }

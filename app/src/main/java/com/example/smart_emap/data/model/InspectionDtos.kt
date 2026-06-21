@@ -156,8 +156,8 @@ data class ProcessDefectItemDto(
     val id: Int? = null,
     @Json(name = "detection_process_cd") val detectionProcessCd: String? = null,
     @Json(name = "attributable_process_cd") val attributableProcessCd: String? = null,
-    @Json(name = "defect_cd") val defectCd: String,
-    @Json(name = "defect_name") val defectName: String,
+    @Json(name = "defect_cd") val defectCd: String? = null,
+    @Json(name = "defect_name") val defectName: String? = null,
     @Json(name = "attributable_process_name") val attributableProcessName: String? = null,
 )
 
@@ -165,3 +165,6 @@ data class ProcessDefectOptionsResponse(
     val success: Boolean? = null,
     val data: List<ProcessDefectItemDto>? = null,
 )
+
+fun List<ProcessDefectItemDto>.defectCdKeys(): List<String> =
+    mapNotNull { it.defectCd?.trim()?.takeIf(String::isNotEmpty) }

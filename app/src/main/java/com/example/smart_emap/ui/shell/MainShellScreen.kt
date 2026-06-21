@@ -135,7 +135,6 @@ import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingOrderSc
 import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingOrderViewModel
 import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingReceivingScreen
 import com.example.smart_emap.ui.erp.purchase.outsourcing.welding.WeldingReceivingViewModel
-import com.example.smart_emap.ui.master.MasterHomeScreen
 import com.example.smart_emap.ui.master.MasterScreen
 import com.example.smart_emap.ui.master.MasterViewModel
 import com.example.smart_emap.ui.master.companycalendar.CompanyWorkCalendarScreen
@@ -1353,7 +1352,6 @@ private fun ShellRouteContent(
             viewModel = dashboardViewModel,
             onNavigate = onNavigate,
         )
-        "/master" -> MasterHomeScreen(onNavigate = onNavigate)
         "/master/product" -> ProductMasterScreen(viewModel = productMasterViewModel)
         "/master/material" -> MaterialMasterScreen(viewModel = materialMasterViewModel)
         "/master/material-inspection" -> MaterialInspectionMasterScreen(viewModel = materialInspectionMasterViewModel)

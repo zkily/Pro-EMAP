@@ -353,7 +353,6 @@ object AppMenuConfig {
                     label = "マスタ",
                     icon = Icons.AutoMirrored.Filled.List,
                     children = listOf(
-                        AppMenuNode.Leaf("MASTER_HOME", "マスタホーム", Icons.Default.Home, "/master", isHome = true),
                         AppMenuNode.Leaf("MASTER_PRODUCT", "製品マスタ", Icons.Default.Description, "/master/product"),
                         AppMenuNode.Leaf("MASTER_MATERIAL", "材料マスタ", Icons.Default.Description, "/master/material"),
                         AppMenuNode.Leaf("MASTER_MATERIAL_INSPECTION", "材料検品マスタ", Icons.Default.Description, "/master/material-inspection"),
@@ -377,7 +376,6 @@ object AppMenuConfig {
                     label = "BOM",
                     icon = Icons.Default.GridView,
                     children = listOf(
-                        AppMenuNode.Leaf("MASTER_BOM_HOME", "BOMホーム", Icons.Default.Home, "/master/bom", isHome = true),
                         AppMenuNode.Leaf("MASTER_PRODUCT_PROCESS_BOM", "製品工程BOM", Icons.Default.GridView, "/master/bom/product-process"),
                         AppMenuNode.Leaf("MASTER_PRODUCT_MACHINE_CONFIG", "製品機器設定", Icons.Default.GridView, "/master/bom/product-machine-config"),
                         AppMenuNode.Leaf("MASTER_EQUIPMENT_EFFICIENCY", "設備能率管理", Icons.Default.Analytics, "/master/bom/equipment-efficiency"),

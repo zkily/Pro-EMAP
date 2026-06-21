@@ -12,6 +12,9 @@ object WeldingManagementRowExt {
         return row.mesDefectByItem?.values?.sumOf { it.coerceAtLeast(0) } ?: 0
     }
 
+    fun rowBreakAccumSec(row: WeldingManagementRowDto): Int =
+        (row.mesBreakSec ?: 0).coerceAtLeast(0)
+
     fun formatHistoryProductionDay(row: WeldingManagementRowDto): String {
         val stored = row.productionDay?.trim()?.take(10).orEmpty()
         if (stored.matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return stored

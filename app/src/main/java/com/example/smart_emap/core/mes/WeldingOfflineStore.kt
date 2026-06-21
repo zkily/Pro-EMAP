@@ -24,6 +24,7 @@ data class WeldingPendingCreatePlan(
     val productCd: String,
     val productName: String,
     val operatorUserId: Int,
+    val weldingMachine: String? = null,
 )
 
 data class WeldingPendingPatch(

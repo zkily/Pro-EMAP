@@ -2149,29 +2149,35 @@ private enum class HistoryColumnGroup {
 
 private data class HistoryColumnSpec(
     val header: String,
-    val width: Dp,
+    val weight: Float,
+    val minWidth: Dp = 0.dp,
     val align: TextAlign = TextAlign.Start,
     val group: HistoryColumnGroup = HistoryColumnGroup.Product,
 )
 
-/** 製品 → 実績数値 → 時間 → 付帯 → 操作 */
+/** 製品 → 実績数値 → 時間 → 付帯 → 操作（weight で横幅に応じて伸縮） */
 private val HistoryTableColumns: (InspStrings) -> List<HistoryColumnSpec> = { s ->
     listOf(
-        HistoryColumnSpec(s.productCd, 66.dp, group = HistoryColumnGroup.Product),
-        HistoryColumnSpec(s.productName, 132.dp, group = HistoryColumnGroup.Product),
-        HistoryColumnSpec(s.productionQty, 54.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.defectQty, 48.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.defectRate, 50.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.efficiencyRate, 58.dp, TextAlign.End, HistoryColumnGroup.Metrics),
-        HistoryColumnSpec(s.productionStart, 90.dp, group = HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.productionEnd, 90.dp, group = HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.elapsedMinutes, 58.dp, TextAlign.End, HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.pausedAccumMinutes, 58.dp, TextAlign.End, HistoryColumnGroup.Time),
-        HistoryColumnSpec(s.productionDay, 76.dp, group = HistoryColumnGroup.Meta),
-        HistoryColumnSpec(s.inspector, 64.dp, group = HistoryColumnGroup.Meta),
-        HistoryColumnSpec(s.historyActions, 52.dp, TextAlign.Center, HistoryColumnGroup.Action),
+        HistoryColumnSpec(s.productCd, 0.9f, 52.dp, group = HistoryColumnGroup.Product),
+        HistoryColumnSpec(s.productName, 2.4f, 88.dp, group = HistoryColumnGroup.Product),
+        HistoryColumnSpec(s.productionQty, 0.65f, 44.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.defectQty, 0.58f, 40.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.defectRate, 0.68f, 44.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.efficiencyRate, 0.72f, 46.dp, TextAlign.End, HistoryColumnGroup.Metrics),
+        HistoryColumnSpec(s.productionStart, 1.15f, 76.dp, group = HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.productionEnd, 1.15f, 76.dp, group = HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.elapsedMinutes, 0.72f, 46.dp, TextAlign.End, HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.pausedAccumMinutes, 0.78f, 48.dp, TextAlign.End, HistoryColumnGroup.Time),
+        HistoryColumnSpec(s.productionDay, 0.88f, 68.dp, group = HistoryColumnGroup.Meta),
+        HistoryColumnSpec(s.inspector, 0.88f, 56.dp, group = HistoryColumnGroup.Meta),
+        HistoryColumnSpec(s.historyActions, 0.48f, 40.dp, TextAlign.Center, HistoryColumnGroup.Action),
     )
 }
+
+private fun RowScope.historyTableColumn(col: HistoryColumnSpec): Modifier =
+    Modifier
+        .weight(col.weight, fill = true)
+        .then(if (col.minWidth > 0.dp) Modifier.widthIn(min = col.minWidth) else Modifier)
 
 @Composable
 private fun CompletedHistorySection(
@@ -2184,7 +2190,6 @@ private fun CompletedHistorySection(
 ) {
     val nf = remember { NumberFormat.getNumberInstance(Locale.JAPAN) }
     val columns = remember(s) { HistoryTableColumns(s) }
-    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
@@ -2224,8 +2229,7 @@ private fun CompletedHistorySection(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.85f), RoundedCornerShape(12.dp))
-                        .horizontalScroll(scrollState),
+                        .border(1.dp, Color(0xFFE2E8F0).copy(alpha = 0.85f), RoundedCornerShape(12.dp)),
                 ) {
                     HistoryTableHeaderRow(columns)
                     rows.forEachIndexed { index, row ->
@@ -2344,6 +2348,7 @@ private fun HistoryBadge(
 private fun HistoryTableHeaderRow(columns: List<HistoryColumnSpec>) {
     Row(
         modifier = Modifier
+            .fillMaxWidth()
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(Color(0xFF0F766E), Color(0xFF115E59), Color(0xFF134E4A)),
@@ -2358,7 +2363,7 @@ private fun HistoryTableHeaderRow(columns: List<HistoryColumnSpec>) {
             }
             Text(
                 text = col.header,
-                modifier = Modifier.width(col.width),
+                modifier = historyTableColumn(col),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFECFDF5),
@@ -2424,42 +2429,42 @@ private fun HistoryTableDataRow(
                 HistoryGroupDivider()
             }
             when (colIndex) {
-                0 -> HistoryCodeCell(row.productCd ?: "—", col.width)
-                1 -> HistoryProductNameCell(row.productName ?: "—", col.width)
-                2 -> HistoryQtyCell(nf.format(prod), col.width, positive = true)
+                0 -> HistoryCodeCell(row.productCd ?: "—", historyTableColumn(col))
+                1 -> HistoryProductNameCell(row.productName ?: "—", historyTableColumn(col))
+                2 -> HistoryQtyCell(nf.format(prod), historyTableColumn(col), positive = true)
                 3 -> HistoryQtyCell(
                     if (defects > 0) nf.format(defects) else "—",
-                    col.width,
+                    historyTableColumn(col),
                     positive = defects > 0,
                     warn = true,
                 )
-                4 -> HistoryRateCell(defectRateStr, col.width, warn = defects > 0 && prod > 0)
-                5 -> HistoryRateCell(efficiencyStr, col.width, efficiency = true)
-                6 -> HistoryTimeCell(HistoryRowFormat.formatProductionStart(row), col.width)
-                7 -> HistoryTimeCell(HistoryRowFormat.formatProductionEnd(row), col.width)
+                4 -> HistoryRateCell(defectRateStr, historyTableColumn(col), warn = defects > 0 && prod > 0)
+                5 -> HistoryRateCell(efficiencyStr, historyTableColumn(col), efficiency = true)
+                6 -> HistoryTimeCell(HistoryRowFormat.formatProductionStart(row), historyTableColumn(col))
+                7 -> HistoryTimeCell(HistoryRowFormat.formatProductionEnd(row), historyTableColumn(col))
                 8 -> HistoryDurationCell(
                     HistoryRowFormat.formatSecondsAsMinutes(wallSec),
-                    col.width,
+                    historyTableColumn(col),
                     active = wallSec > 0,
                 )
                 9 -> HistoryDurationCell(
                     HistoryRowFormat.formatSecondsAsMinutes(pauseSec),
-                    col.width,
+                    historyTableColumn(col),
                     active = pauseSec > 0,
                     muted = pauseSec <= 0,
                 )
-                10 -> HistoryDayCell(InspectionManagementRowExt.formatHistoryProductionDay(row), col.width)
-                11 -> HistoryNameCell(inspectorLabel, col.width)
-                12 -> HistoryActionCell(col.width, canEdit, col.header, onEdit)
+                10 -> HistoryDayCell(InspectionManagementRowExt.formatHistoryProductionDay(row), historyTableColumn(col))
+                11 -> HistoryNameCell(inspectorLabel, historyTableColumn(col))
+                12 -> HistoryActionCell(historyTableColumn(col), canEdit, col.header, onEdit)
             }
         }
     }
 }
 
 @Composable
-private fun HistoryProductNameCell(text: String, width: Dp) {
+private fun HistoryProductNameCell(text: String, modifier: Modifier) {
     Row(
-        modifier = Modifier.width(width),
+        modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -2474,7 +2479,7 @@ private fun HistoryProductNameCell(text: String, width: Dp) {
         )
         Text(
             text = text,
-            modifier = Modifier.width(width - 7.dp),
+            modifier = Modifier.weight(1f),
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = Color(0xFF1E293B),
@@ -2485,8 +2490,8 @@ private fun HistoryProductNameCell(text: String, width: Dp) {
 }
 
 @Composable
-private fun HistoryCodeCell(text: String, width: Dp) {
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterStart) {
+private fun HistoryCodeCell(text: String, modifier: Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Text(
             text = text,
             modifier = Modifier
@@ -2509,8 +2514,8 @@ private fun HistoryCodeCell(text: String, width: Dp) {
 }
 
 @Composable
-private fun HistoryDayCell(text: String, width: Dp) {
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterStart) {
+private fun HistoryDayCell(text: String, modifier: Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         Text(
             text = text,
             modifier = Modifier
@@ -2528,10 +2533,10 @@ private fun HistoryDayCell(text: String, width: Dp) {
 }
 
 @Composable
-private fun HistoryNameCell(text: String, width: Dp) {
+private fun HistoryNameCell(text: String, modifier: Modifier) {
     Text(
         text = text,
-        modifier = Modifier.width(width),
+        modifier = modifier,
         fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
         color = Color(0xFF475569),
@@ -2543,12 +2548,12 @@ private fun HistoryNameCell(text: String, width: Dp) {
 @Composable
 private fun HistoryQtyCell(
     text: String,
-    width: Dp,
+    modifier: Modifier,
     positive: Boolean = false,
     warn: Boolean = false,
 ) {
     val showChip = positive && text != "—"
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterEnd) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterEnd) {
         if (showChip) {
             val bgColors = if (warn) {
                 listOf(Color(0xFFFFF7ED), Color(0xFFFFEDD5))
@@ -2588,7 +2593,7 @@ private fun HistoryQtyCell(
 @Composable
 private fun HistoryRateCell(
     text: String,
-    width: Dp,
+    modifier: Modifier,
     warn: Boolean = false,
     efficiency: Boolean = false,
 ) {
@@ -2604,7 +2609,7 @@ private fun HistoryRateCell(
         warn -> Brush.linearGradient(listOf(Color(0xFFFFF7ED), Color(0xFFFFEDD5).copy(alpha = 0.6f)))
         else -> null
     }
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterEnd) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterEnd) {
         if (bg != null) {
             Text(
                 text = text,
@@ -2633,9 +2638,9 @@ private fun HistoryRateCell(
 }
 
 @Composable
-private fun HistoryTimeCell(text: String, width: Dp) {
+private fun HistoryTimeCell(text: String, modifier: Modifier) {
     val empty = text == "—"
-    Box(modifier = Modifier.width(width), contentAlignment = Alignment.CenterStart) {
+    Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
         if (empty) {
             Text(text, fontSize = 10.sp, color = InspectionActualColors.TextMuted)
         } else {
@@ -2671,7 +2676,7 @@ private fun HistoryTimeCell(text: String, width: Dp) {
 @Composable
 private fun HistoryDurationCell(
     text: String,
-    width: Dp,
+    modifier: Modifier,
     active: Boolean = false,
     muted: Boolean = false,
 ) {
@@ -2682,7 +2687,7 @@ private fun HistoryDurationCell(
     }
     Text(
         text = if (text == "0" && muted) "—" else text,
-        modifier = Modifier.width(width),
+        modifier = modifier,
         fontSize = 11.sp,
         fontWeight = FontWeight.Bold,
         color = color,
@@ -2693,13 +2698,13 @@ private fun HistoryDurationCell(
 
 @Composable
 private fun HistoryActionCell(
-    width: Dp,
+    modifier: Modifier,
     canEdit: Boolean,
     editLabel: String,
     onEdit: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.width(width),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         if (canEdit) {

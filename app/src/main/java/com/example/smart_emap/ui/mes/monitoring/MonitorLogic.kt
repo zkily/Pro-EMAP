@@ -226,7 +226,11 @@ object MonitorLogic {
         }
         machines.sortBy { it.name }
 
-        val defectLabelMap = defectItems.associate { it.defectCd to it.defectName }
+        val defectLabelMap = defectItems.mapNotNull { item ->
+            val cd = item.defectCd?.trim().orEmpty()
+            if (cd.isEmpty()) return@mapNotNull null
+            cd to item.defectName?.trim().orEmpty().ifEmpty { cd }
+        }.toMap()
         val defectRows = buildInspectionDefectListRows(rows, users, defectLabelMap)
         val efficiencyRows = buildInspectionInspectorEfficiencyRows(rows, users, tickNow)
 
