@@ -67,6 +67,14 @@ fun HeaderBar(
     sidebarOpen: Boolean,
     onToggleSidebar: () -> Unit,
     onLogout: () -> Unit,
+    headerTodoState: HeaderTodoUiState = HeaderTodoUiState(),
+    onHeaderTodoOpen: () -> Unit = {},
+    onHeaderTodoDraftChange: (String) -> Unit = {},
+    onHeaderTodoAdd: () -> Unit = {},
+    onHeaderTodoToggle: (Int) -> Unit = {},
+    onHeaderTodoDelete: (Int) -> Unit = {},
+    onHeaderTodoClearDone: () -> Unit = {},
+    onHeaderTodoUpdateContent: (Int, String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     var currentTime by remember { mutableStateOf(formatHeaderTime()) }
@@ -136,6 +144,16 @@ fun HeaderBar(
                         fontWeight = FontWeight.SemiBold,
                     )
                     HeaderWeatherInline(weatherInfo = weatherInfo)
+                    HeaderTodoTrigger(
+                        state = headerTodoState,
+                        onOpen = onHeaderTodoOpen,
+                        onDraftChange = onHeaderTodoDraftChange,
+                        onAdd = onHeaderTodoAdd,
+                        onToggle = onHeaderTodoToggle,
+                        onDelete = onHeaderTodoDelete,
+                        onClearDone = onHeaderTodoClearDone,
+                        onUpdateContent = onHeaderTodoUpdateContent,
+                    )
                 }
             }
 

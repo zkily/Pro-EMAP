@@ -33,6 +33,7 @@ import com.example.smart_emap.data.api.ShippingApiService
 import com.example.smart_emap.data.api.ShortcutsApiService
 import com.example.smart_emap.data.api.SystemApiService
 import com.example.smart_emap.data.api.SystemUsersApiService
+import com.example.smart_emap.data.api.TodosApiService
 import com.example.smart_emap.data.api.WeldingApiService
 import com.example.smart_emap.data.model.FlexibleIntAdapterFactory
 import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
@@ -208,6 +209,8 @@ class ApiClient(
     suspend fun planDataApi(): PlanDataApiService = createService(PlanDataApiService::class.java)
 
     suspend fun shortcutsApi(): ShortcutsApiService = createService(ShortcutsApiService::class.java)
+
+    suspend fun todosApi(): TodosApiService = createService(TodosApiService::class.java)
 
     suspend fun shippingApi(): ShippingApiService = createService(ShippingApiService::class.java)
 

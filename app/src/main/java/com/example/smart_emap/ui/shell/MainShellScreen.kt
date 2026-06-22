@@ -692,13 +692,18 @@ fun MainShellScreen(
     val shortcutsViewModel: SidebarShortcutsViewModel = viewModel(
         factory = SidebarShortcutsViewModel.Factory(appContainer.sidebarShortcutsRepository),
     )
+    val headerTodoViewModel: HeaderTodoViewModel = viewModel(
+        factory = HeaderTodoViewModel.Factory(appContainer.todosRepository),
+    )
     val shellState by shellViewModel.uiState.collectAsState()
     val shortcutsState by shortcutsViewModel.uiState.collectAsState()
+    val headerTodoState by headerTodoViewModel.uiState.collectAsState()
     val activePath = shellState.activePath
     val tabs = shellState.tabs
 
     LaunchedEffect(user.id) {
         shortcutsViewModel.load()
+        headerTodoViewModel.load()
     }
 
     LaunchedEffect(activePath) {
@@ -719,6 +724,14 @@ fun MainShellScreen(
             tabs = tabs,
             shortcutsPinned = shortcutsState.pinned,
             shortcutsFrequent = shortcutsState.frequent,
+            headerTodoState = headerTodoState,
+            onHeaderTodoOpen = headerTodoViewModel::load,
+            onHeaderTodoDraftChange = headerTodoViewModel::setDraft,
+            onHeaderTodoAdd = headerTodoViewModel::add,
+            onHeaderTodoToggle = headerTodoViewModel::toggle,
+            onHeaderTodoDelete = headerTodoViewModel::remove,
+            onHeaderTodoClearDone = headerTodoViewModel::clearDone,
+            onHeaderTodoUpdateContent = headerTodoViewModel::updateContent,
             dashboardViewModel = dashboardViewModel,
             inspectionViewModel = inspectionViewModel,
             inspectionManualRegistrationViewModel = inspectionManualRegistrationViewModel,
@@ -817,6 +830,14 @@ private fun MainShellContent(
     tabs: List<ShellTab>,
     shortcutsPinned: List<ShortcutItemDto> = emptyList(),
     shortcutsFrequent: List<ShortcutItemDto> = emptyList(),
+    headerTodoState: HeaderTodoUiState = HeaderTodoUiState(),
+    onHeaderTodoOpen: () -> Unit = {},
+    onHeaderTodoDraftChange: (String) -> Unit = {},
+    onHeaderTodoAdd: () -> Unit = {},
+    onHeaderTodoToggle: (Int) -> Unit = {},
+    onHeaderTodoDelete: (Int) -> Unit = {},
+    onHeaderTodoClearDone: () -> Unit = {},
+    onHeaderTodoUpdateContent: (Int, String) -> Unit = { _, _ -> },
     dashboardViewModel: DashboardViewModel,
     inspectionViewModel: InspectionActualViewModel,
     inspectionManualRegistrationViewModel: InspectionManualRegistrationViewModel,
@@ -978,6 +999,14 @@ private fun MainShellContent(
                         shellViewModel.setSidebarCollapsed(!shellState.isSidebarCollapsed)
                     },
                     onLogout = onLogout,
+                    headerTodoState = headerTodoState,
+                    onHeaderTodoOpen = onHeaderTodoOpen,
+                    onHeaderTodoDraftChange = onHeaderTodoDraftChange,
+                    onHeaderTodoAdd = onHeaderTodoAdd,
+                    onHeaderTodoToggle = onHeaderTodoToggle,
+                    onHeaderTodoDelete = onHeaderTodoDelete,
+                    onHeaderTodoClearDone = onHeaderTodoClearDone,
+                    onHeaderTodoUpdateContent = onHeaderTodoUpdateContent,
                 )
                 TabsNav(
                     tabs = tabs,
