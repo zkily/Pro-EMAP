@@ -2,27 +2,23 @@ package com.example.smart_emap.ui.mes.productivity
 
 import com.example.smart_emap.core.mes.MesCalendarUtils
 import com.example.smart_emap.data.model.InspectionProductivityDailyRowDto
-import com.example.smart_emap.data.model.UserListItemDto
-import com.example.smart_emap.data.model.WeldingProductivityAnalysisDataDto
-import com.example.smart_emap.data.model.WeldingProductivityBucketDto
-import com.example.smart_emap.data.model.WeldingProductivityDailyRowDto
-import com.example.smart_emap.data.model.WeldingProductivityOperatorRowDto
-import com.example.smart_emap.data.model.WeldingProductivityProductRankingDto
-import com.example.smart_emap.data.model.WeldingProductivityProductRowDto
-import com.example.smart_emap.data.model.WeldingProductivitySessionRowDto
+import com.example.smart_emap.data.model.CuttingProductivityAnalysisDataDto
+import com.example.smart_emap.data.model.CuttingProductivityBucketDto
+import com.example.smart_emap.data.model.CuttingProductivityDailyRowDto
+import com.example.smart_emap.data.model.CuttingProductivityOperatorRowDto
+import com.example.smart_emap.data.model.CuttingProductivityProductRankingDto
+import com.example.smart_emap.data.model.CuttingProductivityProductRowDto
+import com.example.smart_emap.data.model.CuttingProductivitySessionRowDto
 
-const val WELDING_DEPARTMENT_NAME = "製造部"
-const val WELDING_SECTION_NAME = "溶接課"
-
-data class WeldingProductivityReportFilters(
+data class CuttingProductivityReportFilters(
     val startDate: String,
     val endDate: String,
-    val operatorLabel: String,
+    val lineLabel: String,
     val productLabel: String,
     val includeIncomplete: Boolean,
 )
 
-enum class WeldingProductivityReportCommand {
+enum class CuttingProductivityReportCommand {
     PRINT_FULL,
     PRINT_DAILY,
     PRINT_DAILY_BATCH,
@@ -32,7 +28,7 @@ enum class WeldingProductivityReportCommand {
     PRINT_PRODUCT_RANK,
 }
 
-data class WeldingOperatorProductDisplayRow(
+data class CuttingOperatorProductDisplayRow(
     val productCd: String,
     val productName: String,
     val sessionCount: Int,
@@ -43,77 +39,73 @@ data class WeldingOperatorProductDisplayRow(
     val avgEfficiencyPerHour: Double?,
 )
 
-data class WeldingProductivityPrintContext(
-    val filters: WeldingProductivityReportFilters,
+data class CuttingProductivityPrintContext(
+    val filters: CuttingProductivityReportFilters,
     val kpiCards: List<IpaKpiCard>,
-    val operatorRows: List<WeldingProductivityOperatorRowDto>,
-    val productRows: List<WeldingProductivityProductRowDto>,
+    val operatorRows: List<CuttingProductivityOperatorRowDto>,
+    val productRows: List<CuttingProductivityProductRowDto>,
     val operatorSectionAvgEfficiency: Double?,
     val productSectionTotalQty: Int,
-    val productRankList: List<WeldingProductivityProductRankingDto>,
-    val selectedProductRanking: WeldingProductivityProductRankingDto?,
-    val productRankTopOverview: List<WeldingProductivityProductRankingDto>,
+    val productRankList: List<CuttingProductivityProductRankingDto>,
+    val selectedProductRanking: CuttingProductivityProductRankingDto?,
+    val productRankTopOverview: List<CuttingProductivityProductRankingDto>,
     val dailyChartFileName: String? = null,
 )
 
-data class WeldingDailyBatchPrintItem(
-    val operatorLabel: String,
-    val daily: List<WeldingProductivityDailyRowDto>,
+data class CuttingDailyBatchPrintItem(
+    val lineLabel: String,
+    val daily: List<CuttingProductivityDailyRowDto>,
     val chartFileName: String,
 )
 
-object WeldingProductivityLogic {
+object CuttingProductivityLogic {
     fun defaultDateRange(): Pair<String, String> {
         val end = MesCalendarUtils.jstToday()
         val start = MesCalendarUtils.shiftDateYmd(end, -29)
         return start to end
     }
 
-    fun isWeldingSectionOperatorUser(user: UserListItemDto): Boolean =
-        user.department?.trim() == WELDING_DEPARTMENT_NAME &&
-            user.section?.trim() == WELDING_SECTION_NAME
-
     fun reportMenuItems(): List<IpaReportMenuEntry> = listOf(
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_FULL.name,
+            key = CuttingProductivityReportCommand.PRINT_FULL.name,
             label = "印刷（全体）",
             hint = "全セクション一括出力",
             tone = IpaReportMenuTone.INDIGO,
         ),
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_DAILY.name,
+            key = CuttingProductivityReportCommand.PRINT_DAILY.name,
             label = "日別推移（印刷）",
             hint = "生産数 · 能率の推移",
             tone = IpaReportMenuTone.SKY,
             divided = true,
         ),
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_DAILY_BATCH.name,
-            label = "日別推移（溶接作業者別・一括印刷）",
-            hint = "溶接作業者ごとに分割出力",
+            key = CuttingProductivityReportCommand.PRINT_DAILY_BATCH.name,
+            label = "日別推移（ライン別・一括印刷）",
+            hint = "ラインごとに分割出力",
             tone = IpaReportMenuTone.TEAL,
         ),
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_OPERATOR.name,
-            label = "溶接作業者別（印刷）",
-            hint = "溶接作業者別サマリー",
+            key = CuttingProductivityReportCommand.PRINT_OPERATOR.name,
+            label = "ライン別（印刷）",
+            hint = "ライン別サマリー",
             tone = IpaReportMenuTone.VIOLET,
         ),
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_OPERATOR_PRODUCT_BATCH.name,
-            label = "溶接作業者別製品別（一括印刷）",
-            hint = "溶接作業者ごとに製品一覧を出力",
+            key = CuttingProductivityReportCommand.PRINT_OPERATOR_PRODUCT_BATCH.name,
+            label = "ライン別製品別（一括印刷）",
+            hint = "ラインごとに製品一覧を出力",
             tone = IpaReportMenuTone.VIOLET,
         ),
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_PRODUCT.name,
+            key = CuttingProductivityReportCommand.PRINT_PRODUCT.name,
             label = "製品別（印刷）",
             hint = "製品別サマリー",
             tone = IpaReportMenuTone.EMERALD,
         ),
         IpaReportMenuEntry(
-            key = WeldingProductivityReportCommand.PRINT_PRODUCT_RANK.name,
-            label = "製品別 · 溶接作業者能率ランキング（印刷）",
+            key = CuttingProductivityReportCommand.PRINT_PRODUCT_RANK.name,
+            label = "製品別 · ライン能率ランキング（印刷）",
             hint = "製品単位の順位表",
             tone = IpaReportMenuTone.ROSE,
         ),
@@ -141,13 +133,13 @@ object WeldingProductivityLogic {
         efficiencyPerHour,
     )
 
-    fun periodAvgEfficiencyFromBucket(row: WeldingProductivityOperatorRowDto): Double? =
+    fun periodAvgEfficiencyFromBucket(row: CuttingProductivityOperatorRowDto): Double? =
         periodAvgEfficiencyFromBucket(row.sumActualQty, row.sumNetProductionSec, row.efficiencyPerHour)
 
-    fun periodAvgEfficiencyFromBucket(row: WeldingProductivityProductRowDto): Double? =
+    fun periodAvgEfficiencyFromBucket(row: CuttingProductivityProductRowDto): Double? =
         periodAvgEfficiencyFromBucket(row.sumActualQty, row.sumNetProductionSec, row.efficiencyPerHour)
 
-    fun operatorSectionAvgEfficiency(rows: List<WeldingProductivityOperatorRowDto>): Double? {
+    fun operatorSectionAvgEfficiency(rows: List<CuttingProductivityOperatorRowDto>): Double? {
         var totalQty = 0
         var totalSec = 0
         for (row in rows) {
@@ -157,27 +149,27 @@ object WeldingProductivityLogic {
         return periodAvgEfficiencyFromBucket(totalQty, totalSec)
     }
 
-    fun operatorDisplayRows(rows: List<WeldingProductivityOperatorRowDto>): List<WeldingProductivityOperatorRowDto> =
+    fun operatorDisplayRows(rows: List<CuttingProductivityOperatorRowDto>): List<CuttingProductivityOperatorRowDto> =
         rows.map { row ->
             row.copy(
                 efficiencyPerHour = periodAvgEfficiencyFromBucket(row),
             )
         }.sortedByDescending { it.efficiencyPerHour ?: -1.0 }
 
-    fun productDisplayRows(rows: List<WeldingProductivityProductRowDto>): List<WeldingProductivityProductRowDto> =
+    fun productDisplayRows(rows: List<CuttingProductivityProductRowDto>): List<CuttingProductivityProductRowDto> =
         rows.map { row ->
             row.copy(
                 efficiencyPerHour = periodAvgEfficiencyFromBucket(row),
             )
         }.sortedByDescending { it.sumActualQty ?: 0 }
 
-    fun productRankOptionLabel(p: WeldingProductivityProductRankingDto): String {
+    fun productRankOptionLabel(p: CuttingProductivityProductRankingDto): String {
         val name = p.productName?.trim().orEmpty()
         return if (name.isNotEmpty()) "${p.productCd} · $name" else p.productCd
     }
 
-    fun buildKpiCards(summary: WeldingProductivityBucketDto?): List<IpaKpiCard> {
-        val s = summary ?: WeldingProductivityBucketDto()
+    fun buildKpiCards(summary: CuttingProductivityBucketDto?): List<IpaKpiCard> {
+        val s = summary ?: CuttingProductivityBucketDto()
         return listOf(
             IpaKpiCard(
                 key = "sessions",
@@ -207,7 +199,7 @@ object WeldingProductivityLogic {
                 key = "efficiency",
                 label = "総合能率",
                 value = fmtEfficiency(s.efficiencyPerHour),
-                hint = "個 / 時間",
+                hint = "本 / 時間",
                 tone = IpaKpiTone.Emerald,
                 icon = IpaKpiIcon.Efficiency,
             ),
@@ -222,15 +214,15 @@ object WeldingProductivityLogic {
         )
     }
 
-    fun resolveProductRankList(data: WeldingProductivityAnalysisDataDto?): List<WeldingProductivityProductRankingDto> {
+    fun resolveProductRankList(data: CuttingProductivityAnalysisDataDto?): List<CuttingProductivityProductRankingDto> {
         val fromApi = data?.byProductOperatorRanking.orEmpty()
         if (fromApi.isNotEmpty()) return fromApi
         return buildProductOperatorRankingFromSessions(data?.sessions.orEmpty())
     }
 
     fun buildProductOperatorRankingFromSessions(
-        sessions: List<WeldingProductivitySessionRowDto>,
-    ): List<WeldingProductivityProductRankingDto> {
+        sessions: List<CuttingProductivitySessionRowDto>,
+    ): List<CuttingProductivityProductRankingDto> {
         val productMap = linkedMapOf<String, ProductAgg>()
 
         for (s in sessions) {
@@ -242,13 +234,10 @@ object WeldingProductivityLogic {
             prod.sumActualQty += s.actualProductionQuantity ?: 0
             prod.sessionCount += 1
 
-            val opId = s.mesOperatorUserId
-            val opKey = opId?.toString() ?: "none"
-            val opName = s.operatorDisplayName?.trim()
-                ?: s.mesOperatorName?.trim()
-                ?: "—"
+            val opKey = sessionLineKey(s)
+            val opName = opKey
             val inv = prod.operators.getOrPut(opKey) {
-                OperatorAgg(opId, opName.ifBlank { "—" })
+                OperatorAgg(null, opName.ifBlank { "—" })
             }
             inv.sessionCount += 1
             inv.sumActualQty += s.actualProductionQuantity ?: 0
@@ -268,7 +257,7 @@ object WeldingProductivityLogic {
                     null
                 }
                 if (efficiency == null) return@mapNotNull null
-                WeldingProductivityOperatorRowDto(
+                CuttingProductivityOperatorRowDto(
                     operatorUserId = inv.operatorUserId,
                     operatorName = inv.operatorName,
                     sessionCount = inv.sessionCount,
@@ -282,7 +271,7 @@ object WeldingProductivityLogic {
             }.sortedByDescending { it.efficiencyPerHour ?: 0.0 }
                 .mapIndexed { index, row -> row.copy(rank = index + 1) }
 
-            WeldingProductivityProductRankingDto(
+            CuttingProductivityProductRankingDto(
                 productCd = prod.productCd,
                 productName = prod.productName,
                 sumActualQty = prod.sumActualQty,
@@ -296,21 +285,25 @@ object WeldingProductivityLogic {
         }.sortedByDescending { it.sumActualQty ?: 0 }
     }
 
-    fun podiumOperators(ranking: WeldingProductivityProductRankingDto?): List<WeldingProductivityOperatorRowDto> {
+    fun podiumOperators(ranking: CuttingProductivityProductRankingDto?): List<CuttingProductivityOperatorRowDto> {
         val top3 = ranking?.operators.orEmpty().filter { (it.rank ?: 99) <= 3 }
         val order = listOf(2, 1, 3)
         return order.mapNotNull { rank -> top3.find { it.rank == rank } }
     }
 
+    fun sessionLineKey(session: CuttingProductivitySessionRowDto): String =
+        session.operatorDisplayName?.trim()?.ifBlank { null }
+            ?: session.mesOperatorName?.trim()?.ifBlank { null }
+            ?: "—"
+
     fun buildOperatorProductRows(
-        sessions: List<WeldingProductivitySessionRowDto>,
-        operatorKey: String,
-    ): List<WeldingOperatorProductDisplayRow> {
+        sessions: List<CuttingProductivitySessionRowDto>,
+        lineKey: String,
+    ): List<CuttingOperatorProductDisplayRow> {
         val map = linkedMapOf<String, ProductRowAgg>()
         for (s in sessions) {
-            val opId = s.mesOperatorUserId
-            val key = opId?.toString() ?: "none"
-            if (key != operatorKey) continue
+            val key = sessionLineKey(s)
+            if (key != lineKey) continue
             val productCd = s.productCd?.trim().orEmpty().ifBlank { continue }
             val productName = s.productName?.trim().orEmpty().ifBlank { productCd }
             val agg = map.getOrPut(productCd) { ProductRowAgg(productCd, productName) }
@@ -322,7 +315,7 @@ object WeldingProductivityLogic {
         return map.values.map { row ->
             val actual = row.sumActualQty
             val defect = row.sumDefectQty
-            WeldingOperatorProductDisplayRow(
+            CuttingOperatorProductDisplayRow(
                 productCd = row.productCd,
                 productName = row.productName,
                 sessionCount = row.sessionCount,
@@ -335,7 +328,7 @@ object WeldingProductivityLogic {
         }.sortedByDescending { it.sumActualQty }
     }
 
-    fun toInspectionDailyRows(daily: List<WeldingProductivityDailyRowDto>): List<InspectionProductivityDailyRowDto> =
+    fun toInspectionDailyRows(daily: List<CuttingProductivityDailyRowDto>): List<InspectionProductivityDailyRowDto> =
         daily.map { row ->
             InspectionProductivityDailyRowDto(
                 day = row.day,

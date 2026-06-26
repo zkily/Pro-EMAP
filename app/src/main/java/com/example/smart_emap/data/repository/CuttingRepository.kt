@@ -3,6 +3,8 @@ package com.example.smart_emap.data.repository
 import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.data.model.CuttingManagementRowDto
 import com.example.smart_emap.data.model.CuttingPlanningMachineDto
+import com.example.smart_emap.data.model.CuttingProductivityAnalysisDataDto
+import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.PatchCuttingBody
 import com.example.smart_emap.data.model.ReorderCuttingBody
 import com.example.smart_emap.data.model.SplitCuttingToNextDayBody
@@ -80,6 +82,68 @@ class CuttingRepository(
         } catch (e: HttpException) {
             throw mapPatchHttpError(e)
         }
+    }
+
+    suspend fun loadProductivityLines(startDate: String, endDate: String): List<String> {
+        val res = apiClient.cuttingApi().productivityLines(startDate = startDate, endDate = endDate)
+        if (res.success == false) {
+            throw IllegalStateException(res.message ?: "ライン一覧の取得に失敗しました")
+        }
+        return res.data.orEmpty()
+            .map { it.lineName.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    suspend fun loadProductivityAnalysis(
+        startDate: String,
+        endDate: String,
+        productionLine: String? = null,
+        productCd: String? = null,
+        includeIncomplete: Boolean = false,
+    ): Result<CuttingProductivityAnalysisDataDto> = runCatching {
+        val res = apiClient.cuttingApi().productivityAnalysis(
+            startDate = startDate,
+            endDate = endDate,
+            productionLine = productionLine?.trim()?.ifBlank { null },
+            productCd = productCd?.trim()?.ifBlank { null },
+            includeIncomplete = if (includeIncomplete) true else null,
+        )
+        if (res.success == false || res.data == null) {
+            throw IllegalStateException(res.message ?: "分析データの取得に失敗しました")
+        }
+        res.data
+    }
+
+    suspend fun loadProductivityProducts(): List<ErpProductDto> {
+        val pageSize = 500
+        val all = mutableListOf<ErpProductDto>()
+        var page = 1
+        while (page <= 20) {
+            val res = apiClient.masterApiLong().listProducts(
+                page = page,
+                pageSize = pageSize,
+                status = "active",
+            )
+            val list = res.items()
+            if (list.isEmpty()) break
+            for (p in list) {
+                val code = p.productCd?.trim().orEmpty()
+                if (code.isEmpty()) continue
+                all.add(
+                    ErpProductDto(
+                        id = p.id,
+                        productCode = code,
+                        productName = p.productName?.trim().orEmpty().ifEmpty { code },
+                        isActive = true,
+                        unitPerBox = (p.unitPerBox ?: 0).coerceAtLeast(0),
+                    ),
+                )
+            }
+            val total = res.totalCount()
+            if (list.size < pageSize || page * pageSize >= total) break
+            page += 1
+        }
+        return all.distinctBy { it.productCode }.sortedBy { it.productName }
     }
 
     private fun mapPatchHttpError(e: HttpException): CuttingPatchException {

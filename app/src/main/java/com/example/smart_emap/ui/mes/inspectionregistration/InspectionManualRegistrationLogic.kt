@@ -41,6 +41,47 @@ object InspectionManualRegistrationLogic {
         val upb: Int,
     )
 
+    data class ListSummary(
+        val totalProductionQty: Int,
+        val avgEfficiencyPerHour: Int?,
+    )
+
+    fun rowNetSecForEfficiency(row: InspectionManagementRowDto): Int {
+        if (isRowMesInProgress(row)) return 0
+        val prod = row.actualProductionQuantity ?: 0
+        if (prod <= 0) return 0
+        val netSec = (HistoryRowFormat.rowWallElapsedSec(row) - HistoryRowFormat.rowPausedAccumSec(row))
+            .coerceAtLeast(0)
+        return if (netSec > 0) netSec else (row.mesNetProductionSec ?: 0).coerceAtLeast(0)
+    }
+
+    fun buildListSummary(rows: List<InspectionManagementRowDto>): ListSummary {
+        var totalQty = 0
+        var effQty = 0
+        var effNetSec = 0
+        for (row in rows) {
+            val prod = row.actualProductionQuantity ?: 0
+            totalQty += prod
+            if (isRowMesInProgress(row)) continue
+            val netSec = rowNetSecForEfficiency(row)
+            if (prod > 0 && netSec > 0) {
+                effQty += prod
+                effNetSec += netSec
+            }
+        }
+        val avg = if (effQty > 0 && effNetSec > 0) {
+            kotlin.math.round(effQty / (effNetSec / 3600.0)).toInt()
+        } else {
+            null
+        }
+        return ListSummary(totalQty, avg)
+    }
+
+    fun formatListSummaryQty(qty: Int): String = "%,d".format(qty)
+
+    fun formatListSummaryEfficiency(rate: Int?): String =
+        if (rate == null) "—" else "$rate 本/時"
+
     fun parseQtyInput(raw: String): Int? {
         val digits = raw.filter { it.isDigit() }
         if (digits.isEmpty()) return null

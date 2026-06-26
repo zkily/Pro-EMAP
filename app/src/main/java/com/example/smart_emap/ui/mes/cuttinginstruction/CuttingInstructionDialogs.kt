@@ -4439,7 +4439,7 @@ private fun KanbanEditDialog(
 
     row: KanbanIssuanceRowDto,
 
-    onSave: (KanbanIssuanceRowDto, String?, Int?, String?) -> Unit,
+    onSave: (KanbanIssuanceRowDto, String?, Int?, String?, Boolean) -> Unit,
 
     onDismiss: () -> Unit,
 
@@ -4450,6 +4450,8 @@ private fun KanbanEditDialog(
     var qty by remember { mutableStateOf(row.actualProductionQuantity?.toString().orEmpty()) }
 
     var day by remember { mutableStateOf(row.productionDay?.take(10).orEmpty()) }
+
+    var isFirstProduct by remember { mutableStateOf(row.isFirstProduct == true) }
 
     Dialog(onDismissRequest = onDismiss) {
 
@@ -4463,9 +4465,17 @@ private fun KanbanEditDialog(
 
             OutlinedTextField(day, { day = it }, label = { Text("生産日") }, modifier = Modifier.fillMaxWidth())
 
+            Row(verticalAlignment = Alignment.CenterVertically) {
+
+                Checkbox(checked = isFirstProduct, onCheckedChange = { isFirstProduct = it })
+
+                Text("初")
+
+            }
+
             Row {
 
-                Button(onClick = { onSave(row, productName.ifBlank { null }, qty.toIntOrNull(), day.ifBlank { null }) }) { Text("保存") }
+                Button(onClick = { onSave(row, productName.ifBlank { null }, qty.toIntOrNull(), day.ifBlank { null }, isFirstProduct) }) { Text("保存") }
 
                 TextButton(onClick = onDismiss) { Text("キャンセル") }
 

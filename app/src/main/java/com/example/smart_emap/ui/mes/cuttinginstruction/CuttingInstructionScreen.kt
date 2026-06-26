@@ -42,7 +42,10 @@ import androidx.compose.ui.unit.sp
 import com.example.smart_emap.core.system.HtmlPrintHelper
 
 @Composable
-fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
+fun CuttingInstructionScreen(
+    viewModel: CuttingInstructionViewModel,
+    onNavigate: (String) -> Unit = {},
+) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -118,6 +121,7 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                         onMoldingPreInventory = viewModel::openMoldingPreInventory,
                         onCuttingDone = viewModel::openCuttingDoneList,
                         onChamferingDone = viewModel::openChamferingDoneList,
+                        onReportCenter = { onNavigate("/system/reports") },
                     )
 
                     CuttingInstructionDualPanelRow(
@@ -145,6 +149,7 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                                 onProductNameFilter = viewModel::setProductNameFilter,
                                 onMaterialNameFilter = viewModel::setMaterialNameFilter,
                                 onOpenNotes = viewModel::openNotes,
+                                onOpenDataManagement = viewModel::openDataManagement,
                                 onSyncLengths = viewModel::syncLengthsFromProducts,
                                 onNewPlan = viewModel::openNewPlan,
                                 onSelectPlan = viewModel::selectPlan,
@@ -152,6 +157,7 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                                 onDeletePlan = viewModel::deletePlan,
                                 onMoveToCutting = viewModel::openMoveToCutting,
                                 onEditPlan = viewModel::openEditPlan,
+                                onCopyPlan = viewModel::copyPlan,
                                 onPlanPageChange = viewModel::setPlanPage,
                             )
                         },
@@ -202,26 +208,58 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                                 rows = uiState.cuttingTomorrow,
                                 loading = uiState.cuttingLoading,
                                 onMoveBackToBatch = viewModel::moveCuttingBackToBatch,
+                                onEdit = viewModel::openEditCutting,
                                 modifier = panelFillModifier,
                             )
                         },
                     )
 
-                    InstructionSectionCard(
-                        accent = Color(0xFF6366F1),
-                        title = "使用材料数（材料別）- 今日",
-                        titleColor = Color(0xFF4338CA),
-                        headerActions = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                InstructionDateNav(uiState.usageSummaryDateToday, { viewModel.shiftUsageSummaryDateToday(-1) }, { viewModel.shiftUsageSummaryDateToday(1) })
-                                UsageSummaryActionButton("使用数反映", UsageSummaryActionStyle.Reflect, viewModel::openConfirmUsageReflection)
-                                UsageSummaryActionButton("指定日", UsageSummaryActionStyle.SpecifiedDate, viewModel::openSpecifiedDateMaterial)
+                    CuttingInstructionDualPanelRow(
+                        layout = layout,
+                        primaryWeight = layout.todayWeight,
+                        secondaryWeight = layout.tomorrowWeight,
+                        matchHeight = false,
+                        primary = {
+                            InstructionSectionCard(
+                                accent = Color(0xFF6366F1),
+                                title = "使用材料数（材料別）- 今日",
+                                titleColor = Color(0xFF4338CA),
+                                headerActions = {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        InstructionDateNav(uiState.usageSummaryDateToday, { viewModel.shiftUsageSummaryDateToday(-1) }, { viewModel.shiftUsageSummaryDateToday(1) })
+                                        UsageSummaryActionButton("使用数反映", UsageSummaryActionStyle.Reflect, viewModel::openConfirmUsageReflection)
+                                        UsageSummaryActionButton("指定日", UsageSummaryActionStyle.SpecifiedDate, viewModel::openSpecifiedDateMaterial)
+                                    }
+                                },
+                            ) {
+                                UsageSummaryTable(uiState.usageSummaryToday, uiState.usageSummaryLoading, uiState.reflectedCodesToday, viewModel::toggleUsageSummaryStock, viewModel::openEditUsageCount)
+                                UsageSummaryFooter(viewModel.usageSummaryTodayCounts)
                             }
                         },
-                    ) {
-                        UsageSummaryTable(uiState.usageSummaryToday, uiState.usageSummaryLoading, uiState.reflectedCodesToday, viewModel::toggleUsageSummaryStock, viewModel::openEditUsageCount)
-                        UsageSummaryFooter(viewModel.usageSummaryTodayCounts)
-                    }
+                        secondary = {
+                            InstructionSectionCard(
+                                accent = Color(0xFF6366F1),
+                                title = "使用材料数（材料別）- 翌日",
+                                titleColor = Color(0xFF4338CA),
+                                headerActions = {
+                                    InstructionDateNav(
+                                        uiState.usageSummaryDateTomorrow,
+                                        { viewModel.shiftUsageSummaryDateTomorrow(-1) },
+                                        { viewModel.shiftUsageSummaryDateTomorrow(1) },
+                                    )
+                                },
+                            ) {
+                                UsageSummaryTable(
+                                    uiState.usageSummaryTomorrow,
+                                    uiState.usageSummaryLoading,
+                                    uiState.reflectedCodesTomorrow,
+                                    viewModel::toggleUsageSummaryStock,
+                                    viewModel::openEditUsageCount,
+                                )
+                                UsageSummaryFooter(viewModel.usageSummaryTomorrowCounts)
+                            }
+                        },
+                    )
 
                     InstructionSectionCard(
                         accent = CuttingInstructionTheme.ChamferingAccent,
@@ -326,8 +364,6 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                                 titleExtras = {
                                     InstructionDateNav(uiState.chamferingDateTomorrow, { viewModel.shiftChamferingDateTomorrow(-1) }, { viewModel.shiftChamferingDateTomorrow(1) })
                                 },
-                                titleSubRow = { ChamferMgmtHeaderPlaceholderSubRow() },
-                                headerActions = { ChamferMgmtHeaderPlaceholderActions() },
                             ) {
                                 ChamferingManagementTable(
                                     rows = uiState.chamferingTomorrow,
@@ -335,6 +371,7 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                                     formingStartDateByMgmtCode = uiState.cuttingFormingStartDateByMgmtCode,
                                     onToggleCompleted = viewModel::toggleChamferingCompleted,
                                     onToggleNoCount = viewModel::toggleChamferingNoCount,
+                                    onEdit = viewModel::openEditChamfering,
                                     compact = true,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
@@ -368,8 +405,10 @@ fun CuttingInstructionScreen(viewModel: CuttingInstructionViewModel) {
                         onIssue = viewModel::issueKanban,
                         onReissue = viewModel::reissueKanban,
                         onEdit = viewModel::openEditKanban,
+                        onFirstProductChange = viewModel::setKanbanFirstProduct,
                         issueLoadingId = uiState.kanbanIssuePendingLoading,
                         reissueLoadingId = uiState.kanbanReissueLoading,
+                        firstProductSavingId = uiState.kanbanFirstProductSaving,
                     )
                 }
             }
@@ -384,6 +423,7 @@ private fun CuttingInstructionHeader(
     onMoldingPreInventory: () -> Unit,
     onCuttingDone: () -> Unit,
     onChamferingDone: () -> Unit,
+    onReportCenter: () -> Unit,
 ) {
     Surface(
         modifier = Modifier
@@ -414,6 +454,7 @@ private fun CuttingInstructionHeader(
                     HeaderToolbarButton("成型前在庫・時間換算", HeaderToolbarButtonStyle.Molding, onMoldingPreInventory)
                     HeaderToolbarButton("切断済リスト", HeaderToolbarButtonStyle.CuttingDone, onCuttingDone)
                     HeaderToolbarButton("面取済リスト", HeaderToolbarButtonStyle.ChamferingDone, onChamferingDone)
+                    HeaderToolbarButton("報告センター", HeaderToolbarButtonStyle.Report, onReportCenter)
                 }
             }
         } else {
@@ -430,6 +471,7 @@ private fun CuttingInstructionHeader(
                     HeaderToolbarButton("成型前在庫・時間換算", HeaderToolbarButtonStyle.Molding, onMoldingPreInventory)
                     HeaderToolbarButton("切断済リスト", HeaderToolbarButtonStyle.CuttingDone, onCuttingDone)
                     HeaderToolbarButton("面取済リスト", HeaderToolbarButtonStyle.ChamferingDone, onChamferingDone)
+                    HeaderToolbarButton("報告センター", HeaderToolbarButtonStyle.Report, onReportCenter)
                 }
             }
         }

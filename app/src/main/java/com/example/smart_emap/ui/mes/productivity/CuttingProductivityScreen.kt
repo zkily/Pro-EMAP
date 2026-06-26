@@ -1,6 +1,5 @@
 package com.example.smart_emap.ui.mes.productivity
 
-import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,14 +27,14 @@ import com.example.smart_emap.ui.shell.LayoutColors
 import java.io.File
 
 @Composable
-fun InspectionProductivityScreen(
-    viewModel: InspectionProductivityViewModel,
+fun CuttingProductivityScreen(
+    viewModel: CuttingProductivityViewModel,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scroll = rememberScrollState()
     val context = LocalContext.current
-    val printCacheDir = remember(context) { File(context.cacheDir, "inspection_productivity_print") }
+    val printCacheDir = remember(context) { File(context.cacheDir, "cutting_productivity_print") }
 
     LaunchedEffect(Unit) {
         viewModel.onPageEnter()
@@ -47,21 +46,9 @@ fun InspectionProductivityScreen(
         viewModel.clearSnackbar()
     }
 
-    LaunchedEffect(uiState.pendingCsvContent) {
-        val csv = uiState.pendingCsvContent ?: return@LaunchedEffect
-        val subject = uiState.pendingCsvSubject ?: "sessions.csv"
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/csv"
-            putExtra(Intent.EXTRA_SUBJECT, subject)
-            putExtra(Intent.EXTRA_TEXT, csv)
-        }
-        context.startActivity(Intent.createChooser(intent, "CSV共有"))
-        viewModel.clearPendingCsv()
-    }
-
     LaunchedEffect(uiState.pendingPrintHtml) {
         val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
-        val subject = uiState.pendingPrintSubject ?: "検査生産性分析"
+        val subject = uiState.pendingPrintSubject ?: "切断生産性分析"
         val opened = HtmlPrintHelper.printHtml(
             context = context,
             html = html,
@@ -71,14 +58,6 @@ fun InspectionProductivityScreen(
         )
         viewModel.clearPendingPrintHtml()
         if (!opened) snackbarHostState.showSnackbar("印刷画面を開けませんでした")
-    }
-
-    uiState.inspectorProductDialog?.let { dialog ->
-        IpaInspectorProductDialog(
-            state = dialog,
-            rangeLabel = uiState.rangeLabel,
-            onDismiss = viewModel::closeInspectorProductDialog,
-        )
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = LayoutColors.ShellBg) { padding ->
@@ -91,24 +70,27 @@ fun InspectionProductivityScreen(
                     .verticalScroll(scroll),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                IpaHeroBar(
+                IpaHeroBarWithReports(
                     rangeLabel = uiState.rangeLabel,
                     loading = uiState.isLoading,
                     reportBusy = uiState.reportBusy,
                     reportEnabled = uiState.analysisData != null,
-                    onReportCommand = { cmd -> viewModel.handleReportCommand(cmd, printCacheDir) },
+                    reportEntries = CuttingProductivityLogic.reportMenuItems(),
+                    onReportCommand = { key -> viewModel.handleReportCommand(key, printCacheDir) },
                     onRefresh = viewModel::loadAnalysis,
+                    pageTitle = "切断工程 — 生産性分析",
+                    pageSubtitle = "実績 · 能率 · 不良率 · 稼働",
                 )
 
-                IpaToolbarCard(
+                CpaLineToolbarCard(
                     startDate = uiState.startDate,
                     endDate = uiState.endDate,
-                    filterInspectorId = uiState.filterInspectorId,
+                    filterLineName = uiState.filterLineName,
                     filterProductCd = uiState.filterProductCd,
-                    inspectorOptions = uiState.inspectorOptions,
+                    lineOptions = uiState.lineOptions,
                     productOptions = uiState.productOptions,
                     onDateRangeChange = viewModel::setDateRange,
-                    onInspectorChange = viewModel::setFilterInspectorId,
+                    onLineChange = viewModel::setFilterLineName,
                     onProductChange = viewModel::setFilterProductCd,
                 )
 
@@ -126,37 +108,52 @@ fun InspectionProductivityScreen(
                             val data = uiState.analysisData!!
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 IpaKpiGrid(uiState.kpiCards)
-                                IpaDailyChartCard(data.daily.orEmpty())
-                                IpaInspectorProductSplit(
-                                    inspectorRows = data.byInspector.orEmpty(),
-                                    productRows = data.byProduct.orEmpty(),
-                                    inspectorCount = data.byInspector.orEmpty().size,
-                                    inspectorSectionAvgEfficiency = uiState.inspectorSectionAvgEfficiency,
+                                IpaDailyChartCard(
+                                    CuttingProductivityLogic.toInspectionDailyRows(data.daily.orEmpty()),
+                                    chartFontSizeOffset = 1,
+                                )
+                                IpaWeldingOperatorProductSplit(
+                                    operatorRows = uiState.operatorDisplayRows,
+                                    productRows = uiState.productDisplayRows,
+                                    operatorCount = data.byOperator.orEmpty().size,
+                                    operatorSectionAvgEfficiency = uiState.operatorSectionAvgEfficiency,
                                     productSectionTotalQty = uiState.productSectionTotalQty,
+                                    operatorSectionTitle = "ライン別",
+                                    operatorCountSuffix = "ライン",
+                                    operatorAvgEfficiencyUnit = "本/時",
+                                    operatorColumnLabel = "ライン",
+                                    defectRateColumnLabel = "不良率",
+                                    productDefectRateColumnLabel = "不良率",
+                                    efficiencyUnitLabel = "本/時",
                                 )
-                                IpaWeldRankSplit(
-                                    rankOff = uiState.weldRankOff,
-                                    rankOn = uiState.weldRankOn,
-                                    weldingProductBomCount = uiState.weldingProductCdSet.size,
-                                    onInspectorClick = viewModel::openInspectorProductDialog,
-                                )
-                                IpaProductRankSection(
+                                WpaProductRankSection(
                                     productRankList = uiState.productRankList,
                                     selectedRanking = uiState.selectedProductRanking,
-                                    podiumInspectors = uiState.podiumInspectors,
+                                    podiumOperators = uiState.podiumOperators,
                                     rankViewProductCd = uiState.rankViewProductCd,
                                     topOverview = uiState.productRankTopOverview,
                                     onProductSelect = viewModel::setRankViewProductCd,
                                     onDetailClick = viewModel::setRankViewProductCd,
+                                    sectionTitle = "製品別 · ライン能率ランキング",
+                                    operatorLabel = "ライン",
+                                    operatorCountSuffix = "ライン",
+                                    defectRateColumnLabel = "不良率",
+                                    topOperatorColumnLabel = "TOPライン",
+                                    emptyOperatorMessage = "能率を算出できるラインデータがありません",
+                                    chartBlockTitle = "ライン別能率",
+                                    efficiencyUnitLabel = "本/時",
                                 )
-                                IpaDefectSection(
+                                IpaWeldingDefectSection(
                                     rows = data.defectByItem.orEmpty(),
-                                    defectLabel = viewModel::defectLabel,
+                                    defectLabel = viewModel::varianceLabel,
+                                    sectionTitle = "差異内訳",
                                 )
-                                IpaSessionDetailSection(
+                                WpaSessionDetailSection(
                                     rows = data.sessions.orEmpty(),
-                                    exportBusy = uiState.sessionExportBusy,
-                                    onExportCsv = viewModel::exportSessionsCsv,
+                                    operatorColumnLabel = "ライン",
+                                    defectQtyColumnLabel = "差異",
+                                    defectRateColumnLabel = "不良率",
+                                    showMachineColumn = false,
                                 )
                             }
                         }

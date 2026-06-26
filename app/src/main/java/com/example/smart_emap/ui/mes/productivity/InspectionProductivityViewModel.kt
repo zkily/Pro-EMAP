@@ -12,6 +12,8 @@ import com.example.smart_emap.data.repository.InspectionRepository
 import com.example.smart_emap.data.repository.SystemUserRepository
 import com.example.smart_emap.core.network.NetworkErrorHints
 import com.example.smart_emap.core.network.NetworkErrors
+import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
@@ -52,6 +54,7 @@ data class InspectionProductivityUiState(
     val pendingPrintHtml: String? = null,
     val pendingPrintSubject: String? = null,
     val pendingPrintLayout: PrintPageLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+    val pendingPrintContentBaseUrl: String? = null,
     val snackbarMessage: String? = null,
     val lastLoadError: String? = null,
 ) {
@@ -325,7 +328,7 @@ class InspectionProductivityViewModel(
         }
     }
 
-    fun handleReportCommand(command: InspectionProductivityReportCommand) {
+    fun handleReportCommand(command: InspectionProductivityReportCommand, printCacheDir: File) {
         val state = _uiState.value
         val data = state.analysisData ?: run {
             _uiState.update { it.copy(snackbarMessage = "出力する分析データがありません") }
@@ -338,10 +341,12 @@ class InspectionProductivityViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(reportBusy = true) }
             try {
-                val ctx = buildPrintContext(filters, data)
+                printCacheDir.mkdirs()
+                clearPrintChartCache(printCacheDir)
+                val contentBaseUrl = printCacheDir.toFileBaseUrl()
                 val html = when (command) {
                     InspectionProductivityReportCommand.PRINT_DAILY_BATCH -> {
-                        val items = loadDailyBatchPrintItems(filters)
+                        val items = buildDailyBatchPrintItems(filters, printCacheDir)
                         if (items.isEmpty()) throw IllegalStateException("印刷できる日別データがありません")
                         InspectionProductivityReportLogic.buildDailyBatchPrintHtml(filters, items)
                     }
@@ -362,10 +367,14 @@ class InspectionProductivityViewModel(
                         InspectionProductivityReportLogic.buildInspectorMetricsPrintHtml(
                             filters,
                             prepared,
-                            ctx.kpiCards,
+                            InspectionProductivityLogic.buildKpiCards(data.summary),
                         )
                     }
-                    else -> InspectionProductivityReportLogic.buildPrintHtml(command, data, ctx)
+                    else -> {
+                        val charts = renderPrintCharts(printCacheDir, data, state)
+                        val ctx = buildPrintContext(filters, data, charts)
+                        InspectionProductivityReportLogic.buildPrintHtml(command, data, ctx)
+                    }
                 }
                 val layout = when (command) {
                     InspectionProductivityReportCommand.PRINT_DAILY,
@@ -381,6 +390,7 @@ class InspectionProductivityViewModel(
                         pendingPrintHtml = html,
                         pendingPrintSubject = title,
                         pendingPrintLayout = layout,
+                        pendingPrintContentBaseUrl = contentBaseUrl,
                     )
                 }
             } catch (e: Exception) {
@@ -401,11 +411,13 @@ class InspectionProductivityViewModel(
         ).getOrElse { throw it }
     }
 
-    private suspend fun loadDailyBatchPrintItems(
+    private suspend fun buildDailyBatchPrintItems(
         filters: InspectionProductivityReportFilters,
-    ): List<Pair<String, List<com.example.smart_emap.data.model.InspectionProductivityDailyRowDto>>> {
+        printCacheDir: File,
+    ): List<InspectionDailyBatchPrintItem> {
         val state = _uiState.value
-        val items = mutableListOf<Pair<String, List<com.example.smart_emap.data.model.InspectionProductivityDailyRowDto>>>()
+        val items = mutableListOf<InspectionDailyBatchPrintItem>()
+        var chartIndex = 0
         for (insp in state.inspectorOptions) {
             val id = insp.id ?: continue
             val data = inspectionRepository.loadProductivityAnalysis(
@@ -417,10 +429,67 @@ class InspectionProductivityViewModel(
             ).getOrNull() ?: continue
             val daily = data.daily.orEmpty()
             if (daily.isEmpty()) continue
+            val chartFileName = withContext(Dispatchers.Default) {
+                IpaDailyTrendChartExport.savePngFile(
+                    printCacheDir,
+                    "ipa_daily_batch_${chartIndex++}.png",
+                    daily,
+                    fontSizeOffset = 0,
+                )
+            } ?: continue
             val label = insp.displayLabel().ifBlank { insp.username.orEmpty() }
-            items.add(label to daily)
+            items.add(InspectionDailyBatchPrintItem(inspectorLabel = label, daily = daily, chartFileName = chartFileName))
         }
         return items
+    }
+
+    private data class PrintChartFiles(
+        val daily: String? = null,
+        val inspector: String? = null,
+        val product: String? = null,
+        val productRank: String? = null,
+    )
+
+    private suspend fun renderPrintCharts(
+        cacheDir: File,
+        data: InspectionProductivityAnalysisDataDto,
+        state: InspectionProductivityUiState,
+    ): PrintChartFiles = withContext(Dispatchers.Default) {
+        val dailyRows = data.daily.orEmpty()
+        val inspectorRows = data.byInspector.orEmpty()
+        val productRows = data.byProduct.orEmpty()
+        val rankInspectors = state.selectedProductRanking?.inspectors.orEmpty()
+        PrintChartFiles(
+            daily = if (dailyRows.isEmpty()) null else renderDailyChartFile(cacheDir, dailyRows, "ipa_daily_chart.png"),
+            inspector = if (inspectorRows.isEmpty()) null else {
+                IpaBarChartExport.saveInspectorEfficiencyChart(cacheDir, "ipa_inspector_chart.png", inspectorRows)
+            },
+            product = if (productRows.isEmpty()) null else {
+                IpaBarChartExport.saveProductQtyChart(cacheDir, "ipa_product_chart.png", productRows)
+            },
+            productRank = if (rankInspectors.isEmpty()) null else {
+                IpaBarChartExport.saveProductRankChart(cacheDir, "ipa_product_rank_chart.png", rankInspectors)
+            },
+        )
+    }
+
+    private fun renderDailyChartFile(
+        cacheDir: File,
+        daily: List<com.example.smart_emap.data.model.InspectionProductivityDailyRowDto>,
+        fileName: String,
+    ): String? = IpaDailyTrendChartExport.savePngFile(cacheDir, fileName, daily, fontSizeOffset = 0)
+
+    private fun clearPrintChartCache(cacheDir: File) {
+        cacheDir.listFiles()?.forEach { file ->
+            if (file.isFile && file.name.startsWith("ipa_")) {
+                file.delete()
+            }
+        }
+    }
+
+    private fun File.toFileBaseUrl(): String {
+        val path = absolutePath.replace('\\', '/')
+        return if (path.endsWith("/")) "file://$path" else "file://$path/"
     }
 
     private fun loadInspectorProductBatchItems(
@@ -444,6 +513,7 @@ class InspectionProductivityViewModel(
     private fun buildPrintContext(
         filters: InspectionProductivityReportFilters,
         data: InspectionProductivityAnalysisDataDto,
+        charts: PrintChartFiles = PrintChartFiles(),
     ): InspectionProductivityPrintContext {
         val state = _uiState.value
         return InspectionProductivityPrintContext(
@@ -458,6 +528,10 @@ class InspectionProductivityViewModel(
             productRankList = state.productRankList,
             selectedProductRanking = state.selectedProductRanking,
             productRankTopOverview = state.productRankTopOverview,
+            dailyChartFileName = charts.daily,
+            inspectorChartFileName = charts.inspector,
+            productChartFileName = charts.product,
+            productRankChartFileName = charts.productRank,
         )
     }
 
@@ -505,7 +579,11 @@ class InspectionProductivityViewModel(
     fun clearPendingCsv() = _uiState.update { it.copy(pendingCsvContent = null, pendingCsvSubject = null) }
 
     fun clearPendingPrintHtml() = _uiState.update {
-        it.copy(pendingPrintHtml = null, pendingPrintSubject = null)
+        it.copy(
+            pendingPrintHtml = null,
+            pendingPrintSubject = null,
+            pendingPrintContentBaseUrl = null,
+        )
     }
 
     class Factory(

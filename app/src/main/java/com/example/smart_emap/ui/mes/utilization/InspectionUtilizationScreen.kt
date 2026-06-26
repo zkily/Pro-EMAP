@@ -81,10 +81,8 @@ fun InspectionUtilizationScreen(
                     endDate = uiState.endDate,
                     filterInspectorId = uiState.filterInspectorId,
                     inspectorOptions = uiState.inspectorOptions,
-                    includeIncomplete = uiState.includeIncomplete,
                     onDateRangeChange = viewModel::setDateRange,
                     onInspectorChange = viewModel::setFilterInspectorId,
-                    onIncludeIncompleteChange = viewModel::setIncludeIncomplete,
                 )
 
                 uiState.analysisData?.let { data ->

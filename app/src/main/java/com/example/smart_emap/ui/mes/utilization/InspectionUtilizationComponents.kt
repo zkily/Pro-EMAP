@@ -50,8 +50,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -418,10 +416,8 @@ fun IuaToolbarCard(
     endDate: String,
     filterInspectorId: Int?,
     inspectorOptions: List<IuaInspectorOption>,
-    includeIncomplete: Boolean,
     onDateRangeChange: (String, String) -> Unit,
     onInspectorChange: (Int?) -> Unit,
-    onIncludeIncompleteChange: (Boolean) -> Unit,
 ) {
     val inspectorDropdownOptions = listOf("" to "（すべて）") +
         inspectorOptions.map { it.id.toString() to it.name }
@@ -445,7 +441,6 @@ fun IuaToolbarCard(
                 options = inspectorDropdownOptions,
                 onSelect = { onInspectorChange(it.toIntOrNull()) },
             )
-            IuaPillCheckField(checked = includeIncomplete, onCheckedChange = onIncludeIncompleteChange)
         }
     }
 }
@@ -767,30 +762,6 @@ private fun IuaPillInspectorField(
                     contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun IuaPillCheckField(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    IuaPillFieldShell(
-        pillLabel = "オプション",
-        pillIcon = null,
-        pillColors = Brush.linearGradient(listOf(Color(0xFFFFFBEB), Color(0xFFFEF3C7))),
-        pillTextColor = Color(0xFF92400E),
-        minWidth = 148.dp,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                modifier = Modifier.size(28.dp),
-                colors = CheckboxDefaults.colors(checkedColor = iuaGreen),
-            )
-            Text("未確定を含む", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
         }
     }
 }

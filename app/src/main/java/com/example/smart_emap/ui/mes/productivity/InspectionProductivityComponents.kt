@@ -47,8 +47,6 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -166,6 +164,36 @@ fun IpaHeroBar(
     reportEnabled: Boolean,
     onReportCommand: (InspectionProductivityReportCommand) -> Unit,
     onRefresh: () -> Unit,
+    pageTitle: String = "検査工程 — 生産性分析",
+    pageSubtitle: String = "実績 · 能率 · 不良率 · 稼働",
+) {
+    IpaHeroBarWithReports(
+        rangeLabel = rangeLabel,
+        loading = loading,
+        reportBusy = reportBusy,
+        reportEnabled = reportEnabled,
+        reportEntries = InspectionProductivityLogic.reportMenuItems().map { it.toEntry() },
+        onReportCommand = { key ->
+            val cmd = InspectionProductivityReportCommand.entries.firstOrNull { it.name == key }
+            if (cmd != null) onReportCommand(cmd)
+        },
+        onRefresh = onRefresh,
+        pageTitle = pageTitle,
+        pageSubtitle = pageSubtitle,
+    )
+}
+
+@Composable
+fun IpaHeroBarWithReports(
+    rangeLabel: String?,
+    loading: Boolean,
+    reportBusy: Boolean,
+    reportEnabled: Boolean,
+    reportEntries: List<IpaReportMenuEntry>,
+    onReportCommand: (String) -> Unit,
+    onRefresh: () -> Unit,
+    pageTitle: String,
+    pageSubtitle: String,
 ) {
     BoxWithConstraints(
         modifier = Modifier
@@ -210,14 +238,14 @@ fun IpaHeroBar(
                         letterSpacing = 1.2.sp,
                     )
                     Text(
-                        "検査工程 — 生産性分析",
+                        pageTitle,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         color = Color(0xFF0F172A),
                         lineHeight = 22.sp,
                     )
                     Text(
-                        "実績 · 能率 · 不良率 · 稼働",
+                        pageSubtitle,
                         fontSize = 11.sp,
                         color = Color(0xFF64748B),
                         maxLines = 2,
@@ -249,6 +277,7 @@ fun IpaHeroBar(
                 IpaReportMenuButton(
                     enabled = reportEnabled && !reportBusy,
                     busy = reportBusy,
+                    reportEntries = reportEntries,
                     onReportCommand = onReportCommand,
                 )
                 IpaGradientButton(
@@ -296,8 +325,8 @@ fun IpaHeroBar(
                     }
                     Column {
                         Text("MES · 実績分析", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = ipaIndigo, letterSpacing = 1.2.sp)
-                        Text("検査工程 — 生産性分析", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF0F172A), lineHeight = 22.sp)
-                        Text("実績 · 能率 · 不良率 · 稼働", fontSize = 11.sp, color = Color(0xFF64748B), maxLines = 2, lineHeight = 14.sp)
+                        Text(pageTitle, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color(0xFF0F172A), lineHeight = 22.sp)
+                        Text(pageSubtitle, fontSize = 11.sp, color = Color(0xFF64748B), maxLines = 2, lineHeight = 14.sp)
                     }
                 }
                 actionsBlock()
@@ -315,11 +344,10 @@ fun IpaToolbarCard(
     filterProductCd: String,
     inspectorOptions: List<UserListItemDto>,
     productOptions: List<ErpProductDto>,
-    includeIncomplete: Boolean,
     onDateRangeChange: (String, String) -> Unit,
     onInspectorChange: (Int?) -> Unit,
     onProductChange: (String) -> Unit,
-    onIncludeIncompleteChange: (Boolean) -> Unit,
+    personPillLabel: String = "検査員",
 ) {
     val inspectorDropdownOptions = listOf("" to "（すべて）") +
         inspectorOptions.mapNotNull { u ->
@@ -348,7 +376,7 @@ fun IpaToolbarCard(
             ) {
                 IpaPillDateField(startDate = startDate, endDate = endDate, onDateRangeChange = onDateRangeChange)
                 IpaPillDropdownField(
-                    pillLabel = "検査員",
+                    pillLabel = personPillLabel,
                     pillIcon = Icons.Default.Person,
                     pillColors = Brush.linearGradient(listOf(Color(0xFFFAF5FF), Color(0xFFF3E8FF))),
                     pillTextColor = Color(0xFF6B21A8),
@@ -367,13 +395,71 @@ fun IpaToolbarCard(
                     onSelect = onProductChange,
                     minWidth = 160.dp,
                 )
-                IpaPillCheckField(checked = includeIncomplete, onCheckedChange = onIncludeIncompleteChange)
             }
         }
         if (maxWidth < 520.dp) {
             fields()
         } else {
             fields()
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CpaLineToolbarCard(
+    startDate: String,
+    endDate: String,
+    filterLineName: String,
+    filterProductCd: String,
+    lineOptions: List<String>,
+    productOptions: List<ErpProductDto>,
+    onDateRangeChange: (String, String) -> Unit,
+    onLineChange: (String) -> Unit,
+    onProductChange: (String) -> Unit,
+) {
+    val lineDropdownOptions = listOf("" to "（すべて）") +
+        lineOptions.map { line -> line to line }
+    val productDropdownOptions = listOf("" to "（すべて）") +
+        productOptions.map { p ->
+            val cd = p.productCode
+            cd to (p.productName.ifBlank { cd })
+        }
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, panelShape, spotColor = Color(0x120F172A))
+            .clip(panelShape)
+            .background(Brush.linearGradient(listOf(Color(0xFAFFFFFF), Color(0xEBF1F5F9))))
+            .border(1.dp, Color(0xF2FFFFFF), panelShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            IpaPillDateField(startDate = startDate, endDate = endDate, onDateRangeChange = onDateRangeChange)
+            IpaPillDropdownField(
+                pillLabel = "ライン",
+                pillIcon = Icons.Default.Person,
+                pillColors = Brush.linearGradient(listOf(Color(0xFFFAF5FF), Color(0xFFF3E8FF))),
+                pillTextColor = Color(0xFF6B21A8),
+                value = filterLineName,
+                options = lineDropdownOptions,
+                onSelect = onLineChange,
+                minWidth = 148.dp,
+            )
+            IpaPillDropdownField(
+                pillLabel = "製品名",
+                pillIcon = Icons.Default.Inventory2,
+                pillColors = Brush.linearGradient(listOf(Color(0xFFECFDF5), Color(0xFFD1FAE5))),
+                pillTextColor = Color(0xFF047857),
+                value = filterProductCd,
+                options = productDropdownOptions,
+                onSelect = onProductChange,
+                minWidth = 160.dp,
+            )
         }
     }
 }
@@ -596,30 +682,6 @@ private fun IpaPillDropdownField(
 }
 
 @Composable
-private fun IpaPillCheckField(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    IpaPillFieldShell(
-        pillLabel = "オプション",
-        pillIcon = null,
-        pillColors = Brush.linearGradient(listOf(Color(0xFFFFFBEB), Color(0xFFFEF3C7))),
-        pillTextColor = Color(0xFF92400E),
-        minWidth = 148.dp,
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Checkbox(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                modifier = Modifier.size(28.dp),
-                colors = CheckboxDefaults.colors(checkedColor = ipaEmerald),
-            )
-            Text("未確定を含む", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF475569))
-        }
-    }
-}
-
-@Composable
 private fun IpaPillFieldShell(
     pillLabel: String,
     pillIcon: ImageVector?,
@@ -659,7 +721,10 @@ private fun IpaPillFieldShell(
 }
 
 @Composable
-fun IpaDailyChartCard(daily: List<InspectionProductivityDailyRowDto>) {
+fun IpaDailyChartCard(
+    daily: List<InspectionProductivityDailyRowDto>,
+    chartFontSizeOffset: Int = 0,
+) {
     IpaThemedPanel(
         title = "日別推移",
         variant = IpaPanelVariant.Chart,
@@ -680,9 +745,9 @@ fun IpaDailyChartCard(daily: List<InspectionProductivityDailyRowDto>) {
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IpaChartLegend("生産数", Color(0xFF7DD3FC))
+                IpaChartLegend("生産数", Color(0xFF7DD3FC), fontSizeOffset = chartFontSizeOffset)
                 Spacer(Modifier.width(16.dp))
-                IpaChartLegend("能率", ipaEmeraldLight)
+                IpaChartLegend("能率", ipaEmeraldLight, fontSizeOffset = chartFontSizeOffset)
             }
             Box(
                 modifier = Modifier
@@ -703,7 +768,7 @@ fun IpaDailyChartCard(daily: List<InspectionProductivityDailyRowDto>) {
                         (4 downTo 0).forEach { tick ->
                             Text(
                                 "${(qtyMax * tick / 4)}",
-                                fontSize = 8.sp,
+                                fontSize = (8 + chartFontSizeOffset).sp,
                                 color = Color(0xFF94A3B8),
                                 textAlign = TextAlign.End,
                                 modifier = Modifier.fillMaxWidth(),
@@ -711,7 +776,11 @@ fun IpaDailyChartCard(daily: List<InspectionProductivityDailyRowDto>) {
                         }
                     }
                     Box(Modifier.weight(1f)) {
-                        IpaDailyProductivityChart(daily, Modifier.fillMaxSize())
+                        IpaDailyProductivityChart(
+                            daily,
+                            Modifier.fillMaxSize(),
+                            fontSizeOffset = chartFontSizeOffset,
+                        )
                     }
                     Column(
                         Modifier
@@ -723,7 +792,7 @@ fun IpaDailyChartCard(daily: List<InspectionProductivityDailyRowDto>) {
                         (4 downTo 0).forEach { tick ->
                             Text(
                                 "${(effMax * tick / 4)}",
-                                fontSize = 8.sp,
+                                fontSize = (8 + chartFontSizeOffset).sp,
                                 color = Color(0xFF94A3B8),
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -731,7 +800,7 @@ fun IpaDailyChartCard(daily: List<InspectionProductivityDailyRowDto>) {
                     }
                 }
             }
-            IpaChartXAxis(daily.map { it.day })
+            IpaChartXAxis(daily.map { it.day }, fontSizeOffset = chartFontSizeOffset)
         }
     }
 }
@@ -1651,7 +1720,8 @@ private fun IpaInspectorProductTable(rows: List<InspectorProductDisplayRow>, acc
 private fun IpaReportMenuButton(
     enabled: Boolean,
     busy: Boolean,
-    onReportCommand: (InspectionProductivityReportCommand) -> Unit,
+    reportEntries: List<IpaReportMenuEntry>,
+    onReportCommand: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -1672,7 +1742,7 @@ private fun IpaReportMenuButton(
             tonalElevation = 6.dp,
             shadowElevation = 16.dp,
         ) {
-            InspectionProductivityReportLogic.reportMenuItems().forEach { item ->
+            reportEntries.forEach { item ->
                 if (item.divided) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -1681,10 +1751,10 @@ private fun IpaReportMenuButton(
                     )
                 }
                 DropdownMenuItem(
-                    text = { IpaReportMenuItemContent(item) },
+                    text = { IpaReportMenuEntryContent(item) },
                     onClick = {
                         expanded = false
-                        onReportCommand(item.command)
+                        onReportCommand(item.key)
                     },
                     contentPadding = PaddingValues(0.dp),
                 )
@@ -1694,8 +1764,8 @@ private fun IpaReportMenuButton(
 }
 
 @Composable
-private fun IpaReportMenuItemContent(item: IpaReportMenuItem) {
-    val icon = ipaReportMenuIcon(item.command)
+private fun IpaReportMenuEntryContent(item: IpaReportMenuEntry) {
+    val icon = ipaReportMenuIcon(item.key)
     val toneStyle = ipaReportMenuToneStyle(item.tone)
     Row(
         modifier = Modifier
@@ -1778,22 +1848,40 @@ private fun ipaReportMenuToneStyle(tone: IpaReportMenuTone): IpaReportMenuToneSt
     )
 }
 
-private fun ipaReportMenuIcon(command: InspectionProductivityReportCommand): ImageVector = when (command) {
-    InspectionProductivityReportCommand.PRINT_FULL -> Icons.Default.Description
-    InspectionProductivityReportCommand.PRINT_DAILY -> Icons.AutoMirrored.Filled.ShowChart
-    InspectionProductivityReportCommand.PRINT_DAILY_BATCH -> Icons.Default.Analytics
-    InspectionProductivityReportCommand.PRINT_INSPECTOR -> Icons.Default.Person
-    InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS -> Icons.Default.Description
-    InspectionProductivityReportCommand.PRINT_INSPECTOR_PRODUCT_BATCH -> Icons.Default.Inventory2
-    InspectionProductivityReportCommand.PRINT_PRODUCT -> Icons.Default.Inventory2
-    InspectionProductivityReportCommand.PRINT_WELD_RANK -> Icons.Default.Star
-    InspectionProductivityReportCommand.PRINT_PRODUCT_RANK -> Icons.AutoMirrored.Filled.List
+private fun ipaReportMenuIcon(key: String): ImageVector = when (key) {
+    InspectionProductivityReportCommand.PRINT_FULL.name,
+    WeldingProductivityReportCommand.PRINT_FULL.name,
+    -> Icons.Default.Description
+    InspectionProductivityReportCommand.PRINT_DAILY.name,
+    WeldingProductivityReportCommand.PRINT_DAILY.name,
+    -> Icons.AutoMirrored.Filled.ShowChart
+    InspectionProductivityReportCommand.PRINT_DAILY_BATCH.name,
+    WeldingProductivityReportCommand.PRINT_DAILY_BATCH.name,
+    -> Icons.Default.Analytics
+    InspectionProductivityReportCommand.PRINT_INSPECTOR.name,
+    WeldingProductivityReportCommand.PRINT_OPERATOR.name,
+    -> Icons.Default.Person
+    InspectionProductivityReportCommand.PRINT_INSPECTOR_METRICS.name,
+    -> Icons.Default.Description
+    InspectionProductivityReportCommand.PRINT_INSPECTOR_PRODUCT_BATCH.name,
+    WeldingProductivityReportCommand.PRINT_OPERATOR_PRODUCT_BATCH.name,
+    -> Icons.Default.Inventory2
+    InspectionProductivityReportCommand.PRINT_PRODUCT.name,
+    WeldingProductivityReportCommand.PRINT_PRODUCT.name,
+    -> Icons.Default.Inventory2
+    InspectionProductivityReportCommand.PRINT_WELD_RANK.name,
+    -> Icons.Default.Star
+    InspectionProductivityReportCommand.PRINT_PRODUCT_RANK.name,
+    WeldingProductivityReportCommand.PRINT_PRODUCT_RANK.name,
+    -> Icons.AutoMirrored.Filled.List
+    else -> Icons.Default.Description
 }
 
 @Composable
 fun IpaDefectSection(
     rows: List<InspectionProductivityDefectRowDto>,
     defectLabel: (String) -> String,
+    sectionTitle: String = "不良内訳（KT09）",
 ) {
     if (rows.isEmpty()) return
     Column(
@@ -1811,7 +1899,7 @@ fun IpaDefectSection(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(Icons.Default.Warning, null, tint = Color(0xFF3B82F6), modifier = Modifier.size(15.dp))
-            Text("不良内訳（KT09）", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF1E293B))
+            Text(sectionTitle, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color(0xFF1E293B))
         }
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -2057,7 +2145,7 @@ private fun IpaPanel(
 }
 
 @Composable
-private fun IpaChartXAxis(days: List<String?>) {
+private fun IpaChartXAxis(days: List<String?>, fontSizeOffset: Int = 0) {
     if (days.isEmpty()) return
     Row(
         modifier = Modifier
@@ -2068,7 +2156,7 @@ private fun IpaChartXAxis(days: List<String?>) {
         days.forEach { day ->
             Text(
                 InspectionProductivityLogic.chartDayLabel(day),
-                fontSize = 8.sp,
+                fontSize = (8 + fontSizeOffset).sp,
                 color = Color(0xFF94A3B8),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.widthIn(max = 28.dp),
@@ -2078,10 +2166,10 @@ private fun IpaChartXAxis(days: List<String?>) {
 }
 
 @Composable
-private fun IpaChartLegend(label: String, color: Color) {
+private fun IpaChartLegend(label: String, color: Color, fontSizeOffset: Int = 0) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         Box(Modifier.size(8.dp).clip(RoundedCornerShape(2.dp)).background(color))
-        Text(label, fontSize = 9.sp, color = Color(0xFF64748B))
+        Text(label, fontSize = (9 + fontSizeOffset).sp, color = Color(0xFF64748B))
     }
 }
 
@@ -2089,6 +2177,7 @@ private fun IpaChartLegend(label: String, color: Color) {
 private fun IpaDailyProductivityChart(
     daily: List<InspectionProductivityDailyRowDto>,
     modifier: Modifier = Modifier,
+    fontSizeOffset: Int = 0,
 ) {
     val density = LocalDensity.current
     Canvas(modifier = modifier) {
@@ -2168,8 +2257,8 @@ private fun IpaDailyProductivityChart(
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
-        val qtyTextSize = with(density) { 8.sp.toPx() }
-        val effTextSize = with(density) { 7.5.sp.toPx() }
+        val qtyTextSize = with(density) { (8 + fontSizeOffset).sp.toPx() }
+        val effTextSize = with(density) { (7.5f + fontSizeOffset).sp.toPx() }
         val pillPadH = with(density) { 5.dp.toPx() }
         val pillPadV = with(density) { 2.5.dp.toPx() }
         val pillRadius = with(density) { 4.dp.toPx() }

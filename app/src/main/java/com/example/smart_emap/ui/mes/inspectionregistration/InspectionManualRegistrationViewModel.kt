@@ -74,6 +74,8 @@ data class InspectionManualRegistrationUiState(
             val start = (page - 1) * LIST_PAGE_SIZE
             return filteredRows.drop(start).take(LIST_PAGE_SIZE)
         }
+    val listSummary: InspectionManualRegistrationLogic.ListSummary
+        get() = InspectionManualRegistrationLogic.buildListSummary(filteredRows)
     val unitPerBox: Int
         get() {
             val code = productCd.trim()

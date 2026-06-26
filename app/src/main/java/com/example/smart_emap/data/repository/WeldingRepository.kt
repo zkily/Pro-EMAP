@@ -7,12 +7,16 @@ import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.MachineDto
 import com.example.smart_emap.data.model.PatchWeldingBody
 import com.example.smart_emap.data.model.ProcessDefectItemDto
+import com.example.smart_emap.data.model.UserListItemDto
 import com.example.smart_emap.data.model.WeldingManagementRowDto
 import com.example.smart_emap.data.model.WeldingProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.FlexibleIntAdapterFactory
 import com.example.smart_emap.data.model.MesDefectByItemAdapterFactory
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import com.example.smart_emap.ui.mes.productivity.WELDING_DEPARTMENT_NAME
+import com.example.smart_emap.ui.mes.productivity.WELDING_SECTION_NAME
+import com.example.smart_emap.ui.mes.productivity.WeldingProductivityLogic
 import retrofit2.HttpException
 
 const val WELDING_DEFECT_DETECTION_PROCESS_CD = "KT07"
@@ -23,6 +27,7 @@ private val WELDING_MES_MACHINE_NAME_RE = Regex("^溶接.{2}$")
 class WeldingRepository(
     private val apiClient: ApiClient,
     private val mesClientIdStore: MesClientIdStore,
+    private val systemUserRepository: SystemUserRepository? = null,
 ) {
     private val moshi = Moshi.Builder()
         .add(MesDefectByItemAdapterFactory)
@@ -101,6 +106,24 @@ class WeldingRepository(
     suspend fun loadDefectItems(): List<ProcessDefectItemDto> {
         val res = apiClient.processDefectApi().getOptions(WELDING_DEFECT_DETECTION_PROCESS_CD)
         return res.data.orEmpty().filter { !it.defectCd.isNullOrBlank() }
+    }
+
+    /** Web `fetchWeldingSectionOperators`：製造部・溶接課所属の有効ユーザー */
+    suspend fun loadWeldingSectionOperators(): List<UserListItemDto> {
+        val repo = systemUserRepository ?: return emptyList()
+        val orgs = repo.getOrganizations().getOrNull().orEmpty()
+        val departmentId = orgs.firstOrNull { it.type == "department" && it.name == WELDING_DEPARTMENT_NAME }?.id
+        val sectionId = orgs.firstOrNull { it.type == "section" && it.name == WELDING_SECTION_NAME }?.id
+        val users = repo.getUsers(
+            status = "active",
+            departmentId = departmentId,
+            sectionId = sectionId,
+            page = 1,
+            pageSize = 500,
+        ).getOrNull()?.items.orEmpty()
+        return users.filter { user ->
+            user.id != null && WeldingProductivityLogic.isWeldingSectionOperatorUser(user)
+        }.sortedBy { it.displayLabel() }
     }
 
     suspend fun loadProductivityAnalysis(

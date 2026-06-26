@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.PopupProperties
 import com.example.smart_emap.data.model.UserTodoItemDto
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -86,24 +87,29 @@ fun HeaderTodoTrigger(
             onDismissRequest = { expanded = false },
             modifier = Modifier
                 .widthIn(min = 320.dp, max = 380.dp)
-                .heightIn(max = 520.dp)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC), Color(0xFFECFDF5)),
-                    ),
-                    RoundedCornerShape(14.dp),
-                )
-                .border(1.dp, Color(0x8CA7F3D0), RoundedCornerShape(14.dp)),
+                .heightIn(max = 520.dp),
+            properties = PopupProperties(focusable = true),
         ) {
-            HeaderTodoPanelContent(
-                state = state,
-                onDraftChange = onDraftChange,
-                onAdd = onAdd,
-                onToggle = onToggle,
-                onDelete = onDelete,
-                onClearDone = onClearDone,
-                onUpdateContent = onUpdateContent,
-            )
+            Box(
+                modifier = Modifier
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFFFFFFFF), Color(0xFFF8FAFC), Color(0xFFECFDF5)),
+                        ),
+                        RoundedCornerShape(14.dp),
+                    )
+                    .border(1.dp, Color(0x8CA7F3D0), RoundedCornerShape(14.dp)),
+            ) {
+                HeaderTodoPanelContent(
+                    state = state,
+                    onDraftChange = onDraftChange,
+                    onAdd = onAdd,
+                    onToggle = onToggle,
+                    onDelete = onDelete,
+                    onClearDone = onClearDone,
+                    onUpdateContent = onUpdateContent,
+                )
+            }
         }
     }
 }
@@ -342,11 +348,14 @@ private fun HeaderTodoPanelContent(
                 }
             }
             else -> {
-                LazyColumn(
-                    modifier = Modifier.heightIn(max = 280.dp),
+                val listScrollState = rememberScrollState()
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 280.dp)
+                        .verticalScroll(listScrollState),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(state.sortedItems, key = { it.id }) { item ->
+                    state.sortedItems.forEach { item ->
                         HeaderTodoRow(
                             item = item,
                             isEditing = editingId == item.id,
@@ -490,6 +499,7 @@ private fun HeaderTodoRow(
 private fun formatTodoDateTime(value: String?): String {
     if (value.isNullOrBlank()) return "--"
     return runCatching {
-        LocalDateTime.parse(value.take(19)).format(DateTimeFormatter.ofPattern("MM/dd HH:mm"))
+        val normalized = value.replace(" ", "T").take(19)
+        LocalDateTime.parse(normalized).format(DateTimeFormatter.ofPattern("MM/dd HH:mm"))
     }.getOrDefault("--")
 }

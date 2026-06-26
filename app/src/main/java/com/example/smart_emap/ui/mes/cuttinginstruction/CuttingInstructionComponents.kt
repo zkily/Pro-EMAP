@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
@@ -409,6 +410,7 @@ fun ProductionLotListCard(
     onProductNameFilter: (String) -> Unit,
     onMaterialNameFilter: (String) -> Unit,
     onOpenNotes: () -> Unit,
+    onOpenDataManagement: () -> Unit,
     onSyncLengths: () -> Unit,
     onNewPlan: (Boolean) -> Unit,
     onSelectPlan: (InstructionPlanRowDto) -> Unit,
@@ -416,6 +418,7 @@ fun ProductionLotListCard(
     onDeletePlan: (InstructionPlanRowDto) -> Unit,
     onMoveToCutting: (InstructionPlanRowDto) -> Unit,
     onEditPlan: (InstructionPlanRowDto) -> Unit,
+    onCopyPlan: (InstructionPlanRowDto) -> Unit,
     onPlanPageChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -440,6 +443,13 @@ fun ProductionLotListCard(
                 ) {
                     Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = CuttingInstructionTheme.BatchAccent, modifier = Modifier.size(20.dp))
                     Text("生産ロット一覧", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = CuttingInstructionTheme.BatchTitle)
+                    LotCardHeaderButton(
+                        text = "データ管理",
+                        onClick = onOpenDataManagement,
+                        containerColor = CuttingInstructionTheme.BatchDataBtnTop,
+                        contentColor = CuttingInstructionTheme.BatchDataBtnText,
+                        borderColor = CuttingInstructionTheme.BatchDataBtnBorder,
+                    )
                     LotCardHeaderButton(
                         text = "寸法マスタ同期",
                         onClick = onSyncLengths,
@@ -521,6 +531,7 @@ fun ProductionLotListCard(
                 onDelete = onDeletePlan,
                 onMoveToCutting = onMoveToCutting,
                 onEdit = onEditPlan,
+                onCopy = onCopyPlan,
             )
             InstructionPaginationBar(planPage, planTotalPages, planTotal, onPlanPageChange)
         }
@@ -1339,6 +1350,7 @@ fun CuttingInstructionTomorrowCard(
     rows: List<InstructionCuttingRowDto>,
     loading: Boolean,
     onMoveBackToBatch: (InstructionCuttingRowDto) -> Unit,
+    onEdit: (InstructionCuttingRowDto) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -1379,12 +1391,13 @@ fun CuttingInstructionTomorrowCard(
                     onToggleCompleted = { _, _ -> },
                     onDuplicate = {},
                     onDelete = {},
+                    onEdit = onEdit,
                     onMoveBackToBatch = onMoveBackToBatch,
                     modifier = Modifier.fillMaxSize(),
                     expandVertically = true,
                 )
             }
-            CuttingMgmtSummaryFooter(rows, showDefect = false, showUsage = false)
+            CuttingMgmtSummaryFooter(rows)
         }
     }
 }
@@ -1439,7 +1452,7 @@ private enum class CuttingCellAlign { Start, Center, End }
 
 private val CuttingTodayRowHeight = CuttingInstructionTheme.CuttingMgmtRowHeightDp.dp
 private val CuttingTodayMinWidth = 863.dp
-private val CuttingTomorrowMinWidth = 420.dp
+private val CuttingTomorrowMinWidth = 520.dp
 
 private fun cuttingProductNameDisplay(row: InstructionCuttingRowDto): String =
     row.productName?.trim()?.takeIf { it.isNotEmpty() }
@@ -1824,7 +1837,9 @@ private fun RowScope.CuttingTomorrowTableHeaderRow() {
     }
     CuttingTodayCellText("製品名", width = cuttingTomorrowColWidth("製品名"), fontWeight = FontWeight.ExtraBold, align = CuttingCellAlign.Start, color = CuttingInstructionTheme.CuttingTableHeaderText)
     CuttingTodayCellText("生産数", width = cuttingTomorrowColWidth("生産数"), fontWeight = FontWeight.ExtraBold, align = CuttingCellAlign.End, color = CuttingInstructionTheme.CuttingTableHeaderText)
+    CuttingTodayCellText("不良", width = cuttingTomorrowColWidth("不良"), fontWeight = FontWeight.ExtraBold, align = CuttingCellAlign.Center, color = CuttingInstructionTheme.CuttingTableHeaderText)
     CuttingTodayCellText("生産順", width = cuttingTomorrowColWidth("生産順"), fontWeight = FontWeight.ExtraBold, align = CuttingCellAlign.Center, color = CuttingInstructionTheme.CuttingTableHeaderText)
+    CuttingTodayCellText("生産時間", width = cuttingTomorrowColWidth("生産時間"), fontWeight = FontWeight.ExtraBold, align = CuttingCellAlign.Center, color = CuttingInstructionTheme.CuttingTableHeaderText)
     CuttingTodayCellText("", width = cuttingTomorrowColWidth("戻す"), fontWeight = FontWeight.ExtraBold, showRightBorder = false, color = CuttingInstructionTheme.CuttingTableHeaderText)
 }
 
@@ -1834,16 +1849,20 @@ private fun cuttingTomorrowColWidth(h: String) = when (h) {
     "切断機" -> 46.dp
     "製品名" -> 100.dp
     "生産数" -> 50.dp
+    "不良" -> 44.dp
     "生産順" -> 46.dp
+    "生産時間" -> 56.dp
     "戻す" -> 44.dp
     else -> 46.dp
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CuttingTomorrowTable(
     rows: List<InstructionCuttingRowDto>,
     loading: Boolean,
     onMoveBackToBatch: (InstructionCuttingRowDto) -> Unit,
+    onEdit: (InstructionCuttingRowDto) -> Unit = {},
     modifier: Modifier = Modifier,
     expandVertically: Boolean = false,
 ) {
@@ -1904,6 +1923,7 @@ private fun CuttingTomorrowTable(
                             Row(
                                 modifier = Modifier
                                     .width(CuttingTomorrowMinWidth)
+                                    .combinedClickable(onClick = {}, onDoubleClick = { onEdit(row) })
                                     .background(if (index % 2 == 1) Color(0xFFFAFAFF) else Color.White),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -1916,7 +1936,9 @@ private fun CuttingTomorrowTable(
                                     align = CuttingCellAlign.Start,
                                 )
                                 CuttingTodayCellText(row.actualProductionQuantity?.toString() ?: "-", width = cuttingTomorrowColWidth("生産数"), align = CuttingCellAlign.End)
+                                CuttingTodayCellText(row.defectQty?.toString() ?: "-", width = cuttingTomorrowColWidth("不良"))
                                 CuttingTodayCellText(row.productionSequence?.toString() ?: "-", width = cuttingTomorrowColWidth("生産順"))
+                                CuttingTodayCellText(row.productionTime ?: "-", width = cuttingTomorrowColWidth("生産時間"))
                                 CuttingTodayCellBorder(width = cuttingTomorrowColWidth("戻す"), showRightBorder = false) {
                                     TextButton(onClick = { onMoveBackToBatch(row) }, contentPadding = PaddingValues(0.dp)) {
                                         Text("戻す", fontSize = 9.sp, color = CuttingInstructionTheme.BatchAccent)
@@ -1945,6 +1967,7 @@ fun PlanBatchTable(
     onDelete: (InstructionPlanRowDto) -> Unit,
     onMoveToCutting: (InstructionPlanRowDto) -> Unit,
     onEdit: (InstructionPlanRowDto) -> Unit = {},
+    onCopy: (InstructionPlanRowDto) -> Unit = {},
 ) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
@@ -2049,6 +2072,9 @@ fun PlanBatchTable(
                                         IconButton(onClick = { onEdit(row) }, modifier = Modifier.size(24.dp)) {
                                             Icon(Icons.Default.Edit, "編集", tint = CuttingInstructionTheme.BatchAccent, modifier = Modifier.size(14.dp))
                                         }
+                                        IconButton(onClick = { onCopy(row) }, modifier = Modifier.size(24.dp)) {
+                                            Icon(Icons.Default.ContentCopy, "複製", tint = CuttingInstructionTheme.CuttingBtnIssueSolid, modifier = Modifier.size(14.dp))
+                                        }
                                         IconButton(onClick = { onDelete(row) }, modifier = Modifier.size(24.dp)) {
                                             Icon(Icons.Default.Delete, "削除", tint = Color(0xFFDC2626), modifier = Modifier.size(14.dp))
                                         }
@@ -2112,6 +2138,7 @@ fun CuttingManagementTable(
         rows = rows,
         loading = loading,
         onMoveBackToBatch = onMoveBackToBatch,
+        onEdit = onEdit,
         modifier = modifier,
         expandVertically = expandVertically,
     )
@@ -2537,10 +2564,12 @@ private fun ChamferingTodayTable(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChamferingTomorrowTable(
     rows: List<InstructionChamferingRowDto>,
     loading: Boolean,
+    onEdit: (InstructionChamferingRowDto) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val horizontalScroll = rememberScrollState()
@@ -2568,7 +2597,7 @@ private fun ChamferingTomorrowTable(
                         ),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    listOf("CD", "生産日", "面取機", "製品名", "生産数", "生産時間").forEach { h ->
+                    listOf("CD", "生産日", "面取機", "製品名", "生産数", "不良", "生産順", "生産時間").forEach { h ->
                         ChamferMgmtCellText(
                             h,
                             width = chamferTomorrowColWidth(h),
@@ -2610,6 +2639,7 @@ private fun ChamferingTomorrowTable(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .combinedClickable(onClick = {}, onDoubleClick = { onEdit(row) })
                                     .background(chamferMgmtRowBackground(index)),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -2626,6 +2656,8 @@ private fun ChamferingTomorrowTable(
                                     width = chamferTomorrowColWidth("生産数"),
                                     align = CuttingCellAlign.End,
                                 )
+                                ChamferMgmtCellText(row.defectQty?.toString() ?: "-", width = chamferTomorrowColWidth("不良"))
+                                ChamferMgmtCellText(row.productionSequence?.toString() ?: "-", width = chamferTomorrowColWidth("生産順"))
                                 ChamferMgmtCellText(
                                     row.productionTime ?: "-",
                                     width = chamferTomorrowColWidth("生産時間"),
@@ -2645,7 +2677,7 @@ private fun ChamferingTomorrowTable(
         }
         if (rows.isNotEmpty()) {
             HorizontalDivider(color = CuttingInstructionTheme.ChamferMgmtTableBorder, thickness = 2.dp)
-            ChamferMgmtSummaryFooter(rows, showDefectTotal = false)
+            ChamferMgmtSummaryFooter(rows)
         }
     }
 }
@@ -2672,6 +2704,7 @@ fun ChamferingManagementTable(
         ChamferingTomorrowTable(
             rows = rows,
             loading = loading,
+            onEdit = onEdit,
             modifier = modifier,
         )
     } else {
@@ -3223,8 +3256,10 @@ fun KanbanIssuanceSection(
     onIssue: (Int) -> Unit,
     onReissue: (Int) -> Unit,
     onEdit: (KanbanIssuanceRowDto) -> Unit,
+    onFirstProductChange: (KanbanIssuanceRowDto, Boolean) -> Unit = { _, _ -> },
     issueLoadingId: Int? = null,
     reissueLoadingId: Int? = null,
+    firstProductSavingId: Int? = null,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -3282,8 +3317,10 @@ fun KanbanIssuanceSection(
                 onIssue = onIssue,
                 onReissue = onReissue,
                 onEdit = onEdit,
+                onFirstProductChange = onFirstProductChange,
                 issueLoadingId = issueLoadingId,
                 reissueLoadingId = reissueLoadingId,
+                firstProductSavingId = firstProductSavingId,
             )
             if (totalCount > 0) {
                 InstructionPaginationBar(page, totalPages, totalCount, onPageChange)
@@ -3351,8 +3388,10 @@ fun KanbanTable(
     onIssue: (Int) -> Unit,
     onReissue: (Int) -> Unit = {},
     onEdit: (KanbanIssuanceRowDto) -> Unit = {},
+    onFirstProductChange: (KanbanIssuanceRowDto, Boolean) -> Unit = { _, _ -> },
     issueLoadingId: Int? = null,
     reissueLoadingId: Int? = null,
+    firstProductSavingId: Int? = null,
 ) {
     val selectableIds = rows.filter { it.status == "pending" || it.status == "issued" }.mapNotNull { it.id }
     val pageAllSelected = selectableIds.isNotEmpty() && selectableIds.all { it in selectedIds }
@@ -3388,8 +3427,10 @@ fun KanbanTable(
                                 onIssue = onIssue,
                                 onReissue = onReissue,
                                 onEdit = onEdit,
+                                onFirstProductChange = onFirstProductChange,
                                 issueLoadingId = issueLoadingId,
                                 reissueLoadingId = reissueLoadingId,
+                                firstProductSavingId = firstProductSavingId,
                             )
                         }
                     }
@@ -3421,6 +3462,7 @@ private fun KanbanTableHeaderRow(
                 colors = CheckboxDefaults.colors(checkedColor = CuttingInstructionTheme.BtnIssue),
             )
         }
+        KanbanHeaderCell("初", 36.dp)
         KanbanHeaderCell("状態", 56.dp)
         KanbanHeaderCell("発行日", 72.dp)
         KanbanHeaderCell("生産日", 72.dp)
@@ -3445,8 +3487,10 @@ private fun KanbanTableDataRow(
     onIssue: (Int) -> Unit,
     onReissue: (Int) -> Unit,
     onEdit: (KanbanIssuanceRowDto) -> Unit,
+    onFirstProductChange: (KanbanIssuanceRowDto, Boolean) -> Unit = { _, _ -> },
     issueLoadingId: Int? = null,
     reissueLoadingId: Int? = null,
+    firstProductSavingId: Int? = null,
 ) {
     val id = row.id
     val selectable = row.status == "pending" || row.status == "issued"
@@ -3472,6 +3516,17 @@ private fun KanbanTableDataRow(
                         checked = selectedIds.contains(id),
                         onCheckedChange = { onToggleSelect(id, it) },
                         enabled = selectable,
+                        modifier = Modifier.size(18.dp).scale(0.85f),
+                        colors = CheckboxDefaults.colors(checkedColor = CuttingInstructionTheme.BtnIssue),
+                    )
+                }
+            }
+            KanbanDataCell(36.dp) {
+                if (id != null) {
+                    Checkbox(
+                        checked = row.isFirstProduct == true,
+                        onCheckedChange = { onFirstProductChange(row, it) },
+                        enabled = firstProductSavingId != id,
                         modifier = Modifier.size(18.dp).scale(0.85f),
                         colors = CheckboxDefaults.colors(checkedColor = CuttingInstructionTheme.BtnIssue),
                     )
@@ -3948,6 +4003,7 @@ enum class HeaderToolbarButtonStyle {
     Molding,
     CuttingDone,
     ChamferingDone,
+    Report,
 }
 
 private val HeaderToolbarButtonShape = RoundedCornerShape(18.dp)
@@ -3994,6 +4050,13 @@ fun HeaderToolbarButton(
             CuttingInstructionTheme.HeaderBtnChamferBorder,
             CuttingInstructionTheme.HeaderBtnChamferShadow,
         )
+        HeaderToolbarButtonStyle.Report -> listOf(
+            CuttingInstructionTheme.HeaderBtnReportTop,
+            CuttingInstructionTheme.HeaderBtnReportBottom,
+            CuttingInstructionTheme.HeaderBtnReportText,
+            CuttingInstructionTheme.HeaderBtnReportBorder,
+            CuttingInstructionTheme.HeaderBtnReportShadow,
+        )
     }
     Box(
         modifier = modifier
@@ -4021,14 +4084,36 @@ fun HeaderToolbarButton(
                     ),
                 ),
         )
-        Text(
-            text,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = textColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (style == HeaderToolbarButtonStyle.Report) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    Icons.Default.Description,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    text,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        } else {
+            Text(
+                text,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

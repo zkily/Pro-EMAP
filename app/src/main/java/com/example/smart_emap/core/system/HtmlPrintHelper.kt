@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 
@@ -24,6 +25,9 @@ object HtmlPrintHelper {
 
     private const val MARGIN_8MM_MILS = 315
     private const val MARGIN_10MM_MILS = 394
+    private const val DEFAULT_CONTENT_BASE_URL = "https://smart-emap.local/"
+    private const val IMAGE_READY_MAX_RETRIES = 40
+    private const val IMAGE_READY_DELAY_MS = 100L
     private val activeWebViews = mutableSetOf<WebView>()
 
     fun PrintPageLayout.toAttributes(): PrintAttributes = when (this) {
@@ -66,37 +70,68 @@ object HtmlPrintHelper {
             .build()
     }
 
+    /**
+     * @param contentBaseUrl HTML 内相对路径资源（如图表 PNG）的基准 URL。
+     *   例: `file:///data/.../cache/welding_print/`（末尾须带 `/`）
+     */
     fun printHtml(
         context: Context,
         html: String,
         jobName: String,
         layout: PrintPageLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+        contentBaseUrl: String = DEFAULT_CONTENT_BASE_URL,
     ): Boolean {
         val activity = context.findActivity() ?: return false
         val webView = WebView(activity).apply {
-            settings.defaultTextEncodingName = "UTF-8"
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                allowFileAccess = true
+                allowFileAccessFromFileURLs = true
+                allowUniversalAccessFromFileURLs = true
+                blockNetworkImage = false
+                loadsImagesAutomatically = true
+                defaultTextEncodingName = "UTF-8"
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+            }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    val printManager = activity.getSystemService(PrintManager::class.java) ?: return
-                    val adapter = view.createPrintDocumentAdapter(jobName)
-                    printManager.print(
-                        jobName,
-                        adapter,
-                        layout.toAttributes(),
-                    )
-                    Handler(Looper.getMainLooper()).postDelayed(
-                        {
-                            activeWebViews.remove(view)
-                            view.destroy()
-                        },
-                        120_000,
-                    )
+                    waitForImagesThenPrint(view, activity, jobName, layout, attempt = 0)
                 }
             }
-            loadDataWithBaseURL(null, html, "text/html; charset=UTF-8", "UTF-8", null)
+            loadDataWithBaseURL(contentBaseUrl, html, "text/html; charset=UTF-8", "UTF-8", null)
         }
         activeWebViews.add(webView)
         return true
+    }
+
+    private fun waitForImagesThenPrint(
+        webView: WebView,
+        activity: Activity,
+        jobName: String,
+        layout: PrintPageLayout,
+        attempt: Int,
+    ) {
+        webView.evaluateJavascript(IMAGE_READY_SCRIPT) { raw ->
+            val ready = raw?.trim('"') == "ready"
+            if (!ready && attempt < IMAGE_READY_MAX_RETRIES) {
+                Handler(Looper.getMainLooper()).postDelayed(
+                    { waitForImagesThenPrint(webView, activity, jobName, layout, attempt + 1) },
+                    IMAGE_READY_DELAY_MS,
+                )
+                return@evaluateJavascript
+            }
+            val printManager = activity.getSystemService(PrintManager::class.java) ?: return@evaluateJavascript
+            val adapter = webView.createPrintDocumentAdapter(jobName)
+            printManager.print(jobName, adapter, layout.toAttributes())
+            Handler(Looper.getMainLooper()).postDelayed(
+                {
+                    activeWebViews.remove(webView)
+                    webView.destroy()
+                },
+                120_000,
+            )
+        }
     }
 
     private fun Context.findActivity(): Activity? {
@@ -107,4 +142,16 @@ object HtmlPrintHelper {
         }
         return null
     }
+
+    private const val IMAGE_READY_SCRIPT = """
+        (function() {
+          var imgs = document.images;
+          if (!imgs || !imgs.length) return 'ready';
+          for (var i = 0; i < imgs.length; i++) {
+            var img = imgs[i];
+            if (!img.complete || img.naturalWidth === 0) return 'pending';
+          }
+          return 'ready';
+        })()
+    """
 }

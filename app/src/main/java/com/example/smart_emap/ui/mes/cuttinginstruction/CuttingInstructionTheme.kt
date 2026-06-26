@@ -3,10 +3,10 @@ package com.example.smart_emap.ui.mes.cuttinginstruction
 import androidx.compose.ui.graphics.Color
 
 object CuttingInstructionTheme {
-    val PageBg = Color(0xFFF3F4F6)
-    val PageBgTop = Color(0xFFF5F7FB)
-    val PageBgMid = Color(0xFFF3F4F6)
-    val PageBgBottom = Color(0xFFEEF2F6)
+    val PageBg = Color(0xFFF1F5F9)
+    val PageBgTop = Color(0xFFF0F4FF)
+    val PageBgMid = Color(0xFFF8FAFC)
+    val PageBgBottom = Color(0xFFF1F5F9)
 
     val HeaderBg = Color(0xFFFFFFFF)
     val HeaderBorder = Color(0xFFE5E7EB)
@@ -21,6 +21,10 @@ object CuttingInstructionTheme {
     val BatchSyncBtnBg = Color(0xFFECFDF5)
     val BatchSyncBtnText = Color(0xFF059669)
     val BatchSyncBtnBorder = Color(0xFFBBF7D0)
+    val BatchDataBtnTop = Color(0xFFF8FAFC)
+    val BatchDataBtnBottom = Color(0xFFE0E7FF)
+    val BatchDataBtnText = Color(0xFF3730A3)
+    val BatchDataBtnBorder = Color(0xFFC7D2FE)
     val CuttingTableBorder = Color(0xFFC7D2FE)
     val CuttingTableHeaderStart = Color(0xFFEEF2FF)
     val CuttingTableHeaderEnd = Color(0xFFE0E7FF)
@@ -136,6 +140,12 @@ object CuttingInstructionTheme {
     val HeaderBtnChamferBottom = Color(0xFF059669)
     val HeaderBtnChamferBorder = Color(0xFF047857)
     val HeaderBtnChamferShadow = Color(0x40059669)
+    val HeaderBtnReportTop = Color(0xFFFFFFFF)
+    val HeaderBtnReportMid = Color(0xFFEEF2FF)
+    val HeaderBtnReportBottom = Color(0xFFE0E7FF)
+    val HeaderBtnReportText = Color(0xFF4338CA)
+    val HeaderBtnReportBorder = Color(0xFFA5B4FC)
+    val HeaderBtnReportShadow = Color(0x404F46E5)
 
     val ChipActiveBg = Color(0xFFDBEAFE)
     val ChipActiveText = Color(0xFF1D4ED8)

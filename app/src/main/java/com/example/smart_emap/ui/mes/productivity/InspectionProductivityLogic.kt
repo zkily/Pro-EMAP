@@ -3,6 +3,7 @@ package com.example.smart_emap.ui.mes.productivity
 import com.example.smart_emap.core.mes.MesCalendarUtils
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisDataDto
 import com.example.smart_emap.data.model.InspectionProductivityBucketDto
+import com.example.smart_emap.data.model.InspectionProductivityDailyRowDto
 import com.example.smart_emap.data.model.InspectionProductivityInspectorMetricsDataDto
 import com.example.smart_emap.data.model.InspectionProductivityInspectorMetricsRowDto
 import com.example.smart_emap.data.model.InspectionProductivityInspectorRowDto
@@ -50,6 +51,12 @@ data class InspectorProductDisplayRow(
     val avgEfficiencyPerHour: Double?,
 )
 
+data class InspectionDailyBatchPrintItem(
+    val inspectorLabel: String,
+    val daily: List<InspectionProductivityDailyRowDto>,
+    val chartFileName: String,
+)
+
 data class InspectionProductivityReportFilters(
     val startDate: String,
     val endDate: String,
@@ -86,6 +93,23 @@ data class IpaReportMenuItem(
     val hint: String,
     val tone: IpaReportMenuTone,
     val divided: Boolean = false,
+)
+
+/** レポートメニュー共通表示（検査・溶接など工程横断） */
+data class IpaReportMenuEntry(
+    val key: String,
+    val label: String,
+    val hint: String,
+    val tone: IpaReportMenuTone,
+    val divided: Boolean = false,
+)
+
+fun IpaReportMenuItem.toEntry(): IpaReportMenuEntry = IpaReportMenuEntry(
+    key = command.name,
+    label = label,
+    hint = hint,
+    tone = tone,
+    divided = divided,
 )
 
 data class InspectorMetricsPrepared(

@@ -30,7 +30,7 @@ class SmartEmapAppContainer(context: Context) {
     val systemUserRepository = SystemUserRepository(apiClient)
     val inspectionRepository = InspectionRepository(apiClient, mesClientIdStore, systemUserRepository)
     val inspectionOfflineStore = InspectionOfflineStore(context.applicationContext)
-    val weldingRepository = WeldingRepository(apiClient, mesClientIdStore)
+    val weldingRepository = WeldingRepository(apiClient, mesClientIdStore, systemUserRepository)
     val weldingOfflineStore = WeldingOfflineStore(context.applicationContext)
     val cuttingRepository = CuttingRepository(apiClient)
     val cuttingInstructionRepository = CuttingInstructionRepository(apiClient)

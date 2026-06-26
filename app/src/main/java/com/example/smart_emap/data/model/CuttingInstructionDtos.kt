@@ -252,6 +252,8 @@ data class KanbanIssuanceRowDto(
 
     @Json(name = "has_chamfering_process") val hasChamferingProcess: Boolean? = null,
 
+    @Json(name = "is_first_product") val isFirstProduct: Boolean? = null,
+
     @Json(name = "lot_number") val lotNumber: String? = null,
 
     @Json(name = "production_day") val productionDay: String? = null,
@@ -978,6 +980,8 @@ data class PatchKanbanBody(
     @Json(name = "developed_length") val developedLength: Double? = null,
 
     @Json(name = "has_chamfering_process") val hasChamferingProcess: Boolean? = null,
+
+    @Json(name = "is_first_product") val isFirstProduct: Boolean? = null,
 
     @Json(name = "lot_number") val lotNumber: String? = null,
 

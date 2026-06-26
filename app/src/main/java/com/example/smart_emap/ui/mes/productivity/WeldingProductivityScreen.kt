@@ -20,9 +20,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.smart_emap.ui.erp.production.planning.ProductionPageBackground
+import com.example.smart_emap.core.system.HtmlPrintHelper
 import com.example.smart_emap.ui.shell.LayoutColors
+import java.io.File
 
 @Composable
 fun WeldingProductivityScreen(
@@ -31,6 +33,12 @@ fun WeldingProductivityScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scroll = rememberScrollState()
+    val context = LocalContext.current
+    val printCacheDir = remember(context) { File(context.cacheDir, "welding_productivity_print") }
+
+    LaunchedEffect(Unit) {
+        viewModel.onPageEnter()
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         val msg = uiState.snackbarMessage ?: return@LaunchedEffect
@@ -38,36 +46,53 @@ fun WeldingProductivityScreen(
         viewModel.clearSnackbar()
     }
 
+    LaunchedEffect(uiState.pendingPrintHtml) {
+        val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
+        val subject = uiState.pendingPrintSubject ?: "溶接生産性分析"
+        val opened = HtmlPrintHelper.printHtml(
+            context = context,
+            html = html,
+            jobName = subject,
+            layout = uiState.pendingPrintLayout,
+            contentBaseUrl = uiState.pendingPrintContentBaseUrl ?: "https://smart-emap.local/",
+        )
+        viewModel.clearPendingPrintHtml()
+        if (!opened) snackbarHostState.showSnackbar("印刷画面を開けませんでした")
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }, containerColor = LayoutColors.ShellBg) { padding ->
-        ProductionPageBackground {
+        IpaPageBackground {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
                     .verticalScroll(scroll),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                WpaHeroBar(
+                IpaHeroBarWithReports(
                     rangeLabel = uiState.rangeLabel,
                     loading = uiState.isLoading,
+                    reportBusy = uiState.reportBusy,
+                    reportEnabled = uiState.analysisData != null,
+                    reportEntries = WeldingProductivityLogic.reportMenuItems(),
+                    onReportCommand = { key -> viewModel.handleReportCommand(key, printCacheDir) },
                     onRefresh = viewModel::loadAnalysis,
+                    pageTitle = "溶接工程 — 生産性分析",
+                    pageSubtitle = "実績 · 能率 · 不良率 · 稼働",
                 )
 
-                WpaToolbarCard(
+                IpaToolbarCard(
                     startDate = uiState.startDate,
                     endDate = uiState.endDate,
-                    filterOperatorId = uiState.filterOperatorId,
+                    filterInspectorId = uiState.filterOperatorId,
                     filterProductCd = uiState.filterProductCd,
-                    operatorOptions = uiState.operatorOptions,
+                    inspectorOptions = uiState.operatorOptions,
                     productOptions = uiState.productOptions,
-                    includeIncomplete = uiState.includeIncomplete,
-                    loading = uiState.isLoading,
                     onDateRangeChange = viewModel::setDateRange,
-                    onOperatorChange = viewModel::setFilterOperatorId,
+                    onInspectorChange = viewModel::setFilterOperatorId,
                     onProductChange = viewModel::setFilterProductCd,
-                    onIncludeIncompleteChange = viewModel::setIncludeIncomplete,
-                    onAnalyze = viewModel::loadAnalysis,
+                    personPillLabel = "溶接作業者",
                 )
 
                 Box(Modifier.fillMaxWidth()) {
@@ -86,9 +111,15 @@ fun WeldingProductivityScreen(
                                 IpaKpiGrid(uiState.kpiCards)
                                 IpaDailyChartCard(
                                     WeldingProductivityLogic.toInspectionDailyRows(data.daily.orEmpty()),
+                                    chartFontSizeOffset = 1,
                                 )
-                                WpaOperatorSection(data.byOperator.orEmpty())
-                                WpaProductSection(data.byProduct.orEmpty())
+                                IpaWeldingOperatorProductSplit(
+                                    operatorRows = uiState.operatorDisplayRows,
+                                    productRows = uiState.productDisplayRows,
+                                    operatorCount = data.byOperator.orEmpty().size,
+                                    operatorSectionAvgEfficiency = uiState.operatorSectionAvgEfficiency,
+                                    productSectionTotalQty = uiState.productSectionTotalQty,
+                                )
                                 WpaProductRankSection(
                                     productRankList = uiState.productRankList,
                                     selectedRanking = uiState.selectedProductRanking,
@@ -98,14 +129,14 @@ fun WeldingProductivityScreen(
                                     onProductSelect = viewModel::setRankViewProductCd,
                                     onDetailClick = viewModel::setRankViewProductCd,
                                 )
-                                WpaDefectSection(
+                                IpaWeldingDefectSection(
                                     rows = data.defectByItem.orEmpty(),
                                     defectLabel = viewModel::defectLabel,
                                 )
-                                WpaSessionDetailSection(data.sessions.orEmpty())
+                                WpaSessionDetailSection(rows = data.sessions.orEmpty())
                             }
                         }
-                        !uiState.isLoading -> IpaEmptyState()
+                        !uiState.isLoading -> IpaEmptyState(errorMessage = uiState.lastLoadError)
                     }
                     if (uiState.isLoading && uiState.analysisData != null) {
                         Box(

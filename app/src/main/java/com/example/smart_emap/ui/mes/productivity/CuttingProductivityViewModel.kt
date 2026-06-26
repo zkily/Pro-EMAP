@@ -6,12 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.example.smart_emap.core.network.NetworkErrorHints
 import com.example.smart_emap.core.network.NetworkErrors
 import com.example.smart_emap.core.system.PrintPageLayout
+import com.example.smart_emap.data.model.CuttingProductivityAnalysisDataDto
+import com.example.smart_emap.data.model.CuttingProductivityDailyRowDto
+import com.example.smart_emap.data.model.CuttingProductivityProductRankingDto
+import com.example.smart_emap.data.model.CuttingProductivitySessionRowDto
 import com.example.smart_emap.data.model.ErpProductDto
-import com.example.smart_emap.data.model.UserListItemDto
-import com.example.smart_emap.data.model.WeldingProductivityAnalysisDataDto
-import com.example.smart_emap.data.model.WeldingProductivityProductRankingDto
-import com.example.smart_emap.data.repository.SystemUserRepository
-import com.example.smart_emap.data.repository.WeldingRepository
+import com.example.smart_emap.data.repository.CuttingRepository
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,19 +24,18 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-data class WeldingProductivityUiState(
+data class CuttingProductivityUiState(
     val isLoading: Boolean = false,
     val reportBusy: Boolean = false,
-    val startDate: String = WeldingProductivityLogic.defaultDateRange().first,
-    val endDate: String = WeldingProductivityLogic.defaultDateRange().second,
-    val filterOperatorId: Int? = null,
+    val startDate: String = CuttingProductivityLogic.defaultDateRange().first,
+    val endDate: String = CuttingProductivityLogic.defaultDateRange().second,
+    val filterLineName: String = "",
     val filterProductCd: String = "",
     val includeIncomplete: Boolean = false,
-    val operatorOptions: List<UserListItemDto> = emptyList(),
+    val lineOptions: List<String> = emptyList(),
     val productOptions: List<ErpProductDto> = emptyList(),
     val loadingProducts: Boolean = false,
-    val defectLabelMap: Map<String, String> = emptyMap(),
-    val analysisData: WeldingProductivityAnalysisDataDto? = null,
+    val analysisData: CuttingProductivityAnalysisDataDto? = null,
     val rankViewProductCd: String = "",
     val pendingPrintHtml: String? = null,
     val pendingPrintSubject: String? = null,
@@ -45,45 +44,43 @@ data class WeldingProductivityUiState(
     val snackbarMessage: String? = null,
     val lastLoadError: String? = null,
 ) {
-    val kpiCards: List<IpaKpiCard> get() = WeldingProductivityLogic.buildKpiCards(analysisData?.summary)
-    val productRankList: List<WeldingProductivityProductRankingDto> get() =
-        WeldingProductivityLogic.resolveProductRankList(analysisData)
-    val selectedProductRanking: WeldingProductivityProductRankingDto? get() {
+    val kpiCards: List<IpaKpiCard> get() = CuttingProductivityLogic.buildKpiCards(analysisData?.summary)
+    val productRankList: List<CuttingProductivityProductRankingDto> get() =
+        CuttingProductivityLogic.resolveProductRankList(analysisData)
+    val selectedProductRanking: CuttingProductivityProductRankingDto? get() {
         val list = productRankList
         if (list.isEmpty()) return null
         return list.find { it.productCd == rankViewProductCd } ?: list.first()
     }
-    val podiumOperators get() = WeldingProductivityLogic.podiumOperators(selectedProductRanking)
+    val podiumOperators get() = CuttingProductivityLogic.podiumOperators(selectedProductRanking)
     val productRankTopOverview get() = productRankList.filter { it.topEfficiencyPerHour != null }
-    val rangeLabel: String? get() = WeldingProductivityLogic.rangeLabel(
+    val rangeLabel: String? get() = CuttingProductivityLogic.rangeLabel(
         analysisData?.startDate ?: startDate,
         analysisData?.endDate ?: endDate,
     )
     val operatorSectionAvgEfficiency: Double? get() =
-        WeldingProductivityLogic.operatorSectionAvgEfficiency(analysisData?.byOperator.orEmpty())
+        CuttingProductivityLogic.operatorSectionAvgEfficiency(analysisData?.byOperator.orEmpty())
     val productSectionTotalQty: Int get() =
         analysisData?.byProduct.orEmpty().sumOf { it.sumActualQty ?: 0 }
     val operatorDisplayRows get() =
-        WeldingProductivityLogic.operatorDisplayRows(analysisData?.byOperator.orEmpty())
+        CuttingProductivityLogic.operatorDisplayRows(analysisData?.byOperator.orEmpty())
     val productDisplayRows get() =
-        WeldingProductivityLogic.productDisplayRows(analysisData?.byProduct.orEmpty())
+        CuttingProductivityLogic.productDisplayRows(analysisData?.byProduct.orEmpty())
 }
 
-class WeldingProductivityViewModel(
-    private val weldingRepository: WeldingRepository,
-    private val userRepository: SystemUserRepository,
+class CuttingProductivityViewModel(
+    private val cuttingRepository: CuttingRepository,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(WeldingProductivityUiState())
-    val uiState: StateFlow<WeldingProductivityUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(CuttingProductivityUiState())
+    val uiState: StateFlow<CuttingProductivityUiState> = _uiState.asStateFlow()
     private var debounceJob: Job? = null
     private var analysisJob: Job? = null
     private var analysisRequestSeq = 0
 
     init {
         viewModelScope.launch {
-            loadOperators()
+            loadLines()
             loadProductOptions()
-            loadDefectLabels()
         }
         viewModelScope.launch { loadAnalysisInternal(silent = true) }
     }
@@ -97,28 +94,26 @@ class WeldingProductivityViewModel(
         }
     }
 
-    private fun loadOperators() {
+    private fun loadLines() {
+        val state = _uiState.value
+        if (state.startDate.isBlank() || state.endDate.isBlank()) return
         viewModelScope.launch {
-            runCatching { weldingRepository.loadWeldingSectionOperators() }
-                .onSuccess { list ->
-                    _uiState.update { it.copy(operatorOptions = list) }
-                }
-                .onFailure {
-                    userRepository.getUsers(status = "active", page = 1, pageSize = 500)
-                        .onSuccess { res ->
-                            val filtered = res.items.orEmpty().filter { user ->
-                                user.id != null && WeldingProductivityLogic.isWeldingSectionOperatorUser(user)
-                            }
-                            _uiState.update { it.copy(operatorOptions = filtered) }
-                        }
-                }
+            runCatching {
+                cuttingRepository.loadProductivityLines(state.startDate, state.endDate)
+            }.onSuccess { list ->
+                val current = _uiState.value.filterLineName
+                val next = if (current.isNotBlank() && current !in list) "" else current
+                _uiState.update { it.copy(lineOptions = list, filterLineName = next) }
+            }.onFailure {
+                _uiState.update { it.copy(lineOptions = emptyList()) }
+            }
         }
     }
 
     private fun loadProductOptions() {
         viewModelScope.launch {
             _uiState.update { it.copy(loadingProducts = true) }
-            runCatching { weldingRepository.loadProducts() }
+            runCatching { cuttingRepository.loadProductivityProducts() }
                 .onSuccess { list ->
                     _uiState.update { it.copy(loadingProducts = false, productOptions = list) }
                 }
@@ -128,26 +123,14 @@ class WeldingProductivityViewModel(
         }
     }
 
-    private fun loadDefectLabels() {
-        viewModelScope.launch {
-            runCatching { weldingRepository.loadDefectItems() }
-                .onSuccess { items ->
-                    val map = items.associate { item ->
-                        val key = item.defectCd?.trim()?.takeIf { it.isNotBlank() } ?: item.id?.toString().orEmpty()
-                        key to (item.defectName ?: "")
-                    }
-                    _uiState.update { it.copy(defectLabelMap = map) }
-                }
-        }
-    }
-
     fun setDateRange(start: String, end: String) {
         _uiState.update { it.copy(startDate = start, endDate = end) }
+        loadLines()
         scheduleLoadAnalysis()
     }
 
-    fun setFilterOperatorId(id: Int?) {
-        _uiState.update { it.copy(filterOperatorId = id) }
+    fun setFilterLineName(line: String) {
+        _uiState.update { it.copy(filterLineName = line) }
         scheduleLoadAnalysis()
     }
 
@@ -192,10 +175,10 @@ class WeldingProductivityViewModel(
         }
         _uiState.update { it.copy(isLoading = true, lastLoadError = null) }
         try {
-            val result = weldingRepository.loadProductivityAnalysis(
+            val result = cuttingRepository.loadProductivityAnalysis(
                 startDate = state.startDate,
                 endDate = state.endDate,
-                operatorUserId = state.filterOperatorId,
+                productionLine = state.filterLineName.ifBlank { null },
                 productCd = state.filterProductCd.ifBlank { null },
                 includeIncomplete = state.includeIncomplete,
             )
@@ -244,7 +227,7 @@ class WeldingProductivityViewModel(
     }
 
     fun handleReportCommand(commandKey: String, printCacheDir: File) {
-        val command = WeldingProductivityReportCommand.entries.firstOrNull { it.name == commandKey } ?: return
+        val command = CuttingProductivityReportCommand.entries.firstOrNull { it.name == commandKey } ?: return
         val state = _uiState.value
         val data = state.analysisData ?: run {
             _uiState.update { it.copy(snackbarMessage = "出力する分析データがありません") }
@@ -261,31 +244,31 @@ class WeldingProductivityViewModel(
                 clearPrintChartCache(printCacheDir)
                 val contentBaseUrl = printCacheDir.toFileBaseUrl()
                 val html = when (command) {
-                    WeldingProductivityReportCommand.PRINT_DAILY_BATCH -> {
+                    CuttingProductivityReportCommand.PRINT_DAILY_BATCH -> {
                         val items = buildDailyBatchPrintItems(filters, printCacheDir)
                         if (items.isEmpty()) throw IllegalStateException("印刷できる日別データがありません")
-                        WeldingProductivityReportLogic.buildDailyBatchPrintHtml(filters, items)
+                        CuttingProductivityReportLogic.buildDailyBatchPrintHtml(filters, items)
                     }
-                    WeldingProductivityReportCommand.PRINT_OPERATOR_PRODUCT_BATCH -> {
+                    CuttingProductivityReportCommand.PRINT_OPERATOR_PRODUCT_BATCH -> {
                         val batchData = loadAnalysisForBatch(filters)
                         val items = loadOperatorProductBatchItems(batchData.sessions.orEmpty())
-                        if (items.isEmpty()) throw IllegalStateException("印刷できる溶接作業者別製品データがありません")
-                        WeldingProductivityReportLogic.buildOperatorProductBatchPrintHtml(filters, items)
+                        if (items.isEmpty()) throw IllegalStateException("印刷できるライン別製品データがありません")
+                        CuttingProductivityReportLogic.buildOperatorProductBatchPrintHtml(filters, items)
                     }
                     else -> {
                         val dailyChartFileName = renderDailyChartFile(printCacheDir, data.daily.orEmpty())
                         val ctx = buildPrintContext(filters, data, dailyChartFileName)
-                        WeldingProductivityReportLogic.buildPrintHtml(command, data, ctx)
+                        CuttingProductivityReportLogic.buildPrintHtml(command, data, ctx)
                     }
                 }
                 val layout = when (command) {
-                    WeldingProductivityReportCommand.PRINT_DAILY,
-                    WeldingProductivityReportCommand.PRINT_DAILY_BATCH,
+                    CuttingProductivityReportCommand.PRINT_DAILY,
+                    CuttingProductivityReportCommand.PRINT_DAILY_BATCH,
                     -> PrintPageLayout.A4_LANDSCAPE_SINGLE
                     else -> PrintPageLayout.A4_PORTRAIT_SINGLE
                 }
-                val title = WeldingProductivityLogic.reportMenuItems()
-                    .firstOrNull { it.key == command.name }?.label ?: "溶接生産性分析"
+                val title = CuttingProductivityLogic.reportMenuItems()
+                    .firstOrNull { it.key == command.name }?.label ?: "切断生産性分析"
                 _uiState.update {
                     it.copy(
                         pendingPrintHtml = html,
@@ -302,53 +285,52 @@ class WeldingProductivityViewModel(
         }
     }
 
-    private suspend fun loadAnalysisForBatch(filters: WeldingProductivityReportFilters): WeldingProductivityAnalysisDataDto =
-        weldingRepository.loadProductivityAnalysis(
+    private suspend fun loadAnalysisForBatch(filters: CuttingProductivityReportFilters): CuttingProductivityAnalysisDataDto =
+        cuttingRepository.loadProductivityAnalysis(
             startDate = filters.startDate,
             endDate = filters.endDate,
-            operatorUserId = null,
+            productionLine = null,
             productCd = _uiState.value.filterProductCd.ifBlank { null },
             includeIncomplete = filters.includeIncomplete,
         ).getOrElse { throw it }
 
     private suspend fun buildDailyBatchPrintItems(
-        filters: WeldingProductivityReportFilters,
+        filters: CuttingProductivityReportFilters,
         printCacheDir: File,
-    ): List<WeldingDailyBatchPrintItem> {
+    ): List<CuttingDailyBatchPrintItem> {
         val state = _uiState.value
-        val items = mutableListOf<WeldingDailyBatchPrintItem>()
+        val items = mutableListOf<CuttingDailyBatchPrintItem>()
         var chartIndex = 0
-        for (op in state.operatorOptions) {
-            val id = op.id ?: continue
-            val data = weldingRepository.loadProductivityAnalysis(
+        for (line in state.lineOptions) {
+            if (line.isBlank()) continue
+            val data = cuttingRepository.loadProductivityAnalysis(
                 startDate = filters.startDate,
                 endDate = filters.endDate,
-                operatorUserId = id,
+                productionLine = line,
                 productCd = state.filterProductCd.ifBlank { null },
                 includeIncomplete = filters.includeIncomplete,
             ).getOrNull() ?: continue
             val daily = data.daily.orEmpty()
             if (daily.isEmpty()) continue
-            val chartFileName = renderDailyChartFile(printCacheDir, daily, "wpa_daily_batch_${chartIndex++}.png")
+            val chartFileName = renderDailyChartFile(printCacheDir, daily, "cpa_daily_batch_${chartIndex++}.png")
                 ?: continue
-            val label = op.displayLabel().ifBlank { op.username.orEmpty() }
-            items.add(WeldingDailyBatchPrintItem(operatorLabel = label, daily = daily, chartFileName = chartFileName))
+            items.add(CuttingDailyBatchPrintItem(lineLabel = line, daily = daily, chartFileName = chartFileName))
         }
         return items
     }
 
     private suspend fun renderDailyChartFile(
         cacheDir: File,
-        daily: List<com.example.smart_emap.data.model.WeldingProductivityDailyRowDto>,
-        fileName: String = "wpa_daily_chart.png",
+        daily: List<CuttingProductivityDailyRowDto>,
+        fileName: String = "cpa_daily_chart.png",
     ): String? = withContext(Dispatchers.Default) {
-        val rows = WeldingProductivityLogic.toInspectionDailyRows(daily)
+        val rows = CuttingProductivityLogic.toInspectionDailyRows(daily)
         IpaDailyTrendChartExport.savePngFile(cacheDir, fileName, rows, fontSizeOffset = 1)
     }
 
     private fun clearPrintChartCache(cacheDir: File) {
         cacheDir.listFiles()?.forEach { file ->
-            if (file.isFile && file.name.startsWith("wpa_daily")) {
+            if (file.isFile && file.name.startsWith("cpa_daily")) {
                 file.delete()
             }
         }
@@ -360,15 +342,14 @@ class WeldingProductivityViewModel(
     }
 
     private fun loadOperatorProductBatchItems(
-        sessions: List<com.example.smart_emap.data.model.WeldingProductivitySessionRowDto>,
-    ): List<Pair<String, List<WeldingOperatorProductDisplayRow>>> {
+        sessions: List<CuttingProductivitySessionRowDto>,
+    ): List<Pair<String, List<CuttingOperatorProductDisplayRow>>> {
         val state = _uiState.value
-        return state.operatorOptions.mapNotNull { op ->
-            val id = op.id ?: return@mapNotNull null
-            val rows = WeldingProductivityLogic.buildOperatorProductRows(sessions, id.toString())
+        return state.lineOptions.mapNotNull { line ->
+            if (line.isBlank()) return@mapNotNull null
+            val rows = CuttingProductivityLogic.buildOperatorProductRows(sessions, line)
             if (rows.isEmpty()) return@mapNotNull null
-            val label = op.displayLabel().ifBlank { op.username.orEmpty() }
-            label to rows
+            line to rows
         }.sortedByDescending { (_, rows) ->
             rows.sumOf { it.sumNetProductionSec }.let { sec ->
                 val qty = rows.sumOf { it.sumActualQty }
@@ -378,14 +359,14 @@ class WeldingProductivityViewModel(
     }
 
     private fun buildPrintContext(
-        filters: WeldingProductivityReportFilters,
-        data: WeldingProductivityAnalysisDataDto,
+        filters: CuttingProductivityReportFilters,
+        data: CuttingProductivityAnalysisDataDto,
         dailyChartFileName: String? = null,
-    ): WeldingProductivityPrintContext {
+    ): CuttingProductivityPrintContext {
         val state = _uiState.value
-        return WeldingProductivityPrintContext(
+        return CuttingProductivityPrintContext(
             filters = filters,
-            kpiCards = WeldingProductivityLogic.buildKpiCards(data.summary),
+            kpiCards = CuttingProductivityLogic.buildKpiCards(data.summary),
             operatorRows = state.operatorDisplayRows,
             productRows = state.productDisplayRows,
             operatorSectionAvgEfficiency = state.operatorSectionAvgEfficiency,
@@ -397,13 +378,10 @@ class WeldingProductivityViewModel(
         )
     }
 
-    fun buildReportFilters(): WeldingProductivityReportFilters? {
+    fun buildReportFilters(): CuttingProductivityReportFilters? {
         val state = _uiState.value
         if (state.startDate.isBlank() || state.endDate.isBlank()) return null
-        val operatorLabel = state.filterOperatorId?.let { id ->
-            state.operatorOptions.find { it.id == id }?.displayLabel()?.ifBlank { null }
-                ?: "#$id"
-        } ?: "（すべて）"
+        val lineLabel = state.filterLineName.ifBlank { "（すべて）" }
         val productLabel = state.filterProductCd.ifBlank { "（すべて）" }.let { cd ->
             if (cd == "（すべて）") cd
             else {
@@ -411,17 +389,17 @@ class WeldingProductivityViewModel(
                 found?.let { "${it.productCode} · ${it.productName.ifBlank { it.productCode }}" } ?: cd
             }
         }
-        return WeldingProductivityReportFilters(
+        return CuttingProductivityReportFilters(
             startDate = state.startDate,
             endDate = state.endDate,
-            operatorLabel = operatorLabel,
+            lineLabel = lineLabel,
             productLabel = productLabel,
             includeIncomplete = state.includeIncomplete,
         )
     }
 
-    private fun syncRankProductSelection(data: WeldingProductivityAnalysisDataDto) {
-        val list = WeldingProductivityLogic.resolveProductRankList(data)
+    private fun syncRankProductSelection(data: CuttingProductivityAnalysisDataDto) {
+        val list = CuttingProductivityLogic.resolveProductRankList(data)
         val current = _uiState.value.rankViewProductCd
         val next = when {
             list.isEmpty() -> ""
@@ -431,10 +409,7 @@ class WeldingProductivityViewModel(
         _uiState.update { it.copy(rankViewProductCd = next) }
     }
 
-    fun defectLabel(defectCd: String): String {
-        val cd = defectCd.trim()
-        return _uiState.value.defectLabelMap[cd] ?: cd
-    }
+    fun varianceLabel(defectCd: String): String = defectCd.trim().ifBlank { "—" }
 
     fun clearSnackbar() = _uiState.update { it.copy(snackbarMessage = null) }
 
@@ -447,11 +422,10 @@ class WeldingProductivityViewModel(
     }
 
     class Factory(
-        private val weldingRepository: WeldingRepository,
-        private val userRepository: SystemUserRepository,
+        private val cuttingRepository: CuttingRepository,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            WeldingProductivityViewModel(weldingRepository, userRepository) as T
+            CuttingProductivityViewModel(cuttingRepository) as T
     }
 }

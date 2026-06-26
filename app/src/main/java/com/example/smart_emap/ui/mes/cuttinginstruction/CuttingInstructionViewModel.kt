@@ -151,6 +151,7 @@ data class CuttingInstructionUiState(
     val usageSummaryTomorrow: List<InstructionCuttingRowDto> = emptyList(),
     val usageSummaryLoading: Boolean = false,
     val reflectedCodesToday: Set<String> = emptySet(),
+    val reflectedCodesTomorrow: Set<String> = emptySet(),
     val chamferingPlans: List<InstructionChamferingPlanRowDto> = emptyList(),
     val chamferingPlansLoading: Boolean = false,
     val cuttingProductionDayByMgmtCode: Map<String, String> = emptyMap(),
@@ -175,6 +176,7 @@ data class CuttingInstructionUiState(
     val kanbanSyncLoading: Boolean = false,
     val kanbanIssuePendingLoading: Int? = null,
     val kanbanReissueLoading: Int? = null,
+    val kanbanFirstProductSaving: Int? = null,
     val notes: List<CuttingInstructionNoteDto> = emptyList(),
     val notesCount: Int = 0,
     val notesLoading: Boolean = false,
@@ -251,7 +253,7 @@ class CuttingInstructionViewModel(
     val usageSummaryTodayCounts: UsageSummaryCounts
         get() = computeUsageCounts(_uiState.value.usageSummaryToday, _uiState.value.reflectedCodesToday)
     val usageSummaryTomorrowCounts: UsageSummaryCounts
-        get() = computeUsageCounts(_uiState.value.usageSummaryTomorrow, emptySet())
+        get() = computeUsageCounts(_uiState.value.usageSummaryTomorrow, _uiState.value.reflectedCodesTomorrow)
     val kanbanPagedRows: List<KanbanIssuanceRowDto>
         get() {
             val state = _uiState.value
@@ -735,12 +737,14 @@ class CuttingInstructionViewModel(
         runCatching {
             val today = repository.loadCuttingManagement(state.usageSummaryDateToday, null)
             val tomorrow = repository.loadCuttingManagement(state.usageSummaryDateTomorrow, null)
-            val codes = repository.loadReflectedManagementCodes(state.usageSummaryDateToday)
+            val codesToday = repository.loadReflectedManagementCodes(state.usageSummaryDateToday)
+            val codesTomorrow = repository.loadReflectedManagementCodes(state.usageSummaryDateTomorrow)
             _uiState.update {
                 it.copy(
                     usageSummaryToday = today,
                     usageSummaryTomorrow = tomorrow,
-                    reflectedCodesToday = codes,
+                    reflectedCodesToday = codesToday,
+                    reflectedCodesTomorrow = codesTomorrow,
                     usageSummaryLoading = false,
                 )
             }
@@ -1648,14 +1652,39 @@ class CuttingInstructionViewModel(
         }
     }
     fun openEditKanban(row: KanbanIssuanceRowDto) = openDialog(CuttingInstructionDialog.EditKanban(row))
-    fun saveKanbanEdit(row: KanbanIssuanceRowDto, productName: String?, qty: Int?, day: String?) {
+    fun saveKanbanEdit(row: KanbanIssuanceRowDto, productName: String?, qty: Int?, day: String?, isFirstProduct: Boolean) {
         val id = row.id ?: return
         viewModelScope.launch {
             runCatching {
-                repository.patchKanban(id, PatchKanbanBody(productName = productName, actualProductionQuantity = qty, productionDay = day))
+                repository.patchKanban(id, PatchKanbanBody(productName = productName, actualProductionQuantity = qty, productionDay = day, isFirstProduct = isFirstProduct))
                 loadKanbanList()
                 _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "更新しました") }
             }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "保存失敗") } }
+        }
+    }
+    fun setKanbanFirstProduct(row: KanbanIssuanceRowDto, isFirstProduct: Boolean) {
+        val id = row.id ?: return
+        if (row.isFirstProduct == isFirstProduct) return
+        val previous = row.isFirstProduct
+        _uiState.update { state ->
+            state.copy(
+                kanbanRows = state.kanbanRows.map { if (it.id == id) it.copy(isFirstProduct = isFirstProduct) else it },
+                kanbanFirstProductSaving = id,
+            )
+        }
+        viewModelScope.launch {
+            runCatching {
+                repository.patchKanban(id, PatchKanbanBody(isFirstProduct = isFirstProduct))
+                _uiState.update { it.copy(kanbanFirstProductSaving = null) }
+            }.onFailure { e ->
+                _uiState.update { state ->
+                    state.copy(
+                        kanbanRows = state.kanbanRows.map { if (it.id == id) it.copy(isFirstProduct = previous) else it },
+                        kanbanFirstProductSaving = null,
+                        snackbarMessage = e.message ?: "更新失敗",
+                    )
+                }
+            }
         }
     }
     fun syncKanbanProductionDay() {

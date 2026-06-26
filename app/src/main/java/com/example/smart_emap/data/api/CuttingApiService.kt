@@ -2,6 +2,8 @@ package com.example.smart_emap.data.api
 
 import com.example.smart_emap.data.model.ApiMessageResponse
 import com.example.smart_emap.data.model.CuttingListResponse
+import com.example.smart_emap.data.model.CuttingProductionIndicatorLinesResponse
+import com.example.smart_emap.data.model.CuttingProductivityAnalysisResponse
 import com.example.smart_emap.data.model.PatchCuttingBody
 import com.example.smart_emap.data.model.ReorderCuttingBody
 import com.example.smart_emap.data.model.SplitCuttingToNextDayBody
@@ -34,4 +36,20 @@ interface CuttingApiService {
         @Path("id") id: Int,
         @Body body: SplitCuttingToNextDayBody,
     ): ApiMessageResponse
+
+    @GET("/api/plan/cutting-production-indicator/lines")
+    suspend fun productivityLines(
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+    ): CuttingProductionIndicatorLinesResponse
+
+    @GET("/api/plan/cutting-production-indicator/productivity-analysis")
+    suspend fun productivityAnalysis(
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+        @Query("production_line") productionLine: String? = null,
+        @Query("product_cd") productCd: String? = null,
+        @Query("include_incomplete") includeIncomplete: Boolean? = null,
+        @Query("limit") limit: Int? = null,
+    ): CuttingProductivityAnalysisResponse
 }

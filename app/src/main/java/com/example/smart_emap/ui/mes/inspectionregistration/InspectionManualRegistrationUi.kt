@@ -1591,43 +1591,71 @@ private fun IarTablePanel(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ImrTablePanelTitle(
     uiState: InspectionManualRegistrationUiState,
     modifier: Modifier = Modifier,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier) {
-        Box(
-            Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Color(0xFF14B8A6), Color(0xFF0D9488)))),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text("登録一覧", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ImrTheme.TextPrimary)
-        Spacer(Modifier.width(6.dp))
-        Text(
-            uiState.productionDay,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = ImrTheme.TextMuted,
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFFF1F5F9))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            "${uiState.filteredRows.size}件",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF0F766E),
-            modifier = Modifier
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color(0xFFCCFBF1))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-        )
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Color(0xFF14B8A6), Color(0xFF0D9488)))),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("登録一覧", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = ImrTheme.TextPrimary)
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            ImrListSummaryChip(
+                text = uiState.productionDay,
+                fg = ImrTheme.TextMuted,
+                bg = Color(0xFFF1F5F9),
+                shape = RoundedCornerShape(6.dp),
+                fontSize = 12.sp,
+            )
+            ImrListSummaryChip(
+                text = "${uiState.filteredRows.size}件",
+                fg = Color(0xFF0F766E),
+                bg = Color(0xFFCCFBF1),
+            )
+            ImrListSummaryChip(
+                text = "生産数合計 ${InspectionManualRegistrationLogic.formatListSummaryQty(uiState.listSummary.totalProductionQty)}",
+                fg = Color(0xFF1D4ED8),
+                bg = Color(0xFFDBEAFE),
+            )
+            ImrListSummaryChip(
+                text = "平均能率 ${InspectionManualRegistrationLogic.formatListSummaryEfficiency(uiState.listSummary.avgEfficiencyPerHour)}",
+                fg = Color(0xFF6D28D9),
+                bg = Color(0xFFEDE9FE),
+            )
+        }
     }
+}
+
+@Composable
+private fun ImrListSummaryChip(
+    text: String,
+    fg: Color,
+    bg: Color,
+    shape: RoundedCornerShape = RoundedCornerShape(999.dp),
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
+) {
+    Text(
+        text,
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        color = fg,
+        modifier = Modifier
+            .clip(shape)
+            .background(bg)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    )
 }
 
 @Composable
