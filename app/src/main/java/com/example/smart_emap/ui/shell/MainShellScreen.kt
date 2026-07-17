@@ -16,6 +16,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.activity.ComponentActivity
@@ -196,6 +199,8 @@ import com.example.smart_emap.ui.mes.utilization.InspectionUtilizationScreen
 import com.example.smart_emap.ui.mes.utilization.InspectionUtilizationViewModel
 import com.example.smart_emap.ui.mes.welding.WeldingActualScreen
 import com.example.smart_emap.ui.mes.welding.WeldingActualViewModel
+import com.example.smart_emap.core.deviceowner.DeviceOwnerController
+import com.example.smart_emap.ui.deviceowner.KioskAdminDialog
 import com.example.smart_emap.ui.system.organization.OrganizationListScreen
 import com.example.smart_emap.ui.system.organization.OrganizationListViewModel
 import com.example.smart_emap.ui.system.role.RolePermissionScreen
@@ -932,6 +937,14 @@ private fun MainShellContent(
     rolePermissionViewModel: RolePermissionViewModel,
     onLogout: () -> Unit,
 ) {
+    val context = LocalContext.current
+    var showKioskAdminDialog by remember {
+        mutableStateOf(false)
+    }
+    val isDeviceOwner = remember(context) {
+        DeviceOwnerController.isDeviceOwner(context)
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -1016,6 +1029,8 @@ private fun MainShellContent(
                     onHeaderTodoDelete = onHeaderTodoDelete,
                     onHeaderTodoClearDone = onHeaderTodoClearDone,
                     onHeaderTodoUpdateContent = onHeaderTodoUpdateContent,
+                    showKioskAdmin = isDeviceOwner,
+                    onKioskAdmin = { showKioskAdminDialog = true },
                 )
                 TabsNav(
                     tabs = tabs,
@@ -1295,6 +1310,10 @@ private fun MainShellContent(
                     }
                 }
             }
+        }
+
+        if (showKioskAdminDialog) {
+            KioskAdminDialog(onDismiss = { showKioskAdminDialog = false })
         }
     }
 }

@@ -18,6 +18,7 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.example.smart_emap.core.deviceowner.DeviceOwnerController
 import com.example.smart_emap.core.system.KeepAwakeHelper
 import com.example.smart_emap.ui.navigation.AppNavHost
 import com.example.smart_emap.ui.splash.SplashScreenContent
@@ -33,7 +34,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         KeepAwakeHelper.bindActivity(this)
         KeepAwakeHelper.requestBatteryOptimizationExemptionIfNeeded(this)
-        
+
+        // Device Owner：应用 Kiosk 策略（非 Owner 时为空操作）
+        DeviceOwnerController.applyPoliciesIfOwner(this)
+
         // 彻底隐藏状态栏和导航栏，进入沉浸式全屏模式
         applyImmersiveFullscreen()
 
@@ -43,6 +47,8 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 delay(SPLASH_MIN_DISPLAY_MS)
                 showSplash = false
+                // 启动画面结束后进入 Lock Task（真正的 Kiosk）
+                DeviceOwnerController.startKioskIfNeeded(this@MainActivity)
             }
 
             // 确保在页面切换或重新组合时，系统 UI 保持隐藏
@@ -65,6 +71,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // 从维护模式返回或系统唤起后，按设置重新锁定
+        DeviceOwnerController.startKioskIfNeeded(this)
+        applyImmersiveFullscreen()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
@@ -76,10 +89,10 @@ class MainActivity : ComponentActivity() {
     private fun applyImmersiveFullscreen() {
         // 让内容延伸到系统栏区域
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        
+
         // 允许内容绘制到刘海/挖孔屏区域（如果有）
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            window.attributes.layoutInDisplayCutoutMode = 
+            window.attributes.layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
@@ -95,4 +108,3 @@ class MainActivity : ComponentActivity() {
         const val SPLASH_MIN_DISPLAY_MS = 1500L
     }
 }
-

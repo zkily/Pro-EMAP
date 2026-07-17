@@ -102,6 +102,21 @@ cd SmartEMAP
 
 APK 输出：`app/build/outputs/apk/debug/app-debug.apk`
 
+## Device Owner / キオスク
+
+工厂平板可用 Device Owner 锁定为专用机。详见：
+
+→ [docs/DEVICE_OWNER.md](docs/DEVICE_OWNER.md)
+
+开发测试（需先恢复出厂并跳过 Google 账户）：
+
+```powershell
+.\gradlew.bat installDebug
+adb shell dpm set-device-owner com.example.smart_emap/.admin.SmartEmapDeviceAdminReceiver
+```
+
+默认管理 PIN：`2468`（App 内「端末管理」可修改）
+
 ## 注意事项
 
 - 开发环境允许 HTTP（`network_security_config.xml`）；上线请改 HTTPS

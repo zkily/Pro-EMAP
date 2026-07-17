@@ -16,6 +16,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -85,6 +86,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -97,6 +99,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.R
+import com.example.smart_emap.ui.deviceowner.KioskAdminDialog
 import com.example.smart_emap.ui.theme.LoginColors
 import kotlinx.coroutines.launch
 
@@ -196,6 +199,7 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showForgotDialog by remember { mutableStateOf(false) }
     var showContactDialog by remember { mutableStateOf(false) }
+    var showKioskAdminDialog by remember { mutableStateOf(false) }
     val entranceProgress = rememberLoginEntranceProgress()
 
     LaunchedEffect(uiState.errorMessage) {
@@ -217,6 +221,9 @@ fun LoginScreen(
             message = "システム管理者に連絡してください",
             onDismiss = { showContactDialog = false },
         )
+    }
+    if (showKioskAdminDialog) {
+        KioskAdminDialog(onDismiss = { showKioskAdminDialog = false })
     }
 
     val formCallbacks = LoginFormCallbacks(
@@ -256,6 +263,7 @@ fun LoginScreen(
                         dims = dims,
                         callbacks = formCallbacks,
                         entranceProgress = entranceProgress.value,
+                        onBrandLongPress = { showKioskAdminDialog = true },
                     )
                 } else {
                     NarrowLoginLayout(
@@ -263,6 +271,7 @@ fun LoginScreen(
                         dims = dims,
                         callbacks = formCallbacks,
                         entranceProgress = entranceProgress.value,
+                        onBrandLongPress = { showKioskAdminDialog = true },
                     )
                 }
             }
@@ -456,6 +465,7 @@ private fun WideLoginLayout(
     dims: LoginDimensions,
     callbacks: LoginFormCallbacks,
     entranceProgress: Float,
+    onBrandLongPress: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
 
@@ -490,7 +500,12 @@ private fun WideLoginLayout(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    BrandHeader(dims = dims, embedded = true, entranceProgress = entranceProgress)
+                    BrandHeader(
+                        dims = dims,
+                        embedded = true,
+                        entranceProgress = entranceProgress,
+                        onBrandLongPress = onBrandLongPress,
+                    )
                     Spacer(modifier = Modifier.height(dims.sectionGap))
                     FeatureList(dims = dims, entranceProgress = entranceProgress)
                 }
@@ -540,6 +555,7 @@ private fun NarrowLoginLayout(
     dims: LoginDimensions,
     callbacks: LoginFormCallbacks,
     entranceProgress: Float,
+    onBrandLongPress: () -> Unit = {},
 ) {
     val scrollState = rememberScrollState()
 
@@ -549,7 +565,12 @@ private fun NarrowLoginLayout(
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandHeader(dims = dims, embedded = false, entranceProgress = entranceProgress)
+        BrandHeader(
+            dims = dims,
+            embedded = false,
+            entranceProgress = entranceProgress,
+            onBrandLongPress = onBrandLongPress,
+        )
         Spacer(modifier = Modifier.height(dims.sectionGap))
         LoginFormContent(
             uiState = uiState,
@@ -573,7 +594,12 @@ private fun NarrowLoginLayout(
 }
 
 @Composable
-private fun BrandHeader(dims: LoginDimensions, embedded: Boolean, entranceProgress: Float) {
+private fun BrandHeader(
+    dims: LoginDimensions,
+    embedded: Boolean,
+    entranceProgress: Float,
+    onBrandLongPress: () -> Unit = {},
+) {
     val content = @Composable {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -595,6 +621,10 @@ private fun BrandHeader(dims: LoginDimensions, embedded: Boolean, entranceProgre
                     fontSize = dims.brandTitleSize,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
+                    // 隐藏入口：长按标题打开端末管理（Kiosk）对话框，供无网络时解除 Kiosk
+                    modifier = Modifier.pointerInput(Unit) {
+                        detectTapGestures(onLongPress = { onBrandLongPress() })
+                    },
                 )
                 Text(
                     text = "生産管理システム",

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.PhonelinkLock
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -47,11 +48,13 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.smart_emap.R
 import com.example.smart_emap.data.model.UserDto
 import com.example.smart_emap.ui.system.user.avatarGradientFor
 import kotlinx.coroutines.delay
@@ -75,6 +78,8 @@ fun HeaderBar(
     onHeaderTodoDelete: (Int) -> Unit = {},
     onHeaderTodoClearDone: () -> Unit = {},
     onHeaderTodoUpdateContent: (Int, String) -> Unit = { _, _ -> },
+    showKioskAdmin: Boolean = false,
+    onKioskAdmin: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var currentTime by remember { mutableStateOf(formatHeaderTime()) }
@@ -182,6 +187,18 @@ fun HeaderBar(
                         onClick = { userMenuExpanded = false },
                         enabled = false,
                     )
+                    if (showKioskAdmin) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.kiosk_admin_menu)) },
+                            onClick = {
+                                userMenuExpanded = false
+                                onKioskAdmin()
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Default.PhonelinkLock, contentDescription = null)
+                            },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text("ログアウト") },
                         onClick = {
