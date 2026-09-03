@@ -101,7 +101,8 @@ fun KioskAdminDialog(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "默认 PIN：${KioskSettingsStore.DEFAULT_PIN}（请尽快修改）",
+                    text = "默认 PIN：${KioskSettingsStore.DEFAULT_PIN}（请尽快修改）\n" +
+                        "退出 Kiosk＝维护模式（可初期化）。再開すると再び初期化禁止。",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

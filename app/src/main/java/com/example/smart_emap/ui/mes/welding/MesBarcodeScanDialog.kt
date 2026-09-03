@@ -64,8 +64,7 @@ fun MesBarcodeScanDialog(
     onDismiss: () -> Unit,
     onScanned: (String) -> Unit,
 ) {
-    if (!visible) return
-
+    // remember* は visible に関係なく毎回同じ順で呼ぶ（早期 return 禁止）
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var useFrontCamera by remember { mutableStateOf(true) }
@@ -93,6 +92,7 @@ fun MesBarcodeScanDialog(
     }
 
     LaunchedEffect(visible) {
+        if (!visible) return@LaunchedEffect
         scannedOnce.set(false)
         if (!hasPermission) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -175,6 +175,8 @@ fun MesBarcodeScanDialog(
             runCatching { cameraProvider?.unbindAll() }
         }
     }
+
+    if (!visible) return
 
     AlertDialog(
         onDismissRequest = onDismiss,

@@ -111,6 +111,27 @@ class WeldingOfflineStore(context: Context) {
         writeSync(sync.copy(patches = patches))
     }
 
+    /** 生産取消時：未送信 create / patch を削除し、再同期で進行中状態が復活しないようにする */
+    suspend fun removePendingSyncForPlan(localOrServerPlanId: Int) = mutex.withLock {
+        val sync = readSync()
+        val relatedIds = buildSet {
+            add(localOrServerPlanId)
+            sync.localToServer.forEach { (localId, serverId) ->
+                if (localId == localOrServerPlanId || serverId == localOrServerPlanId) {
+                    add(localId)
+                    add(serverId)
+                }
+            }
+        }
+        writeSync(
+            sync.copy(
+                creates = sync.creates.filter { it.localPlanId !in relatedIds },
+                patches = sync.patches.filter { it.planId !in relatedIds },
+                localToServer = sync.localToServer.filterKeys { it !in relatedIds },
+            ),
+        )
+    }
+
     suspend fun flush(
         createPlan: suspend (WeldingPendingCreatePlan) -> Int,
         patchPlan: suspend (Int, PatchWeldingBody) -> Unit,
@@ -211,6 +232,7 @@ fun mergeWeldingPatch(previous: PatchWeldingBody, incoming: PatchWeldingBody): P
         mesClientInstanceId = incoming.mesClientInstanceId ?: previous.mesClientInstanceId,
         mesClaimClientLock = incoming.mesClaimClientLock ?: previous.mesClaimClientLock,
         mesForceRelease = incoming.mesForceRelease ?: previous.mesForceRelease,
+        mesAbandonInProgress = incoming.mesAbandonInProgress ?: previous.mesAbandonInProgress,
         remarks = incoming.remarks ?: previous.remarks,
     )
 }

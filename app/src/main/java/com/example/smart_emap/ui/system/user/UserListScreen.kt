@@ -22,7 +22,6 @@ import com.example.smart_emap.core.auth.canCreate
 import com.example.smart_emap.core.auth.canEdit
 import com.example.smart_emap.core.auth.canExport
 import com.example.smart_emap.core.system.HtmlPrintHelper
-import com.example.smart_emap.core.system.PrintPageLayout
 import com.example.smart_emap.ui.shell.LayoutColors
 import com.example.smart_emap.ui.shell.LocalCurrentUser
 
@@ -50,7 +49,12 @@ fun UserListScreen(viewModel: UserListViewModel) {
 
     LaunchedEffect(uiState.pendingPrintHtml) {
         val html = uiState.pendingPrintHtml ?: return@LaunchedEffect
-        val opened = HtmlPrintHelper.printHtml(context, html, "ユーザー一覧", PrintPageLayout.A4_LANDSCAPE_SINGLE)
+        val opened = HtmlPrintHelper.printHtml(
+            context,
+            html,
+            uiState.pendingPrintSubject,
+            uiState.pendingPrintLayout,
+        )
         viewModel.clearPendingPrintHtml()
         if (!opened) snackbarHostState.showSnackbar("印刷画面を開けませんでした")
     }
@@ -80,15 +84,20 @@ fun UserListScreen(viewModel: UserListViewModel) {
                     UserListFilterSection(
                         keyword = uiState.keyword,
                         departmentId = uiState.departmentId,
+                        sectionId = uiState.sectionId,
                         statusFilter = uiState.statusFilter,
                         departments = uiState.departments,
+                        sections = uiState.sections,
                         canCreate = canCreate,
                         canExport = canExport,
+                        isPrintingLoginQr = uiState.isPrintingLoginQr,
                         onKeywordChange = viewModel::setKeyword,
                         onDepartmentChange = viewModel::setDepartmentFilter,
+                        onSectionChange = viewModel::setSectionFilter,
                         onStatusChange = viewModel::setStatusFilter,
                         onAdd = viewModel::openCreate,
                         onPrint = viewModel::printUsers,
+                        onPrintLoginQr = { viewModel.printLoginQr() },
                     )
                     uiState.errorMessage?.let { msg ->
                         UserErrorBanner(message = msg)
@@ -101,6 +110,7 @@ fun UserListScreen(viewModel: UserListViewModel) {
                         onEdit = viewModel::openEdit,
                         onToggleLock = { user -> viewModel.toggleLock(user, currentUser.id) },
                         onResetPassword = viewModel::openResetPassword,
+                        onPrintLoginQr = { viewModel.printLoginQr(it) },
                     )
                     UserListPagination(
                         page = uiState.page,
@@ -122,6 +132,7 @@ fun UserListScreen(viewModel: UserListViewModel) {
             form = uiState.form,
             roles = uiState.roles,
             departments = uiState.departments,
+            sections = uiState.sections,
             isSubmitting = uiState.isSubmitting,
             onFormChange = viewModel::updateForm,
             onConfirm = viewModel::submitForm,

@@ -3,11 +3,15 @@ package com.example.smart_emap.data.api
 import com.example.smart_emap.data.model.ApiMessageResponse
 import com.example.smart_emap.data.model.CreateInspectionBody
 import com.example.smart_emap.data.model.CreateInspectionResponse
+import com.example.smart_emap.data.model.CreateInspectionQrScanBody
+import com.example.smart_emap.data.model.CreateInspectionQrScanResponse
 import com.example.smart_emap.data.model.InspectionListResponse
 import com.example.smart_emap.data.model.DeleteInspectionNextAssignmentBody
 import com.example.smart_emap.data.model.InspectionMonitorSummaryResponse
 import com.example.smart_emap.data.model.InspectionNextAssignmentResponse
 import com.example.smart_emap.data.model.InspectionNextAssignmentsResponse
+import com.example.smart_emap.data.model.InspectionQrScanListResponse
+import com.example.smart_emap.data.model.InspectionQrScanSummaryResponse
 import com.example.smart_emap.data.model.UpsertInspectionNextAssignmentBody
 import com.example.smart_emap.data.model.InspectionProductivityAnalysisResponse
 import com.example.smart_emap.data.model.InspectionUtilizationAnalysisResponse
@@ -46,6 +50,11 @@ interface InspectionApiService {
         @Query("production_day") productionDay: String,
     ): InspectionNextAssignmentResponse
 
+    @DELETE("/api/plan/inspection-management/next-assignment/me")
+    suspend fun deleteMyNextAssignment(
+        @Query("production_day") productionDay: String,
+    ): ApiMessageResponse
+
     @PUT("/api/plan/inspection-management/next-assignment")
     suspend fun upsertNextAssignment(
         @Body body: UpsertInspectionNextAssignmentBody,
@@ -55,6 +64,29 @@ interface InspectionApiService {
     suspend fun deleteNextAssignment(
         @Body body: DeleteInspectionNextAssignmentBody,
     ): ApiMessageResponse
+
+    @POST("/api/plan/inspection-management/qr-scans")
+    suspend fun createQrScan(@Body body: CreateInspectionQrScanBody): CreateInspectionQrScanResponse
+
+    @GET("/api/plan/inspection-management/qr-scans")
+    suspend fun listQrScans(
+        @Query("production_day") productionDay: String,
+        @Query("product_cd") productCd: String,
+        @Query("inspection_id") inspectionId: Int? = null,
+        @Query("started_at") startedAt: String? = null,
+        @Query("ended_at") endedAt: String? = null,
+        @Query("limit") limit: Int? = null,
+    ): InspectionQrScanListResponse
+
+    @GET("/api/plan/inspection-management/qr-scans/summary")
+    suspend fun qrScanSummary(
+        @Query("production_day") productionDay: String,
+        @Query("product_cd") productCd: String? = null,
+        @Query("inspection_id") inspectionId: Int? = null,
+        @Query("inspector_user_id") inspectorUserId: Int? = null,
+        @Query("started_at") startedAt: String? = null,
+        @Query("ended_at") endedAt: String? = null,
+    ): InspectionQrScanSummaryResponse
 
     @POST("/api/plan/inspection-management")
     suspend fun create(@Body body: CreateInspectionBody): CreateInspectionResponse

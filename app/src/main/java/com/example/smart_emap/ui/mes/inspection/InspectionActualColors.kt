@@ -34,3 +34,56 @@ object InspectionActualColors {
     val GlassShadow = Color(0x330D9488)
     val GlassHighlight = Color(0x80FFFFFF)
 }
+
+/** 不良（項目別）の帰属工程ごとの淡色トーン */
+data class DefectProcessTone(
+    val background: Color,
+    val border: Color,
+    val accent: Color,
+    val labelBg: Color,
+)
+
+fun defectProcessTone(processCd: String): DefectProcessTone = when (processCd.trim().uppercase()) {
+    "KT01" -> DefectProcessTone(
+        background = Color(0xFFEFF6FF),
+        border = Color(0xFFBFDBFE),
+        accent = Color(0xFF1D4ED8),
+        labelBg = Color(0xFFDBEAFE),
+    )
+    "KT02" -> DefectProcessTone(
+        background = Color(0xFFF0FDFA),
+        border = Color(0xFF99F6E4),
+        accent = Color(0xFF0F766E),
+        labelBg = Color(0xFFCCFBF1),
+    )
+    "KT04" -> DefectProcessTone(
+        background = Color(0xFFF5F3FF),
+        border = Color(0xFFDDD6FE),
+        accent = Color(0xFF6D28D9),
+        labelBg = Color(0xFFEDE9FE),
+    )
+    "KT07" -> DefectProcessTone(
+        background = Color(0xFFFFFBEB),
+        border = Color(0xFFFDE68A),
+        accent = Color(0xFFB45309),
+        labelBg = Color(0xFFFEF3C7),
+    )
+    "KT05" -> DefectProcessTone(
+        background = Color(0xFFFFF1F2),
+        border = Color(0xFFFECDD3),
+        accent = Color(0xFFBE123C),
+        labelBg = Color(0xFFFFE4E6),
+    )
+    "KT09" -> DefectProcessTone(
+        background = Color(0xFFF0F9FF),
+        border = Color(0xFFBAE6FD),
+        accent = Color(0xFF0369A1),
+        labelBg = Color(0xFFE0F2FE),
+    )
+    else -> DefectProcessTone(
+        background = Color(0xFFF8FAFC),
+        border = Color(0xFFE2E8F0),
+        accent = Color(0xFF475569),
+        labelBg = Color(0xFFF1F5F9),
+    )
+}

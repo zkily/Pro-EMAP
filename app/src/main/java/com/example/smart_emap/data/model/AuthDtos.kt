@@ -7,6 +7,10 @@ data class LoginRequest(
     val password: String,
 )
 
+data class QrLoginRequest(
+    val code: String,
+)
+
 data class LoginResponse(
     @Json(name = "access_token") val accessToken: String,
     @Json(name = "token_type") val tokenType: String,

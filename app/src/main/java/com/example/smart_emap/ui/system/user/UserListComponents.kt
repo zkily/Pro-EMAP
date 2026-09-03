@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
@@ -52,6 +53,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
@@ -171,16 +173,24 @@ private fun HeaderStat(value: String, label: String, valueColor: Color) {
 fun UserListFilterSection(
     keyword: String,
     departmentId: Int?,
+    sectionId: Int?,
     statusFilter: String,
     departments: List<OrganizationDto>,
+    sections: List<OrganizationDto>,
     canCreate: Boolean,
     canExport: Boolean,
+    isPrintingLoginQr: Boolean,
     onKeywordChange: (String) -> Unit,
     onDepartmentChange: (Int?) -> Unit,
+    onSectionChange: (Int?) -> Unit,
     onStatusChange: (String) -> Unit,
     onAdd: () -> Unit,
     onPrint: () -> Unit,
+    onPrintLoginQr: () -> Unit,
 ) {
+    val sectionOptions = remember(departmentId, sections) {
+        if (departmentId == null) sections else sections.filter { it.parentId == departmentId }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -196,17 +206,24 @@ fun UserListFilterSection(
             FilterSearchField(
                 value = keyword,
                 onValueChange = onKeywordChange,
-                modifier = Modifier.weight(1.1f),
+                modifier = Modifier.weight(1.15f),
             )
             UserFilterDropdown(
-                modifier = Modifier.weight(0.85f),
+                modifier = Modifier.weight(0.8f),
                 label = "部門",
                 value = departments.find { it.id == departmentId }?.name ?: "すべて",
                 options = listOf(null to "すべて") + departments.map { it.id.toString() to it.name },
                 onSelect = { onDepartmentChange(it?.toIntOrNull()) },
             )
             UserFilterDropdown(
-                modifier = Modifier.weight(0.75f),
+                modifier = Modifier.weight(0.7f),
+                label = "課",
+                value = sectionOptions.find { it.id == sectionId }?.name ?: "すべて",
+                options = listOf(null to "すべて") + sectionOptions.map { it.id.toString() to it.name },
+                onSelect = { onSectionChange(it?.toIntOrNull()) },
+            )
+            UserFilterDropdown(
+                modifier = Modifier.weight(0.65f),
                 label = "ステータス",
                 value = when (statusFilter) {
                     "active" -> "有効"
@@ -227,6 +244,7 @@ fun UserListFilterSection(
             }
             if (canExport) {
                 PrintToolbarButton(onClick = onPrint)
+                QrToolbarButton(onClick = onPrintLoginQr, isLoading = isPrintingLoginQr)
             }
         }
     }
@@ -263,7 +281,7 @@ private fun FilterSearchField(
                     cursorBrush = SolidColor(SystemUserTheme.PrimaryStart),
                     decorationBox = { inner ->
                         if (value.isEmpty()) {
-                            Text("ユーザー名・氏名", fontSize = 12.sp, color = SystemUserTheme.TextMuted)
+                            Text("ユーザー名・氏名・メール", fontSize = 12.sp, color = SystemUserTheme.TextMuted)
                         }
                         inner()
                     },
@@ -330,6 +348,32 @@ private fun PrintToolbarButton(onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun QrToolbarButton(onClick: () -> Unit, isLoading: Boolean = false) {
+    Surface(
+        onClick = onClick,
+        enabled = !isLoading,
+        shape = SystemUserTheme.shapeInput,
+        color = Color.Transparent,
+        shadowElevation = 2.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .background(Brush.linearGradient(listOf(Color(0xFFF59E0B), Color(0xFFD97706))))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(14.dp))
+            } else {
+                Icon(Icons.Default.QrCode2, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+            }
+            Text("ログインQR", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun UserFilterDropdown(
@@ -384,6 +428,7 @@ fun UserListTable(
     onEdit: (UserListItemDto) -> Unit,
     onToggleLock: (UserListItemDto) -> Unit,
     onResetPassword: (UserListItemDto) -> Unit,
+    onPrintLoginQr: (UserListItemDto) -> Unit,
 ) {
     val scroll = rememberScrollState()
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -426,6 +471,7 @@ fun UserListTable(
                     onEdit = onEdit,
                     onToggleLock = onToggleLock,
                     onResetPassword = onResetPassword,
+                    onPrintLoginQr = onPrintLoginQr,
                 )
             }
         }
@@ -439,12 +485,13 @@ private fun tableColumns(canEdit: Boolean): List<Pair<String, Int>> {
         "氏名" to 76,
         "メール" to 150,
         "部門" to 90,
+        "課" to 80,
         "ロール" to 88,
         "ステータス" to 72,
         "2FA" to 44,
         "最終ログイン" to 112,
     )
-    if (canEdit) cols.add("操作" to 100)
+    if (canEdit) cols.add("操作" to 148)
     return cols
 }
 
@@ -458,6 +505,7 @@ private fun UserListTableRow(
     onEdit: (UserListItemDto) -> Unit,
     onToggleLock: (UserListItemDto) -> Unit,
     onResetPassword: (UserListItemDto) -> Unit,
+    onPrintLoginQr: (UserListItemDto) -> Unit,
 ) {
     val isLocked = user.status == "locked"
     val rowBg = when {
@@ -501,6 +549,9 @@ private fun UserListTableRow(
         Box(Modifier.width(90.dp), contentAlignment = Alignment.Center) {
             DeptBadge(user.department)
         }
+        Box(Modifier.width(80.dp), contentAlignment = Alignment.Center) {
+            DeptBadge(user.section)
+        }
         Box(Modifier.width(88.dp), contentAlignment = Alignment.Center) {
             RoleBadge(roleLabel(user.role), roleBg, roleFg)
         }
@@ -515,7 +566,7 @@ private fun UserListTableRow(
         }
         if (canEdit) {
             Row(
-                Modifier.width(100.dp),
+                Modifier.width(148.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -529,6 +580,8 @@ private fun UserListTableRow(
                 ) { onToggleLock(user) }
                 Spacer(Modifier.width(4.dp))
                 FilledActionButton(Icons.Default.Key, SystemUserTheme.BtnInfo) { onResetPassword(user) }
+                Spacer(Modifier.width(4.dp))
+                FilledActionButton(Icons.Default.QrCode2, Color(0xFFF59E0B)) { onPrintLoginQr(user) }
             }
         }
     }

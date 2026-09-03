@@ -214,52 +214,29 @@ fun CuttingInstructionScreen(
                         },
                     )
 
-                    CuttingInstructionDualPanelRow(
-                        layout = layout,
-                        primaryWeight = layout.todayWeight,
-                        secondaryWeight = layout.tomorrowWeight,
-                        matchHeight = false,
-                        primary = {
-                            InstructionSectionCard(
-                                accent = Color(0xFF6366F1),
-                                title = "使用材料数（材料別）- 今日",
-                                titleColor = Color(0xFF4338CA),
-                                headerActions = {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        InstructionDateNav(uiState.usageSummaryDateToday, { viewModel.shiftUsageSummaryDateToday(-1) }, { viewModel.shiftUsageSummaryDateToday(1) })
-                                        UsageSummaryActionButton("使用数反映", UsageSummaryActionStyle.Reflect, viewModel::openConfirmUsageReflection)
-                                        UsageSummaryActionButton("指定日", UsageSummaryActionStyle.SpecifiedDate, viewModel::openSpecifiedDateMaterial)
-                                    }
-                                },
-                            ) {
-                                UsageSummaryTable(uiState.usageSummaryToday, uiState.usageSummaryLoading, uiState.reflectedCodesToday, viewModel::toggleUsageSummaryStock, viewModel::openEditUsageCount)
-                                UsageSummaryFooter(viewModel.usageSummaryTodayCounts)
+                    InstructionSectionCard(
+                        accent = CuttingInstructionTheme.UsageAccent,
+                        title = "使用材料数（材料別）",
+                        titleColor = CuttingInstructionTheme.UsageTitle,
+                        glowColor = CuttingInstructionTheme.UsageCardGlow,
+                        borderColor = CuttingInstructionTheme.UsageCardBorder,
+                        headerActions = {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                InstructionDateNav(uiState.usageSummaryDateToday, { viewModel.shiftUsageSummaryDateToday(-1) }, { viewModel.shiftUsageSummaryDateToday(1) })
+                                UsageSummaryActionButton("使用数反映", UsageSummaryActionStyle.Reflect, viewModel::openConfirmUsageReflection)
+                                UsageSummaryActionButton("指定日", UsageSummaryActionStyle.SpecifiedDate, viewModel::openSpecifiedDateMaterial)
                             }
                         },
-                        secondary = {
-                            InstructionSectionCard(
-                                accent = Color(0xFF6366F1),
-                                title = "使用材料数（材料別）- 翌日",
-                                titleColor = Color(0xFF4338CA),
-                                headerActions = {
-                                    InstructionDateNav(
-                                        uiState.usageSummaryDateTomorrow,
-                                        { viewModel.shiftUsageSummaryDateTomorrow(-1) },
-                                        { viewModel.shiftUsageSummaryDateTomorrow(1) },
-                                    )
-                                },
-                            ) {
-                                UsageSummaryTable(
-                                    uiState.usageSummaryTomorrow,
-                                    uiState.usageSummaryLoading,
-                                    uiState.reflectedCodesTomorrow,
-                                    viewModel::toggleUsageSummaryStock,
-                                    viewModel::openEditUsageCount,
-                                )
-                                UsageSummaryFooter(viewModel.usageSummaryTomorrowCounts)
-                            }
-                        },
-                    )
+                    ) {
+                        UsageSummaryTable(
+                            uiState.usageSummaryToday,
+                            uiState.usageSummaryLoading,
+                            uiState.reflectedCodesToday,
+                            viewModel::toggleUsageSummaryStock,
+                            viewModel::openEditUsageCount,
+                        )
+                        UsageSummaryFooter(viewModel.usageSummaryTodayCounts)
+                    }
 
                     InstructionSectionCard(
                         accent = CuttingInstructionTheme.ChamferingAccent,
@@ -483,20 +460,27 @@ private fun UsageSummaryFooter(counts: UsageSummaryCounts) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(CuttingInstructionTheme.TableRowAlt)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(top = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SummaryChip("合計", counts.total.toString())
-        SummaryChip("反映済", counts.reflected.toString())
-        SummaryChip("未反映", counts.notReflected.toString())
+        UsageStatChip("合计件数", counts.total.toString(), Color(0xFFF8FAFC), Color(0xFFE2E8F0), Color(0xFF334155))
+        UsageStatChip("反映済", counts.reflected.toString(), Color(0xFFF0FDF4), Color(0xFFBBF7D0), Color(0xFF166534))
+        UsageStatChip("未反映", counts.notReflected.toString(), Color(0xFFFFF7ED), Color(0xFFFED7AA), Color(0xFF9A3412))
     }
 }
 
 @Composable
-private fun SummaryChip(label: String, value: String) {
-    Text("$label：", fontSize = 11.sp, color = CuttingInstructionTheme.Subtitle)
-    Text(value, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = CuttingInstructionTheme.Title)
+private fun UsageStatChip(label: String, value: String, bg: Color, border: Color, fg: Color) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(bg)
+            .border(1.dp, border, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = fg.copy(alpha = 0.8f))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = fg)
+    }
 }

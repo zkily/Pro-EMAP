@@ -146,12 +146,9 @@ data class CuttingInstructionUiState(
     val cuttingTomorrow: List<InstructionCuttingRowDto> = emptyList(),
     val cuttingLoading: Boolean = false,
     val usageSummaryDateToday: String = instructionToday(),
-    val usageSummaryDateTomorrow: String = instructionTomorrow(),
     val usageSummaryToday: List<InstructionCuttingRowDto> = emptyList(),
-    val usageSummaryTomorrow: List<InstructionCuttingRowDto> = emptyList(),
     val usageSummaryLoading: Boolean = false,
     val reflectedCodesToday: Set<String> = emptySet(),
-    val reflectedCodesTomorrow: Set<String> = emptySet(),
     val chamferingPlans: List<InstructionChamferingPlanRowDto> = emptyList(),
     val chamferingPlansLoading: Boolean = false,
     val cuttingProductionDayByMgmtCode: Map<String, String> = emptyMap(),
@@ -252,8 +249,6 @@ class CuttingInstructionViewModel(
         get() = _uiState.value.allPlans.mapNotNull { it.materialName?.trim()?.takeIf { n -> n.isNotEmpty() } }.distinct().sorted()
     val usageSummaryTodayCounts: UsageSummaryCounts
         get() = computeUsageCounts(_uiState.value.usageSummaryToday, _uiState.value.reflectedCodesToday)
-    val usageSummaryTomorrowCounts: UsageSummaryCounts
-        get() = computeUsageCounts(_uiState.value.usageSummaryTomorrow, _uiState.value.reflectedCodesTomorrow)
     val kanbanPagedRows: List<KanbanIssuanceRowDto>
         get() {
             val state = _uiState.value
@@ -454,6 +449,65 @@ class CuttingInstructionViewModel(
         }
         return UsageSummaryCounts(total = target.size, reflected = reflected, notReflected = target.size - reflected)
     }
+    private fun filterUsageRowsReflectedOnOtherDays(
+        rows: List<InstructionCuttingRowDto>,
+        hiddenCodes: Set<String>,
+    ): List<InstructionCuttingRowDto> {
+        if (hiddenCodes.isEmpty()) return rows
+        return rows.filter { row ->
+            val code = row.managementCode.orEmpty().trim()
+            code.isEmpty() || !hiddenCodes.contains(code)
+        }
+    }
+
+    private fun isUsageRowReflected(row: InstructionCuttingRowDto, reflectedCodes: Set<String>): Boolean {
+        val code = row.managementCode.orEmpty().trim()
+        return row.materialUsageReflected == "反映済" || (code.isNotEmpty() && reflectedCodes.contains(code))
+    }
+
+    private fun preferUsageRow(
+        a: InstructionCuttingRowDto,
+        b: InstructionCuttingRowDto,
+        reflectedCodes: Set<String>,
+    ): InstructionCuttingRowDto {
+        val aRef = isUsageRowReflected(a, reflectedCodes)
+        val bRef = isUsageRowReflected(b, reflectedCodes)
+        if (aRef != bRef) return if (aRef) a else b
+        val aSub = a.useMaterialStockSub == 1
+        val bSub = b.useMaterialStockSub == 1
+        if (aSub != bSub) return if (aSub) b else a
+        val aId = a.id ?: Int.MAX_VALUE
+        val bId = b.id ?: Int.MAX_VALUE
+        return if (aId <= bId) a else b
+    }
+
+    private fun dedupeUsageRowsByManagementCode(
+        rows: List<InstructionCuttingRowDto>,
+        reflectedCodes: Set<String>,
+    ): List<InstructionCuttingRowDto> {
+        val byCode = linkedMapOf<String, InstructionCuttingRowDto>()
+        val noCode = mutableListOf<InstructionCuttingRowDto>()
+        for (row in rows) {
+            val code = row.managementCode.orEmpty().trim()
+            if (code.isEmpty()) {
+                noCode.add(row)
+                continue
+            }
+            val existing = byCode[code]
+            byCode[code] = if (existing == null) row else preferUsageRow(existing, row, reflectedCodes)
+        }
+        return byCode.values.toList() + noCode
+    }
+
+    private fun prepareUsageSummaryRows(
+        rows: List<InstructionCuttingRowDto>,
+        hiddenCodes: Set<String>,
+        reflectedCodes: Set<String>,
+    ): List<InstructionCuttingRowDto> =
+        dedupeUsageRowsByManagementCode(
+            filterUsageRowsReflectedOnOtherDays(rows, hiddenCodes),
+            reflectedCodes,
+        )
     private fun <T> filterDoneList(
         raw: List<T>,
         productFilter: String,
@@ -736,15 +790,12 @@ class CuttingInstructionViewModel(
         if (showLoading) _uiState.update { it.copy(usageSummaryLoading = true) }
         runCatching {
             val today = repository.loadCuttingManagement(state.usageSummaryDateToday, null)
-            val tomorrow = repository.loadCuttingManagement(state.usageSummaryDateTomorrow, null)
-            val codesToday = repository.loadReflectedManagementCodes(state.usageSummaryDateToday)
-            val codesTomorrow = repository.loadReflectedManagementCodes(state.usageSummaryDateTomorrow)
+            val codesToday = repository.loadReflectedManagementCodes()
+            val hiddenToday = repository.loadReflectedManagementCodes(excludeDate = state.usageSummaryDateToday)
             _uiState.update {
                 it.copy(
-                    usageSummaryToday = today,
-                    usageSummaryTomorrow = tomorrow,
+                    usageSummaryToday = prepareUsageSummaryRows(today, hiddenToday, codesToday),
                     reflectedCodesToday = codesToday,
-                    reflectedCodesTomorrow = codesTomorrow,
                     usageSummaryLoading = false,
                 )
             }
@@ -755,10 +806,6 @@ class CuttingInstructionViewModel(
     }
     fun shiftUsageSummaryDateToday(days: Long) {
         _uiState.update { it.copy(usageSummaryDateToday = shiftInstructionDate(it.usageSummaryDateToday, days)) }
-        loadUsageSummary()
-    }
-    fun shiftUsageSummaryDateTomorrow(days: Long) {
-        _uiState.update { it.copy(usageSummaryDateTomorrow = shiftInstructionDate(it.usageSummaryDateTomorrow, days)) }
         loadUsageSummary()
     }
     fun toggleUsageSummaryStock(row: InstructionCuttingRowDto, enabled: Boolean) {
@@ -943,6 +990,7 @@ class CuttingInstructionViewModel(
                 runCatching {
                     repository.deleteCutting(id)
                     loadCuttingLists()
+                    loadUsageSummary()
                     _uiState.update { it.copy(activeDialog = CuttingInstructionDialog.None, snackbarMessage = "削除しました") }
                 }.onFailure { e -> _uiState.update { it.copy(snackbarMessage = e.message ?: "削除失敗") } }
             }
@@ -1705,7 +1753,8 @@ class CuttingInstructionViewModel(
             val state = _uiState.value
             _uiState.update { it.copy(actionLoading = true) }
             runCatching {
-                val msg = repository.commitMaterialUsage(state.usageSummaryDateToday, state.usageSummaryDateTomorrow)
+                val tomorrow = shiftInstructionDate(state.usageSummaryDateToday, 1)
+                val msg = repository.commitMaterialUsage(state.usageSummaryDateToday, tomorrow)
                 _uiState.update { it.copy(actionLoading = false, activeDialog = CuttingInstructionDialog.None, snackbarMessage = msg) }
                 loadUsageSummary()
                 loadCuttingLists()
@@ -1901,7 +1950,15 @@ class CuttingInstructionViewModel(
             _uiState.update { it.copy(specifiedMaterialLoading = true) }
             runCatching {
                 val rows = repository.loadCuttingManagement(_uiState.value.specifiedMaterialDate, null)
-                _uiState.update { it.copy(specifiedMaterialRows = rows, specifiedMaterialLoading = false) }
+                val date = _uiState.value.specifiedMaterialDate
+                val hidden = repository.loadReflectedManagementCodes(excludeDate = date)
+                val codes = repository.loadReflectedManagementCodes()
+                _uiState.update {
+                    it.copy(
+                        specifiedMaterialRows = prepareUsageSummaryRows(rows, hidden, codes),
+                        specifiedMaterialLoading = false,
+                    )
+                }
             }.onFailure { e -> _uiState.update { it.copy(specifiedMaterialLoading = false) } }
         }
     }

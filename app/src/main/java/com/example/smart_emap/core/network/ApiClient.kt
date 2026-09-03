@@ -242,6 +242,7 @@ class ApiClient(
             .readTimeout(timeout, TimeUnit.SECONDS)
             .writeTimeout(timeout, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+            .addInterceptor(NgrokInterceptor)
             .addInterceptor(AuthInterceptor(sessionStore))
             .addInterceptor(UnauthorizedInterceptor(sessionEvents))
             .addInterceptor(logging)

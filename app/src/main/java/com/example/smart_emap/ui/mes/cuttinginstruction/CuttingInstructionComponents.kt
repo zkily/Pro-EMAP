@@ -761,16 +761,18 @@ fun InstructionSectionCard(
     titleSubRow: @Composable () -> Unit = {},
     headerActions: @Composable () -> Unit = {},
     fillHeight: Boolean = false,
+    glowColor: Color = CuttingInstructionTheme.CardShadow,
+    borderColor: Color = CuttingInstructionTheme.TableBorder.copy(alpha = 0.85f),
     content: @Composable () -> Unit,
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
-            .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = CuttingInstructionTheme.CardShadow, spotColor = CuttingInstructionTheme.CardShadow),
+            .shadow(4.dp, RoundedCornerShape(12.dp), ambientColor = glowColor, spotColor = glowColor),
         shape = RoundedCornerShape(12.dp),
         color = CuttingInstructionTheme.CardBg,
-        border = androidx.compose.foundation.BorderStroke(1.dp, CuttingInstructionTheme.TableBorder.copy(alpha = 0.85f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
     ) {
         Column(
             modifier = Modifier
@@ -3015,11 +3017,12 @@ private val UsageSummaryBodyHeight =
     UsageSummaryRowHeight * CuttingInstructionTheme.UsageSummaryVisibleRows
 
 private val UsageSummaryColumnWeights = listOf(
-    "製品名" to 1.35f,
-    "材料" to 1.15f,
-    "在庫区分" to 0.85f,
-    "使用数" to 0.85f,
-    "反映" to 0.8f,
+    "製品名" to 1.3f,
+    "材料" to 1.1f,
+    "管理コード" to 1.4f,
+    "在庫" to 0.75f,
+    "使用数" to 0.75f,
+    "反映" to 0.7f,
 )
 
 @Composable
@@ -3034,7 +3037,7 @@ private fun RowScope.UsageSummaryHeaderCell(text: String, weight: Float) {
             text,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            color = CuttingInstructionTheme.TableHeaderText,
+            color = CuttingInstructionTheme.UsageTableHeaderText,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -3105,7 +3108,14 @@ private fun UsageSummaryTableHeader() {
         Modifier
             .fillMaxWidth()
             .height(UsageSummaryHeaderHeight)
-            .background(CuttingInstructionTheme.TableHeaderBg)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        CuttingInstructionTheme.UsageTableHeaderStart,
+                        CuttingInstructionTheme.UsageTableHeaderEnd,
+                    ),
+                ),
+            )
             .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -3132,7 +3142,7 @@ private fun UsageSummaryTableRow(
             Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .background(if (index % 2 == 1) CuttingInstructionTheme.TableRowAlt else Color.White)
+                .background(if (index % 2 == 1) CuttingInstructionTheme.UsageRowAlt else Color.White)
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -3146,8 +3156,14 @@ private fun UsageSummaryTableRow(
                 weight = UsageSummaryColumnWeights[1].second,
                 align = CuttingCellAlign.Start,
             )
+            UsageSummaryTextCell(
+                text = row.managementCode?.trim()?.takeIf { it.isNotEmpty() } ?: "-",
+                weight = UsageSummaryColumnWeights[2].second,
+                align = CuttingCellAlign.Start,
+                color = CuttingInstructionTheme.UsageTitle,
+            )
             Box(
-                modifier = Modifier.weight(UsageSummaryColumnWeights[2].second),
+                modifier = Modifier.weight(UsageSummaryColumnWeights[3].second),
                 contentAlignment = Alignment.Center,
             ) {
                 UsageSummaryStockSwitch(
@@ -3157,16 +3173,46 @@ private fun UsageSummaryTableRow(
             }
             UsageSummaryTextCell(
                 text = formatUsageCount(row.usageCount),
-                weight = UsageSummaryColumnWeights[3].second,
-                align = CuttingCellAlign.Center,
-                modifier = Modifier.clickable { onEditUsage(row) },
-            )
-            UsageSummaryTextCell(
-                text = if (reflected) "済" else "未",
                 weight = UsageSummaryColumnWeights[4].second,
                 align = CuttingCellAlign.Center,
-                color = if (reflected) CuttingInstructionTheme.ChamferingAccent else Color(0xFFDC2626),
+                color = Color(0xFFC2410C),
+                modifier = Modifier.clickable { onEditUsage(row) },
             )
+            Box(
+                modifier = Modifier.weight(UsageSummaryColumnWeights[5].second),
+                contentAlignment = Alignment.Center,
+            ) {
+                val isSub = row.useMaterialStockSub == 1
+                val pillBg = when {
+                    isSub -> Color(0xFFE2E8F0)
+                    reflected -> Color(0xFFBBF7D0)
+                    else -> Color(0xFFFED7AA)
+                }
+                val pillFg = when {
+                    isSub -> Color(0xFF475569)
+                    reflected -> Color(0xFF166534)
+                    else -> Color(0xFF9A3412)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(pillBg)
+                        .padding(horizontal = 7.dp, vertical = 1.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = when {
+                            isSub -> "サブ"
+                            reflected -> "反映済"
+                            else -> "未反映"
+                        },
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = pillFg,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
         HorizontalDivider(
             modifier = Modifier.fillMaxWidth(),
@@ -3184,7 +3230,13 @@ fun UsageSummaryTable(
     onToggleStock: (InstructionCuttingRowDto, Boolean) -> Unit,
     onEditUsage: (InstructionCuttingRowDto) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .border(1.dp, CuttingInstructionTheme.UsageCardBorder, RoundedCornerShape(12.dp))
+            .background(Color.White),
+    ) {
         UsageSummaryTableHeader()
         Box(
             modifier = Modifier

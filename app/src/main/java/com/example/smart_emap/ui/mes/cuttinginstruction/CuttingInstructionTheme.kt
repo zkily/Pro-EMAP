@@ -4,13 +4,13 @@ import androidx.compose.ui.graphics.Color
 
 object CuttingInstructionTheme {
     val PageBg = Color(0xFFF1F5F9)
-    val PageBgTop = Color(0xFFF0F4FF)
+    val PageBgTop = Color(0xFFEEF2FF)
     val PageBgMid = Color(0xFFF8FAFC)
     val PageBgBottom = Color(0xFFF1F5F9)
 
     val HeaderBg = Color(0xFFFFFFFF)
-    val HeaderBorder = Color(0xFFE5E7EB)
-    val Title = Color(0xFF1E293B)
+    val HeaderBorder = Color(0xFFC7D2FE)
+    val Title = Color(0xFF1E1B4B)
     val Subtitle = Color(0xFF64748B)
 
     val BatchAccent = Color(0xFF2563EB)
@@ -41,9 +41,9 @@ object CuttingInstructionTheme {
     const val CuttingTodayVisibleRows = 6
     const val ChamferTodayVisibleRows = 12
     const val CuttingCompletedSwitchScale = 0.7f
-    const val UsageSummaryVisibleRows = 5
-    const val UsageSummaryRowHeightDp = 22
-    const val UsageSummaryHeaderHeightDp = 20
+    const val UsageSummaryVisibleRows = 6
+    const val UsageSummaryRowHeightDp = 26
+    const val UsageSummaryHeaderHeightDp = 26
     const val UsageSummaryStockSwitchScale = 0.7f
     val UsageSummaryStockSwitchTrackChecked = Color(0xFFCBD5E1)
     val UsageSummaryStockSwitchTrackUnchecked = Color(0xFFE2E8F0)
@@ -86,10 +86,18 @@ object CuttingInstructionTheme {
     val UsageReflectBtnEnd = Color(0xFFEA580C)
     val UsageReflectBtnBorder = Color(0xFFD97706)
     val UsageReflectBtnShadow = Color(0x40EA580C)
-    val UsageSpecifiedBtnBg = Color(0xFFEEF2FF)
-    val UsageSpecifiedBtnBorder = Color(0xFF818CF8)
-    val UsageSpecifiedBtnText = Color(0xFF4338CA)
-    val UsageSpecifiedBtnShadow = Color(0x206366F1)
+    val UsageAccent = Color(0xFF7C3AED)
+    val UsageTitle = Color(0xFF6D28D9)
+    val UsageCardBorder = Color(0xFFDDD6FE)
+    val UsageCardGlow = Color(0x4D7C3AED)
+    val UsageTableHeaderStart = Color(0xFFF5F3FF)
+    val UsageTableHeaderEnd = Color(0xFFEDE9FE)
+    val UsageTableHeaderText = Color(0xFF5B21B6)
+    val UsageRowAlt = Color(0xFFFAF8FF)
+    val UsageSpecifiedBtnBg = Color(0xFFEDE9FE)
+    val UsageSpecifiedBtnBorder = Color(0xFFC4B5FD)
+    val UsageSpecifiedBtnText = Color(0xFF5B21B6)
+    val UsageSpecifiedBtnShadow = Color(0x337C3AED)
     val ChamferHeaderBtnNewBg = Color(0xFFF8FAFC)
     val ChamferHeaderBtnNewBorder = Color(0xFFCBD5E1)
     val ChamferHeaderBtnNewText = Color(0xFF047857)

@@ -1,4 +1,4 @@
-﻿package com.example.smart_emap.ui.mes.welding
+package com.example.smart_emap.ui.mes.welding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -110,12 +110,17 @@ data class WeldingUiState(
     val wallStartClockDisplay: String = "—",
     val wallEndDisplay: String = "—",
     val defectTotal: Int = 0,
+    /** Snapshot for Compose invalidation (session map is not observed directly). */
+    val defectCounts: Map<String, Int> = emptyMap(),
     val canStart: Boolean = false,
     val canPause: Boolean = false,
     val canResume: Boolean = false,
     val canBreak: Boolean = false,
     val canResumeBreak: Boolean = false,
     val canEnd: Boolean = false,
+    val canCancelProduction: Boolean = false,
+    val cancelProductionConfirmVisible: Boolean = false,
+    val cancelProductionSubmitting: Boolean = false,
     val showPlanCard: Boolean = false,
     val productSelectionLocked: Boolean = false,
     val canEditDefects: Boolean = false,
@@ -755,6 +760,119 @@ class WeldingActualViewModel(
             persistTimerCheckpoint(planId, session)
             publishUi()
         }
+    }
+
+    fun requestCancelProduction() {
+        if (!_uiState.value.canCancelProduction) return
+        _uiState.update {
+            it.copy(cancelProductionConfirmVisible = true, cancelProductionSubmitting = false)
+        }
+    }
+
+    fun dismissCancelProductionConfirm() {
+        if (_uiState.value.cancelProductionSubmitting) return
+        _uiState.update {
+            it.copy(cancelProductionConfirmVisible = false, cancelProductionSubmitting = false)
+        }
+    }
+
+    fun confirmCancelProduction() {
+        if (_uiState.value.cancelProductionSubmitting) return
+        val planId = _uiState.value.activePlanId ?: return
+        if (!locallyOperated.contains(planId)) return
+        val session = sessions[planId] ?: return
+        if (!InspectionSessionLogic.isProductionInProgress(session)) return
+        viewModelScope.launch {
+            val s = weldStringsFor(_uiState.value.locale)
+            _uiState.update { it.copy(cancelProductionSubmitting = true) }
+            val resolvedId = offlineStore.resolvePlanId(planId)
+            val ok = when {
+                resolvedId < 0 -> true
+                !networkMonitor.checkOnline() -> {
+                    _uiState.update {
+                        it.copy(
+                            cancelProductionSubmitting = false,
+                            snackbarMessage = s.networkNoConnectionError,
+                        )
+                    }
+                    false
+                }
+                else -> try {
+                    repository.patchPlan(
+                        resolvedId,
+                        PatchWeldingBody(
+                            mesForceRelease = true,
+                            mesAbandonInProgress = true,
+                        ),
+                    )
+                    true
+                } catch (e: WeldingPatchException) {
+                    if (e.statusCode == 409) {
+                        true
+                    } else {
+                        _uiState.update {
+                            it.copy(cancelProductionSubmitting = false, snackbarMessage = e.message)
+                        }
+                        false
+                    }
+                } catch (e: Exception) {
+                    _uiState.update {
+                        it.copy(
+                            cancelProductionSubmitting = false,
+                            snackbarMessage = formatNetworkError(e, s.saveFailed),
+                        )
+                    }
+                    false
+                }
+            }
+            if (!ok) return@launch
+            offlineStore.removePendingSyncForPlan(planId)
+            clearLocalAbandonedSession(planId, dropUnsyncedLocalRow = resolvedId < 0)
+            refreshPendingSyncState()
+            _uiState.update {
+                it.copy(
+                    activePlanId = null,
+                    selectedProductCode = null,
+                    cancelProductionConfirmVisible = false,
+                    cancelProductionSubmitting = false,
+                    snackbarMessage = s.cancelProductionSuccess,
+                    endDialogVisible = false,
+                )
+            }
+            loadPlans(showLoading = false, rebindSelection = false)
+            publishUi()
+        }
+    }
+
+    private suspend fun clearLocalAbandonedSession(planId: Int, dropUnsyncedLocalRow: Boolean) {
+        locallyOperated.remove(planId)
+        sessions[planId] = InspectionSessionLogic.emptySession(defectItems.defectCdKeys())
+        managementRows = if (dropUnsyncedLocalRow && offlineStore.isLocalPlanId(planId)) {
+            managementRows.filter { it.id != planId }
+        } else {
+            managementRows.map { row ->
+                if (row.id != planId) {
+                    row
+                } else {
+                    row.copy(
+                        mesProductionStartedAt = null,
+                        mesProductionEndedAt = null,
+                        mesNetProductionSec = null,
+                        mesPausedAccumSec = null,
+                        mesBreakSec = null,
+                        mesStopSec = null,
+                        mesProductionIsPaused = null,
+                        mesOperatorUserId = null,
+                        mesDefectByItem = null,
+                        defectQty = 0,
+                        productionCompletedCheck = 0,
+                        mesClientInstanceId = null,
+                        actualProductionQuantity = null,
+                    )
+                }
+            }
+        }
+        offlineStore.savePlans(_uiState.value.productionDay, managementRows)
     }
 
     fun openEndDialog() {
@@ -1893,6 +2011,7 @@ class WeldingActualViewModel(
             wallStartClockDisplay = formatWallClock(session?.wallStart),
             wallEndDisplay = formatWall(session?.wallEnd),
             defectTotal = session?.defects?.values?.sum() ?: 0,
+            defectCounts = session?.defects?.toMap() ?: emptyMap(),
             canStart = state.selectedWeldingMachineId != null && state.selectedProductCode != null && run {
                 val rowId = activeRow?.id
                 if (activeRow != null && rowId != null && isRowMesActive(activeRow) &&
@@ -1910,6 +2029,9 @@ class WeldingActualViewModel(
                 InspectionSessionLogic.isProductionInProgress(it) &&
                     !InspectionSessionLogic.isTimerPaused(it) &&
                     !InspectionSessionLogic.isTimerOnBreak(it)
+            } == true,
+            canCancelProduction = editableSession?.let {
+                InspectionSessionLogic.isProductionInProgress(it)
             } == true,
             showPlanCard = state.selectedWeldingMachineId != null && state.selectedProductCode != null,
             productSelectionLocked = locked,

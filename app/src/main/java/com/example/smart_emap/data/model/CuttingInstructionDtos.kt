@@ -617,6 +617,8 @@ data class MaterialUsageReflectedCodesResponse(
 
     val codes: List<String>? = null,
 
+    @Json(name = "management_codes") val managementCodes: List<String>? = null,
+
 )
 
 

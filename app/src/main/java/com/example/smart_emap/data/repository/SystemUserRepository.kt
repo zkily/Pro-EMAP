@@ -6,6 +6,8 @@ import com.example.smart_emap.data.model.ResetPasswordBodyDto
 import com.example.smart_emap.data.model.RoleListItemDto
 import com.example.smart_emap.data.model.UserCreateBodyDto
 import com.example.smart_emap.data.model.UserListResponse
+import com.example.smart_emap.data.model.UserLoginQrItemDto
+import com.example.smart_emap.data.model.UserLoginQrRequestDto
 import com.example.smart_emap.data.model.UserUpdateBodyDto
 
 class SystemUserRepository(
@@ -47,6 +49,10 @@ class SystemUserRepository(
 
     suspend fun resetPassword(userId: Int, newPassword: String): Result<Unit> = runCatching {
         apiClient.systemApi().resetPassword(userId, ResetPasswordBodyDto(newPassword))
+    }
+
+    suspend fun getLoginQrPayloads(userIds: List<Int>): Result<List<UserLoginQrItemDto>> = runCatching {
+        apiClient.systemApi().getUserLoginQr(UserLoginQrRequestDto(userIds)).items
     }
 
     suspend fun getRoles(): Result<List<RoleListItemDto>> = runCatching {

@@ -15,6 +15,8 @@ import com.example.smart_emap.data.model.RoleUpdateBodyDto
 import com.example.smart_emap.data.model.UserCreateBodyDto
 import com.example.smart_emap.data.model.UserListItemDto
 import com.example.smart_emap.data.model.UserListResponse
+import com.example.smart_emap.data.model.UserLoginQrRequestDto
+import com.example.smart_emap.data.model.UserLoginQrResponseDto
 import com.example.smart_emap.data.model.UserUpdateBodyDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -55,6 +57,9 @@ interface SystemApiService {
         @Path("userId") userId: Int,
         @Body body: ResetPasswordBodyDto,
     )
+
+    @POST("/api/system/users/login-qr")
+    suspend fun getUserLoginQr(@Body body: UserLoginQrRequestDto): UserLoginQrResponseDto
 
     @GET("/api/system/roles")
     suspend fun getRoles(): List<RoleListItemDto>

@@ -1,4 +1,4 @@
-﻿package com.example.smart_emap.ui.mes.welding
+package com.example.smart_emap.ui.mes.welding
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -43,6 +43,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Pause
@@ -119,6 +120,7 @@ import androidx.compose.ui.unit.sp
 import com.example.smart_emap.core.mes.InspectionSessionLogic
 import com.example.smart_emap.core.mes.TimerPhase
 import com.example.smart_emap.data.model.WeldingManagementRowDto
+import com.example.smart_emap.ui.mes.inspection.defectProcessTone
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -248,12 +250,45 @@ fun WeldingActualScreen(
         )
     }
 
+    if (uiState.cancelProductionConfirmVisible) {
+        val cancelSubmitting = uiState.cancelProductionSubmitting
+        AlertDialog(
+            onDismissRequest = {
+                if (!cancelSubmitting) viewModel.dismissCancelProductionConfirm()
+            },
+            title = { Text(s.cancelProductionConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(s.cancelProductionConfirm, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmCancelProduction,
+                    enabled = !cancelSubmitting,
+                ) {
+                    if (cancelSubmitting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(s.btnCancelProduction)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::dismissCancelProductionConfirm,
+                    enabled = !cancelSubmitting,
+                ) {
+                    Text(s.cancel)
+                }
+            },
+        )
+    }
+
     if (uiState.confirmedEditVisible) {
         ConfirmedHistoryEditDialog(
             uiState = uiState,
             s = s,
             defectGroups = uiState.defectGroups,
-            defectCount = viewModel::confirmedEditDefectCount,
             onQtyChange = viewModel::onConfirmedEditQtyChange,
             onWallStartChange = viewModel::onConfirmedEditWallStartChange,
             onWallEndChange = viewModel::onConfirmedEditWallEndChange,
@@ -357,13 +392,13 @@ fun WeldingActualScreen(
                         PlanProductionCard(
                             uiState = uiState,
                             s = s,
-                            defectCount = viewModel::defectCount,
                             onStart = viewModel::onStartProduction,
                             onPause = viewModel::onPauseProduction,
                             onResume = viewModel::onResumeProduction,
                             onBreak = viewModel::onBreakProduction,
                             onResumeBreak = viewModel::onResumeBreakProduction,
                             onEnd = viewModel::openEndDialog,
+                            onCancelProduction = viewModel::requestCancelProduction,
                             onBumpDefect = viewModel::bumpDefect,
                         )
                     }
@@ -761,7 +796,7 @@ private fun timerPanelMinHeight(uiState: WeldingUiState): androidx.compose.ui.un
         else -> PlanOpsMetrics.BlockHeight
     }
 
-private enum class PlanActionVariant { Start, Pause, Resume, End, Break, BreakResume, Disabled }
+private enum class PlanActionVariant { Start, Pause, Resume, End, Break, BreakResume, Cancel, Disabled }
 
 private data class TimerPhaseStyle(
     val background: Brush,
@@ -893,6 +928,13 @@ private fun planActionStyle(variant: PlanActionVariant, enabled: Boolean): PlanA
             border = Color(0xFF6D28D9),
             content = Color.White,
             shadow = Color(0x337C3AED),
+        )
+        PlanActionVariant.Cancel -> PlanActionStyle(
+            top = Color(0xFF94A3B8),
+            bottom = Color(0xFF64748B),
+            border = Color(0xFF475569),
+            content = Color.White,
+            shadow = Color(0x4064748B),
         )
         PlanActionVariant.Disabled -> PlanActionStyle(
             top = Color(0xFFF8FAFC),
@@ -1411,7 +1453,6 @@ private fun PlanProductionMetaRow(
     uiState: WeldingUiState,
     s: WeldStrings,
 ) {
-    val blockHeight = 44.dp
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1451,32 +1492,30 @@ private fun PlanProductionMetaRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             PlanMetaGlassChip(
                 label = s.productCd,
                 value = uiState.displayProductCd,
                 variant = PlanMetaChipVariant.ProductCd,
-                height = blockHeight,
-                modifier = Modifier.widthIn(min = 84.dp, max = 108.dp),
+                modifier = Modifier.widthIn(min = 88.dp, max = 116.dp),
             )
             PlanMetaGlassChip(
                 label = s.productName,
                 value = uiState.displayProductName,
                 variant = PlanMetaChipVariant.ProductName,
-                height = blockHeight,
                 compactWidth = true,
                 modifier = Modifier
-                    .widthIn(max = 136.dp)
+                    .widthIn(min = 96.dp, max = 148.dp)
                     .wrapContentWidth(),
             )
             PlanMetaGlassChip(
                 label = s.defectTotal,
                 value = uiState.defectTotal.toString(),
                 variant = PlanMetaChipVariant.DefectTotal,
-                height = blockHeight,
                 valueColorOverride = if (uiState.defectTotal > 0) Color(0xFFDC2626) else null,
                 modifier = Modifier.widthIn(min = 88.dp, max = 112.dp),
             )
@@ -1484,9 +1523,8 @@ private fun PlanProductionMetaRow(
                 label = s.inspector,
                 value = uiState.operatorLabel.ifBlank { "—" },
                 variant = PlanMetaChipVariant.Welder,
-                height = blockHeight,
                 leadingIcon = Icons.Default.Person,
-                modifier = Modifier.widthIn(min = 100.dp, max = 148.dp),
+                modifier = Modifier.widthIn(min = 108.dp, max = 160.dp),
             )
         }
     }
@@ -1549,7 +1587,6 @@ private fun PlanMetaGlassChip(
     value: String,
     variant: PlanMetaChipVariant,
     modifier: Modifier = Modifier,
-    height: Dp = 44.dp,
     valueColorOverride: Color? = null,
     leadingIcon: ImageVector? = null,
     compactWidth: Boolean = false,
@@ -1564,8 +1601,7 @@ private fun PlanMetaGlassChip(
 
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = height)
-            .height(height)
+            .heightIn(min = 52.dp)
             .shadow(
                 elevation = 5.dp,
                 shape = RoundedCornerShape(10.dp),
@@ -1576,7 +1612,7 @@ private fun PlanMetaGlassChip(
             .background(Brush.verticalGradient(listOf(style.gradientTop, style.gradientBottom)))
             .border(1.dp, style.border.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
             .border(0.5.dp, Color.White.copy(alpha = 0.65f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
@@ -1605,10 +1641,11 @@ private fun PlanMetaGlassChip(
             }
             Column(
                 modifier = if (compactWidth) {
-                    Modifier.widthIn(max = 116.dp)
+                    Modifier.widthIn(max = 128.dp)
                 } else {
                     Modifier.weight(1f, fill = false)
                 },
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = label,
@@ -1618,6 +1655,7 @@ private fun PlanMetaGlassChip(
                     letterSpacing = 0.4.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = 11.sp,
                 )
                 Text(
                     text = value,
@@ -1625,8 +1663,10 @@ private fun PlanMetaGlassChip(
                     fontWeight = FontWeight.Bold,
                     color = valueColor,
                     fontFamily = valueFont,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp,
+                    softWrap = true,
                 )
             }
         }
@@ -1638,13 +1678,13 @@ private fun PlanMetaGlassChip(
 private fun PlanProductionCard(
     uiState: WeldingUiState,
     s: WeldStrings,
-    defectCount: (String) -> Int,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onBreak: () -> Unit,
     onResumeBreak: () -> Unit,
     onEnd: () -> Unit,
+    onCancelProduction: () -> Unit,
     onBumpDefect: (String, Int) -> Unit,
 ) {
     val phaseLabel = phaseLabel(uiState.timerPhase, s)
@@ -1727,6 +1767,13 @@ private fun PlanProductionCard(
                         onClick = {},
                     )
                 }
+                GlassPlanActionButton(
+                    label = s.btnCancelProduction,
+                    icon = Icons.Default.Cancel,
+                    variant = PlanActionVariant.Cancel,
+                    enabled = uiState.canCancelProduction,
+                    onClick = onCancelProduction,
+                )
             }
 
             HorizontalDivider(color = WeldingActualColors.Border)
@@ -1745,36 +1792,15 @@ private fun PlanProductionCard(
             } else if (uiState.defectGroups.isEmpty()) {
                 Text(s.defectItemsEmpty, fontSize = 12.sp, color = WeldingActualColors.TextMuted)
             } else {
-                uiState.defectGroups.forEach { group ->
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                s.attributableProcess,
-                                fontSize = 10.sp,
-                                color = WeldingActualColors.TextMuted,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0xFFF1F5F9))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(group.processName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            group.items.forEach { item ->
-                                DefectCell(
-                                    label = item.label,
-                                    count = defectCount(item.id),
-                                    active = defectCount(item.id) > 0,
-                                    enabled = uiState.canEditDefects,
-                                    onMinus = { onBumpDefect(item.id, -1) },
-                                    onPlus = { onBumpDefect(item.id, 1) },
-                                )
-                            }
-                        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    uiState.defectGroups.forEach { group ->
+                        WeldDefectProcessGroupBlock(
+                            s = s,
+                            group = group,
+                            counts = uiState.defectCounts,
+                            canEdit = uiState.canEditDefects,
+                            onBumpDefect = onBumpDefect,
+                        )
                     }
                 }
             }
@@ -2069,6 +2095,82 @@ private fun GlassPlanActionButton(
                 lineHeight = 12.sp,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Composable
+private fun WeldDefectProcessGroupBlock(
+    s: WeldStrings,
+    group: DefectGroupUi,
+    counts: Map<String, Int>,
+    canEdit: Boolean,
+    onBumpDefect: (String, Int) -> Unit,
+    compact: Boolean = false,
+) {
+    val tone = defectProcessTone(group.processCd)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(tone.background)
+            .border(1.dp, tone.border.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
+            .padding(
+                horizontal = if (compact) 8.dp else 10.dp,
+                vertical = if (compact) 8.dp else 10.dp,
+            ),
+        verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                s.attributableProcess,
+                fontSize = if (compact) 9.sp else 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = tone.accent.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(tone.labelBg)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            Text(
+                group.processName,
+                fontSize = if (compact) 11.sp else 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = tone.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+        ) {
+            group.items.forEach { item ->
+                val count = counts[item.id] ?: 0
+                if (compact) {
+                    ConfirmedEditDefectChip(
+                        label = item.label,
+                        count = count,
+                        active = count > 0,
+                        enabled = canEdit,
+                        onMinus = { onBumpDefect(item.id, -1) },
+                        onPlus = { onBumpDefect(item.id, 1) },
+                    )
+                } else {
+                    DefectCell(
+                        label = item.label,
+                        count = count,
+                        active = count > 0,
+                        enabled = canEdit,
+                        onMinus = { onBumpDefect(item.id, -1) },
+                        onPlus = { onBumpDefect(item.id, 1) },
+                    )
+                }
+            }
         }
     }
 }
@@ -2431,34 +2533,43 @@ private fun HistoryTableDataRow(
             if (colIndex > 0 && columns[colIndex - 1].group != col.group) {
                 HistoryGroupDivider()
             }
-            when (colIndex) {
-                0 -> HistoryDayCell(WeldingManagementRowExt.formatHistoryProductionDay(row), historyTableColumn(col))
-                1 -> HistoryNameCell(operatorLabel, historyTableColumn(col))
-                2 -> HistoryDataSourceCell(historyDataSourceLabel(row, s), historyTableColumn(col))
-                3 -> HistoryProductNameCell(row.productName ?: "—", historyTableColumn(col))
-                4 -> HistoryQtyCell(nf.format(prod), historyTableColumn(col), positive = true)
-                5 -> HistoryQtyCell(
+            when (col.header) {
+                s.productionDay -> HistoryDayCell(
+                    WeldingManagementRowExt.formatHistoryProductionDay(row),
+                    historyTableColumn(col),
+                )
+                s.inspector -> HistoryNameCell(operatorLabel, historyTableColumn(col))
+                s.dataSource -> HistoryDataSourceCell(historyDataSourceLabel(row, s), historyTableColumn(col))
+                s.productName -> HistoryProductNameCell(row.productName ?: "—", historyTableColumn(col))
+                s.productionQty -> HistoryQtyCell(nf.format(prod), historyTableColumn(col), positive = true)
+                s.defectQty -> HistoryQtyCell(
                     if (defects > 0) nf.format(defects) else "—",
                     historyTableColumn(col),
                     positive = defects > 0,
                     warn = true,
                 )
-                6 -> HistoryRateCell(defectRateStr, historyTableColumn(col), warn = defects > 0 && prod > 0)
-                7 -> HistoryRateCell(efficiencyStr, historyTableColumn(col), efficiency = true)
-                8 -> HistoryTimeCell(WeldingHistoryRowFormat.formatProductionStart(row), historyTableColumn(col))
-                9 -> HistoryTimeCell(WeldingHistoryRowFormat.formatProductionEnd(row), historyTableColumn(col))
-                10 -> HistoryDurationCell(
+                s.defectRate -> HistoryRateCell(defectRateStr, historyTableColumn(col), warn = defects > 0 && prod > 0)
+                s.efficiencyRate -> HistoryRateCell(efficiencyStr, historyTableColumn(col), efficiency = true)
+                s.productionStart -> HistoryTimeCell(
+                    WeldingHistoryRowFormat.formatProductionStart(row),
+                    historyTableColumn(col),
+                )
+                s.productionEnd -> HistoryTimeCell(
+                    WeldingHistoryRowFormat.formatProductionEnd(row),
+                    historyTableColumn(col),
+                )
+                s.elapsedMinutes -> HistoryDurationCell(
                     WeldingHistoryRowFormat.formatSecondsAsMinutes(wallSec),
                     historyTableColumn(col),
                     active = wallSec > 0,
                 )
-                11 -> HistoryDurationCell(
+                s.pausedAccumMinutes -> HistoryDurationCell(
                     WeldingHistoryRowFormat.formatSecondsAsMinutes(pauseSec),
                     historyTableColumn(col),
                     active = pauseSec > 0,
                     muted = pauseSec <= 0,
                 )
-                12 -> HistoryActionCell(historyTableColumn(col), canEdit, col.header, onEdit)
+                s.historyActions -> HistoryActionCell(historyTableColumn(col), canEdit, col.header, onEdit)
             }
         }
     }
@@ -2743,7 +2854,6 @@ private fun ConfirmedHistoryEditDialog(
     uiState: WeldingUiState,
     s: WeldStrings,
     defectGroups: List<DefectGroupUi>,
-    defectCount: (String) -> Int,
     onQtyChange: (String) -> Unit,
     onWallStartChange: (Long) -> Unit,
     onWallEndChange: (Long) -> Unit,
@@ -2995,29 +3105,16 @@ private fun ConfirmedHistoryEditDialog(
                     if (defectGroups.isEmpty()) {
                         Text(s.defectItemsEmpty, fontSize = 10.sp, color = WeldingActualColors.TextMuted)
                     } else {
-                        defectGroups.forEach { group ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    group.processName,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF64748B),
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            defectGroups.forEach { group ->
+                                WeldDefectProcessGroupBlock(
+                                    s = s,
+                                    group = group,
+                                    counts = uiState.confirmedEditDefects,
+                                    canEdit = !submitting,
+                                    onBumpDefect = onBumpDefect,
+                                    compact = true,
                                 )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    group.items.forEach { item ->
-                                        ConfirmedEditDefectChip(
-                                            label = item.label,
-                                            count = defectCount(item.id),
-                                            active = defectCount(item.id) > 0,
-                                            enabled = !submitting,
-                                            onMinus = { onBumpDefect(item.id, -1) },
-                                            onPlus = { onBumpDefect(item.id, 1) },
-                                        )
-                                    }
-                                }
                             }
                         }
                     }

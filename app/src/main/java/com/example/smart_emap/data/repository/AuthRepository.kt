@@ -7,6 +7,7 @@ import com.example.smart_emap.core.network.NetworkErrorHints
 import com.example.smart_emap.core.network.NetworkErrors
 import com.example.smart_emap.data.model.ApiErrorBody
 import com.example.smart_emap.data.model.LoginRequest
+import com.example.smart_emap.data.model.QrLoginRequest
 import com.example.smart_emap.data.model.UserDto
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
@@ -80,15 +81,50 @@ class AuthRepository(
             val response = apiClient.authApiForBaseUrl(normalizedUrl).login(
                 LoginRequest(username = identifier, password = password),
             )
-            sessionStore.saveSession(response.accessToken, response.user)
-            sessionStore.saveRememberMe(
-                remember = rememberMe,
-                username = identifier,
+            persistLoginSession(response.accessToken, response.user, rememberMe, identifier)
+            response.user
+        }.recoverCatching { e ->
+            throw mapError(e)
+        }
+    }
+
+    suspend fun qrLogin(
+        code: String,
+        apiBaseUrl: String,
+        rememberMe: Boolean,
+    ): Result<UserDto> {
+        return runCatching {
+            val normalizedUrl = ApiDefaults.ensureTrailingSlash(
+                ApiDefaults.migrateDevApiUrl(apiBaseUrl.trim().trimEnd('/')),
+            )
+            sessionStore.saveApiBaseUrl(normalizedUrl)
+            apiClient.invalidate()
+            val response = apiClient.authApiForBaseUrl(normalizedUrl).qrLogin(
+                QrLoginRequest(code = code),
+            )
+            persistLoginSession(
+                token = response.accessToken,
+                user = response.user,
+                rememberMe = rememberMe,
+                username = response.user.username,
             )
             response.user
         }.recoverCatching { e ->
             throw mapError(e)
         }
+    }
+
+    private suspend fun persistLoginSession(
+        token: String,
+        user: UserDto,
+        rememberMe: Boolean,
+        username: String,
+    ) {
+        sessionStore.saveSession(token, user)
+        sessionStore.saveRememberMe(
+            remember = rememberMe,
+            username = username,
+        )
     }
 
     suspend fun logout() {

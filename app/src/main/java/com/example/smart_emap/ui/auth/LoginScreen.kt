@@ -40,7 +40,6 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -51,6 +50,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Monitor
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -59,6 +59,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -99,6 +104,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.smart_emap.R
+import com.example.smart_emap.core.network.ApiDefaults
 import com.example.smart_emap.ui.deviceowner.KioskAdminDialog
 import com.example.smart_emap.ui.theme.LoginColors
 import kotlinx.coroutines.launch
@@ -200,6 +206,7 @@ fun LoginScreen(
     var showForgotDialog by remember { mutableStateOf(false) }
     var showContactDialog by remember { mutableStateOf(false) }
     var showKioskAdminDialog by remember { mutableStateOf(false) }
+    var showQrScanDialog by remember { mutableStateOf(false) }
     val entranceProgress = rememberLoginEntranceProgress()
 
     LaunchedEffect(uiState.errorMessage) {
@@ -225,6 +232,14 @@ fun LoginScreen(
     if (showKioskAdminDialog) {
         KioskAdminDialog(onDismiss = { showKioskAdminDialog = false })
     }
+    LoginQrScanDialog(
+        visible = showQrScanDialog,
+        onDismiss = { showQrScanDialog = false },
+        onScanned = { code ->
+            showQrScanDialog = false
+            viewModel.loginWithScannedQr(code, onLoginSuccess)
+        },
+    )
 
     val formCallbacks = LoginFormCallbacks(
         onUsernameChange = viewModel::onUsernameChange,
@@ -234,6 +249,11 @@ fun LoginScreen(
         onTogglePasswordVisible = viewModel::togglePasswordVisible,
         onForgotPassword = { showForgotDialog = true },
         onLogin = { viewModel.login(onLoginSuccess) },
+        onQrLogin = {
+            if (viewModel.canAttemptQrLogin()) {
+                showQrScanDialog = true
+            }
+        },
         onContactAdmin = { showContactDialog = true },
     )
 
@@ -456,6 +476,7 @@ private data class LoginFormCallbacks(
     val onTogglePasswordVisible: () -> Unit,
     val onForgotPassword: () -> Unit,
     val onLogin: () -> Unit,
+    val onQrLogin: () -> Unit,
     val onContactAdmin: () -> Unit,
 )
 
@@ -927,32 +948,12 @@ private fun LoginFormContent(
 
             Spacer(modifier = Modifier.height(dims.fieldGap))
             FormLabel("API サーバー")
-            OutlinedTextField(
-                value = uiState.apiBaseUrl,
-                onValueChange = callbacks.onApiBaseUrlChange,
-                placeholder = { Text("http://192.168.1.62:3010", fontSize = 13.sp) },
-                singleLine = true,
-                isError = uiState.apiBaseUrlError != null,
-                supportingText = uiState.apiBaseUrlError?.let { { Text(it, fontSize = 11.sp) } },
-                leadingIcon = {
-                    Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp))
-                },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri,
-                    imeAction = ImeAction.Done,
-                ),
-                keyboardActions = KeyboardActions(onDone = { callbacks.onLogin() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .bringIntoViewRequester(apiBringIntoView)
-                    .onFocusEvent { event ->
-                        if (event.isFocused) {
-                            scope.launch { apiBringIntoView.bringIntoView() }
-                        }
-                    },
-                shape = RoundedCornerShape(14.dp),
-                colors = loginFieldColors(),
-                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+            ApiServerDropdown(
+                selectedUrl = uiState.apiBaseUrl,
+                error = uiState.apiBaseUrlError,
+                onSelected = callbacks.onApiBaseUrlChange,
+                bringIntoViewRequester = apiBringIntoView,
+                onFocused = { scope.launch { apiBringIntoView.bringIntoView() } },
             )
 
             Row(
@@ -996,6 +997,13 @@ private fun LoginFormContent(
             LoginPrimaryButton(
                 isLoading = uiState.isLoading,
                 onClick = callbacks.onLogin,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+            LoginQrButton(
+                enabled = !uiState.isLoading,
+                onClick = callbacks.onQrLogin,
                 modifier = Modifier.fillMaxWidth(),
             )
 
@@ -1134,9 +1142,126 @@ private fun LoginPrimaryButton(
 }
 
 @Composable
+private fun LoginQrButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 440f),
+        label = "qr-login-btn-scale",
+    )
+
+    Box(
+        modifier = modifier
+            .height(50.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(14.dp))
+            .border(
+                width = 1.5.dp,
+                brush = Brush.linearGradient(listOf(LoginColors.Primary, LoginColors.PrimaryDark)),
+                shape = RoundedCornerShape(14.dp),
+            )
+            .background(Color.White)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.QrCodeScanner,
+                contentDescription = null,
+                tint = LoginColors.Primary,
+                modifier = Modifier.size(20.dp),
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "QRコードでログイン",
+                color = LoginColors.Primary,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+            )
+        }
+    }
+}
+
+@Composable
 private fun FormLabel(text: String) {
     Text(text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = LoginColors.FieldLabel)
     Spacer(modifier = Modifier.height(4.dp))
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ApiServerDropdown(
+    selectedUrl: String,
+    error: String?,
+    onSelected: (String) -> Unit,
+    bringIntoViewRequester: BringIntoViewRequester,
+    onFocused: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val displayValue = ApiDefaults.matchPreset(selectedUrl)
+        ?: selectedUrl.ifBlank { ApiDefaults.displayBaseUrl }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onFocusEvent { event ->
+                if (event.isFocused) onFocused()
+            },
+    ) {
+        OutlinedTextField(
+            value = displayValue.trimEnd('/'),
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            isError = error != null,
+            supportingText = error?.let { { Text(it, fontSize = 11.sp) } },
+            leadingIcon = {
+                Icon(Icons.Default.Dns, contentDescription = null, modifier = Modifier.size(20.dp))
+            },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+            shape = RoundedCornerShape(14.dp),
+            colors = loginFieldColors(),
+            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            ApiDefaults.presetBaseUrls.forEach { url ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = url.trimEnd('/'),
+                            fontSize = 13.sp,
+                        )
+                    },
+                    onClick = {
+                        onSelected(url)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

@@ -14,6 +14,7 @@ fun buildUserListPrintHtml(users: List<UserListItemDto>): String {
           <td>${escapeHtml(user.fullName.orEmpty())}</td>
           <td>${escapeHtml(user.email.orEmpty())}</td>
           <td>${escapeHtml(user.department.orEmpty())}</td>
+          <td>${escapeHtml(user.section.orEmpty())}</td>
           <td>${escapeHtml(roleLabel(user.role))}</td>
           <td>${if (user.status == "locked") "ロック中" else "有効"}</td>
           <td>${if (user.twoFactor == true) "ON" else "OFF"}</td>
@@ -38,7 +39,7 @@ fun buildUserListPrintHtml(users: List<UserListItemDto>): String {
           <table>
             <thead><tr>
               <th>ID</th><th>ユーザー名</th><th>氏名</th><th>メール</th>
-              <th>部門</th><th>ロール</th><th>状態</th><th>2FA</th><th>最終ログイン</th>
+              <th>部門</th><th>課</th><th>ロール</th><th>状態</th><th>2FA</th><th>最終ログイン</th>
             </tr></thead>
             <tbody>$rows</tbody>
           </table>

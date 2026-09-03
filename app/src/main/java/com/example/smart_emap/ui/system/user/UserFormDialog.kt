@@ -83,6 +83,7 @@ fun UserFormDialog(
     form: UserFormState,
     roles: List<RoleListItemDto>,
     departments: List<OrganizationDto>,
+    sections: List<OrganizationDto>,
     isSubmitting: Boolean,
     onFormChange: ((UserFormState) -> UserFormState) -> Unit,
     onConfirm: () -> Unit,
@@ -168,7 +169,22 @@ fun UserFormDialog(
                             value = departments.find { it.id == form.departmentId }?.name ?: "未選択",
                             options = listOf(null to "未選択") + departments.map { it.id to it.name },
                             accent = SectionAccess,
-                            onSelect = { id -> onFormChange { f -> f.copy(departmentId = id) } },
+                            onSelect = { id ->
+                                onFormChange { f ->
+                                    val keepSection = f.sectionId != null &&
+                                        sections.any { it.id == f.sectionId && it.parentId == id }
+                                    f.copy(departmentId = id, sectionId = if (keepSection) f.sectionId else null)
+                                }
+                            },
+                        )
+                        UserDropdownField(
+                            label = "課",
+                            value = sections.find { it.id == form.sectionId }?.name ?: "未選択",
+                            options = listOf(null to "未選択") +
+                                sections.filter { form.departmentId == null || it.parentId == form.departmentId }
+                                    .map { it.id to it.name },
+                            accent = SectionAccess,
+                            onSelect = { id -> onFormChange { f -> f.copy(sectionId = id) } },
                         )
                         UserDropdownField(
                             label = "ロール",

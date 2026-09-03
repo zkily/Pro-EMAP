@@ -75,5 +75,6 @@ data class PatchWeldingBody(
     @Json(name = "mes_claim_client_lock") val mesClaimClientLock: Boolean? = null,
     @Json(name = "mes_force_release") val mesForceRelease: Boolean? = null,
     @Json(name = "mes_release_client_lock") val mesReleaseClientLock: Boolean? = null,
+    @Json(name = "mes_abandon_in_progress") val mesAbandonInProgress: Boolean? = null,
     val remarks: String? = null,
 )

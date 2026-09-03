@@ -3,6 +3,7 @@ package com.example.smart_emap.data.repository
 import com.example.smart_emap.core.mes.MesClientIdStore
 import com.example.smart_emap.core.network.ApiClient
 import com.example.smart_emap.data.model.CreateInspectionBody
+import com.example.smart_emap.data.model.CreateInspectionQrScanBody
 import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.InspectionManagementRowDto
 import com.example.smart_emap.data.model.InspectionNextAssignmentDto
@@ -176,6 +177,84 @@ class InspectionRepository(
         if (res.success == false) {
             throw IllegalStateException(res.message ?: "指定解除に失敗しました")
         }
+    }
+
+    /** ログイン検査員自身の次製品指定を解除（実績収集「選ぶ」用） */
+    suspend fun deleteMyNextAssignment(productionDay: String) {
+        val res = apiClient.inspectionApi().deleteMyNextAssignment(productionDay = productionDay)
+        if (res.success == false) {
+            throw IllegalStateException(res.message ?: "指定解除に失敗しました")
+        }
+    }
+
+    suspend fun createQrScan(
+        productionDay: String,
+        productCd: String,
+        productName: String,
+        unitPerBox: Int,
+        boxQty: Int = 1,
+        pieceQty: Int? = null,
+        scannedCode: String? = null,
+        inspectionId: Int? = null,
+        inspectorUserId: Int? = null,
+        registeredAt: String? = null,
+    ): com.example.smart_emap.data.model.InspectionQrScanDto {
+        val res = apiClient.inspectionApi().createQrScan(
+            CreateInspectionQrScanBody(
+                productionDay = productionDay,
+                productCd = productCd,
+                productName = productName,
+                unitPerBox = unitPerBox,
+                boxQty = boxQty,
+                pieceQty = pieceQty,
+                scannedCode = scannedCode,
+                inspectionId = inspectionId,
+                inspectorUserId = inspectorUserId,
+                registeredAt = registeredAt,
+            ),
+        )
+        if (res.success == false) {
+            throw IllegalStateException(res.message ?: "QR読取の登録に失敗しました")
+        }
+        return res.data ?: throw IllegalStateException(res.message ?: "QR読取の登録に失敗しました")
+    }
+
+    suspend fun loadQrScanSummary(
+        productionDay: String,
+        productCd: String? = null,
+        inspectionId: Int? = null,
+        inspectorUserId: Int? = null,
+        startedAt: String? = null,
+        endedAt: String? = null,
+    ): com.example.smart_emap.data.model.InspectionQrScanSummaryDto {
+        val res = apiClient.inspectionApi().qrScanSummary(
+            productionDay = productionDay,
+            productCd = productCd,
+            inspectionId = inspectionId,
+            inspectorUserId = inspectorUserId,
+            startedAt = startedAt,
+            endedAt = endedAt,
+        )
+        return res.data ?: com.example.smart_emap.data.model.InspectionQrScanSummaryDto()
+    }
+
+    suspend fun loadQrScanList(
+        productionDay: String,
+        productCd: String,
+        inspectionId: Int? = null,
+        startedAt: String? = null,
+        endedAt: String? = null,
+        limit: Int = 500,
+    ): com.example.smart_emap.data.model.InspectionQrScanListDataDto {
+        val res = apiClient.inspectionApi().listQrScans(
+            productionDay = productionDay,
+            productCd = productCd,
+            inspectionId = inspectionId,
+            startedAt = startedAt,
+            endedAt = endedAt,
+            limit = limit,
+        )
+        return res.data ?: com.example.smart_emap.data.model.InspectionQrScanListDataDto()
     }
 
     suspend fun createPlan(

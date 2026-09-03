@@ -792,12 +792,12 @@ class CuttingInstructionRepository(
 
 
 
-    suspend fun loadReflectedManagementCodes(date: String): Set<String> = runCatching {
-
-        val res = api().getReflectedManagementCodes(date)
-
-        (res.data ?: res.codes.orEmpty()).toSet()
-
+    suspend fun loadReflectedManagementCodes(date: String? = null, excludeDate: String? = null): Set<String> = runCatching {
+        val res = api().getReflectedManagementCodes(date = date, excludeDate = excludeDate)
+        (res.managementCodes ?: res.data ?: res.codes.orEmpty())
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
     }.getOrDefault(emptySet())
 
 

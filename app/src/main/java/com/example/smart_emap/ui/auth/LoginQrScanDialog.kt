@@ -1,15 +1,15 @@
-package com.example.smart_emap.ui.mes.inspection
+package com.example.smart_emap.ui.auth
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.util.Size
-import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -51,20 +50,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.smart_emap.ui.theme.LoginColors
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
-fun MesBarcodeScanDialog(
+fun LoginQrScanDialog(
     visible: Boolean,
-    s: InspStrings,
-    productLabel: String?,
     onDismiss: () -> Unit,
     onScanned: (String) -> Unit,
 ) {
-    // remember* は visible に関係なく毎回同じ順で呼ぶ（早期 return 禁止）
+    // remember* 必须始终按相同顺序调用；不可在 if (!visible) return 之后才 remember。
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var useFrontCamera by remember { mutableStateOf(true) }
@@ -77,23 +75,22 @@ fun MesBarcodeScanDialog(
     }
     var cameraKey by remember { mutableIntStateOf(0) }
     val scannedOnce = remember { AtomicBoolean(false) }
-    val previewView = remember { PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER } }
+    val previewView = remember {
+        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         hasPermission = granted
-        if (!granted) {
-            cameraError = s.scanCameraFailed
-        } else {
-            cameraError = null
-            cameraKey++
-        }
+        cameraError = if (granted) null else "カメラ権限が必要です"
+        if (granted) cameraKey++
     }
 
     LaunchedEffect(visible) {
         if (!visible) return@LaunchedEffect
         scannedOnce.set(false)
+        cameraError = null
         if (!hasPermission) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
         }
@@ -101,7 +98,6 @@ fun MesBarcodeScanDialog(
 
     DisposableEffect(visible, hasPermission, useFrontCamera, cameraKey) {
         if (!visible || !hasPermission) {
-            onDispose { }
             return@DisposableEffect onDispose { }
         }
         scannedOnce.set(false)
@@ -116,10 +112,15 @@ fun MesBarcodeScanDialog(
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = previewView.surfaceProvider
                 }
-                val selector = if (useFrontCamera) {
+                val preferred = if (useFrontCamera) {
                     CameraSelector.DEFAULT_FRONT_CAMERA
                 } else {
                     CameraSelector.DEFAULT_BACK_CAMERA
+                }
+                val fallback = if (useFrontCamera) {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                } else {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
                 }
                 val analysis = ImageAnalysis.Builder()
                     .setResolutionSelector(
@@ -162,9 +163,16 @@ fun MesBarcodeScanDialog(
                         .addOnCompleteListener { imageProxy.close() }
                 }
                 cameraProvider?.unbindAll()
-                cameraProvider?.bindToLifecycle(lifecycleOwner, selector, preview, analysis)
-            } catch (_: Exception) {
-                cameraError = s.scanCameraFailed
+                try {
+                    cameraProvider?.bindToLifecycle(lifecycleOwner, preferred, preview, analysis)
+                } catch (_: Exception) {
+                    cameraProvider?.unbindAll()
+                    cameraProvider?.bindToLifecycle(lifecycleOwner, fallback, preview, analysis)
+                }
+                cameraError = null
+            } catch (e: Exception) {
+                cameraError = e.message?.takeIf { it.isNotBlank() }
+                    ?: "カメラを起動できませんでした"
             }
         }, ContextCompat.getMainExecutor(context))
 
@@ -181,20 +189,19 @@ fun MesBarcodeScanDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Column {
-                Text(s.scanDialogTitle, fontWeight = FontWeight.Bold)
-                productLabel?.let {
-                    Text(it, fontSize = 12.sp, color = InspectionActualColors.TextMuted)
-                }
-            }
+            Text("QRコードでログイン", fontWeight = FontWeight.Bold)
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(s.scanDialogHint, fontSize = 12.sp, color = InspectionActualColors.TextMuted)
+                Text(
+                    "ログインQRを枠内に合わせてください",
+                    fontSize = 12.sp,
+                    color = LoginColors.TextMuted,
+                )
                 if (!hasPermission) {
-                    Text(s.scanCameraFailed, fontSize = 12.sp, color = Color(0xFFDC2626))
+                    Text("カメラ権限が必要です", fontSize = 12.sp, color = Color(0xFFDC2626))
                     Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text(s.scanRetryCamera)
+                        Text("権限を許可")
                     }
                 } else if (cameraError != null) {
                     Text(cameraError!!, fontSize = 12.sp, color = Color(0xFFDC2626))
@@ -202,7 +209,7 @@ fun MesBarcodeScanDialog(
                         cameraError = null
                         cameraKey++
                     }) {
-                        Text(s.scanRetryCamera)
+                        Text("カメラを再起動")
                     }
                 } else {
                     Box(
@@ -221,7 +228,7 @@ fun MesBarcodeScanDialog(
                         )
                         Box(
                             modifier = Modifier
-                                .size(width = 260.dp, height = 120.dp)
+                                .size(width = 220.dp, height = 220.dp)
                                 .border(2.dp, Color(0xFF10B981), RoundedCornerShape(8.dp)),
                         )
                     }
@@ -236,13 +243,13 @@ fun MesBarcodeScanDialog(
                     ) {
                         Icon(Icons.Default.Cameraswitch, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.size(4.dp))
-                        Text(if (useFrontCamera) s.scanUseRearCamera else s.scanUseFrontCamera, fontSize = 12.sp)
+                        Text(if (useFrontCamera) "背面カメラ" else "前面カメラ", fontSize = 12.sp)
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text(s.btnScanDialogClose) }
+            TextButton(onClick = onDismiss) { Text("閉じる") }
         },
     )
 }

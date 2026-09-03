@@ -1,5 +1,10 @@
 package com.example.smart_emap.ui.shell
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -13,7 +18,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +30,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.BatteryAlert
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
@@ -36,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,6 +56,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -70,14 +80,7 @@ fun HeaderBar(
     sidebarOpen: Boolean,
     onToggleSidebar: () -> Unit,
     onLogout: () -> Unit,
-    headerTodoState: HeaderTodoUiState = HeaderTodoUiState(),
-    onHeaderTodoOpen: () -> Unit = {},
-    onHeaderTodoDraftChange: (String) -> Unit = {},
-    onHeaderTodoAdd: () -> Unit = {},
-    onHeaderTodoToggle: (Int) -> Unit = {},
-    onHeaderTodoDelete: (Int) -> Unit = {},
-    onHeaderTodoClearDone: () -> Unit = {},
-    onHeaderTodoUpdateContent: (Int, String) -> Unit = { _, _ -> },
+    apiBaseUrl: String? = null,
     showKioskAdmin: Boolean = false,
     onKioskAdmin: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -93,9 +96,9 @@ fun HeaderBar(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(apiBaseUrl) {
         while (true) {
-            weatherInfo = HeaderWeatherFetcher.fetch()
+            weatherInfo = HeaderWeatherFetcher.fetch(apiBaseUrl)
             delay(HeaderWeatherFetcher.REFRESH_MS)
         }
     }
@@ -149,76 +152,160 @@ fun HeaderBar(
                         fontWeight = FontWeight.SemiBold,
                     )
                     HeaderWeatherInline(weatherInfo = weatherInfo)
-                    HeaderTodoTrigger(
-                        state = headerTodoState,
-                        onOpen = onHeaderTodoOpen,
-                        onDraftChange = onHeaderTodoDraftChange,
-                        onAdd = onHeaderTodoAdd,
-                        onToggle = onHeaderTodoToggle,
-                        onDelete = onHeaderTodoDelete,
-                        onClearDone = onHeaderTodoClearDone,
-                        onUpdateContent = onHeaderTodoUpdateContent,
-                    )
                 }
             }
 
-            Box {
-                HeaderUserChip(
-                    displayName = user.fullName ?: user.username,
-                    role = roleDisplayName(user.role),
-                    expanded = userMenuExpanded,
-                    onClick = { userMenuExpanded = true },
-                )
-                DropdownMenu(
-                    expanded = userMenuExpanded,
-                    onDismissRequest = { userMenuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(user.fullName ?: user.username, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    text = roleDisplayName(user.role),
-                                    fontSize = 11.sp,
-                                    color = Color.Gray,
-                                )
-                            }
-                        },
-                        onClick = { userMenuExpanded = false },
-                        enabled = false,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                HeaderBatteryChip()
+                Box {
+                    HeaderUserChip(
+                        displayName = user.fullName ?: user.username,
+                        expanded = userMenuExpanded,
+                        onClick = { userMenuExpanded = true },
                     )
-                    if (showKioskAdmin) {
+                    DropdownMenu(
+                        expanded = userMenuExpanded,
+                        onDismissRequest = { userMenuExpanded = false },
+                    ) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.kiosk_admin_menu)) },
+                            text = {
+                                Text(user.fullName ?: user.username, fontWeight = FontWeight.SemiBold)
+                            },
+                            onClick = { userMenuExpanded = false },
+                            enabled = false,
+                        )
+                        if (showKioskAdmin) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.kiosk_admin_menu)) },
+                                onClick = {
+                                    userMenuExpanded = false
+                                    onKioskAdmin()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.PhonelinkLock, contentDescription = null)
+                                },
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("ログアウト") },
                             onClick = {
                                 userMenuExpanded = false
-                                onKioskAdmin()
+                                onLogout()
                             },
                             leadingIcon = {
-                                Icon(Icons.Default.PhonelinkLock, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                             },
                         )
                     }
-                    DropdownMenuItem(
-                        text = { Text("ログアウト") },
-                        onClick = {
-                            userMenuExpanded = false
-                            onLogout()
-                        },
-                        leadingIcon = {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
-                        },
-                    )
                 }
             }
         }
     }
 }
 
+private data class HeaderBatteryInfo(
+    val percent: Int?,
+    val charging: Boolean,
+)
+
+@Composable
+private fun HeaderBatteryChip(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    var battery by remember { mutableStateOf(readBatteryInfo(context)) }
+
+    DisposableEffect(context) {
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                battery = parseBatteryInfo(intent) ?: readBatteryInfo(context)
+            }
+        }
+        // sticky broadcast で初回値も取得できる
+        val sticky = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, filter)
+        }
+        battery = parseBatteryInfo(sticky) ?: battery
+        onDispose {
+            runCatching { context.unregisterReceiver(receiver) }
+        }
+    }
+
+    val percent = battery.percent
+    val charging = battery.charging
+    val (icon, tint) = batteryVisual(percent, charging)
+    val label = if (percent != null) "$percent%" else "--%"
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(Color(0x470F172A))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = "バッテリー残量",
+            tint = tint,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = label,
+            color = Color(0xFFF8FAFC),
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+        )
+    }
+}
+
+private fun batteryVisual(percent: Int?, charging: Boolean): Pair<ImageVector, Color> {
+    return when {
+        charging -> Icons.Default.BatteryChargingFull to Color(0xFF4ADE80)
+        percent == null -> Icons.Default.BatteryFull to Color(0xFFC7D2FE)
+        percent <= 15 -> Icons.Default.BatteryAlert to Color(0xFFF87171)
+        percent <= 30 -> Icons.Default.BatteryAlert to Color(0xFFFBBF24)
+        else -> Icons.Default.BatteryFull to Color(0xFFA5B4FC)
+    }
+}
+
+private fun readBatteryInfo(context: Context): HeaderBatteryInfo {
+    val sticky = if (android.os.Build.VERSION.SDK_INT >= 33) {
+        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED), Context.RECEIVER_NOT_EXPORTED)
+    } else {
+        @Suppress("UnspecifiedRegisterReceiverFlag")
+        context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    }
+    return parseBatteryInfo(sticky) ?: HeaderBatteryInfo(percent = null, charging = false)
+}
+
+private fun parseBatteryInfo(intent: Intent?): HeaderBatteryInfo? {
+    if (intent == null) return null
+    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+    val percent = if (level >= 0 && scale > 0) {
+        ((level * 100f) / scale).toInt().coerceIn(0, 100)
+    } else {
+        null
+    }
+    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+    val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+    val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+        status == BatteryManager.BATTERY_STATUS_FULL ||
+        plugged != 0
+    return HeaderBatteryInfo(percent = percent, charging = charging)
+}
+
 @Composable
 private fun HeaderUserChip(
     displayName: String,
-    role: String,
     expanded: Boolean,
     onClick: () -> Unit,
 ) {
@@ -278,31 +365,22 @@ private fun HeaderUserChip(
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        Column(modifier = Modifier.widthIn(max = 120.dp)) {
-            Text(
-                text = displayName,
-                color = Color.White,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = TextStyle(
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = Color(0x440F172A),
-                        offset = androidx.compose.ui.geometry.Offset(0f, 1f),
-                        blurRadius = 4f,
-                    ),
+        Text(
+            text = displayName,
+            modifier = Modifier.widthIn(max = 120.dp),
+            color = Color.White,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = TextStyle(
+                shadow = androidx.compose.ui.graphics.Shadow(
+                    color = Color(0x440F172A),
+                    offset = androidx.compose.ui.geometry.Offset(0f, 1f),
+                    blurRadius = 4f,
                 ),
-            )
-            Text(
-                text = role,
-                color = Color(0xFFC7D2FE),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+            ),
+        )
         Spacer(modifier = Modifier.width(4.dp))
         Icon(
             Icons.Default.KeyboardArrowDown,
@@ -339,20 +417,29 @@ private fun HeaderWeatherInline(
                     ),
                 ),
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = weatherInfo.emoji,
-            fontSize = 13.sp,
-            lineHeight = 13.sp,
+            fontSize = 14.sp,
+            maxLines = 1,
+            softWrap = false,
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = "名古屋",
+            color = Color(0xFFA5B4FC),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = weatherInfo.temperature,
-            color = Color(0xFFC7D2FE),
-            fontSize = 11.5.sp,
-            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFFE0E7FF),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
             maxLines = 1,
-            modifier = Modifier.widthIn(min = 36.dp),
+            softWrap = false,
         )
     }
 }
@@ -360,13 +447,4 @@ private fun HeaderWeatherInline(
 private fun formatHeaderTime(): String {
     val formatter = DateTimeFormatter.ofPattern("MM/dd (E) HH:mm", Locale.JAPAN)
     return ZonedDateTime.now(ZoneId.of("Asia/Tokyo")).format(formatter)
-}
-
-private fun roleDisplayName(role: String): String = when (role) {
-    "admin" -> "管理者"
-    "manager" -> "マネージャー"
-    "worker" -> "作業者"
-    "guest" -> "ゲスト"
-    "viewer" -> "閲覧者"
-    else -> "一般ユーザー"
 }

@@ -121,6 +121,8 @@ object DeviceOwnerController {
     /**
      * 临时关闭 Kiosk 并解除部分限制（仍保持 Device Owner）。
      * 用于维护；之后可再 [startKioskIfNeeded]。
+     *
+     * 同时解除 [UserManager.DISALLOW_FACTORY_RESET]，否则設定画面の「初期化」が灰色のままになる。
      */
     fun enterMaintenanceMode(activity: Activity) {
         val store = KioskSettingsStore(activity)
@@ -136,6 +138,11 @@ object DeviceOwnerController {
                 dpm.setStatusBarDisabled(admin, false)
                 dpm.setKeyguardDisabled(admin, false)
             }
+            // 维护期允许恢复出厂 / USB（再开 Kiosk 时 applyPolicies 会重新禁止）
+            setRestriction(dpm, admin, UserManager.DISALLOW_FACTORY_RESET, false)
+            setRestriction(dpm, admin, UserManager.DISALLOW_USB_FILE_TRANSFER, false)
+            setRestriction(dpm, admin, UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA, false)
+            setRestriction(dpm, admin, UserManager.DISALLOW_SAFE_BOOT, false)
         } catch (e: SecurityException) {
             Log.e(TAG, "exit restrictions failed", e)
         }
@@ -148,12 +155,33 @@ object DeviceOwnerController {
         startKioskIfNeeded(activity)
     }
 
-    /** 清除 Device Owner（仅调试；生产环境通常不可随意清除）。 */
+    /**
+     * 清除 Device Owner（调试 / 退场用）。
+     *
+     * 必须先清用户限制再 clear：否则有的机型在 Owner 已移除后仍残留
+     * [UserManager.DISALLOW_FACTORY_RESET]，設定から初期化できない。
+     *
+     * 注意：Android 8+ 上对正式 Provisioning 的 Owner，[DevicePolicyManager.clearDeviceOwnerApp]
+     * 常会失败；失败时只能走 Recovery / fastboot 擦除。
+     */
     fun clearDeviceOwner(context: Context): Boolean {
         if (!isDeviceOwner(context)) return false
         val dpm = context.getSystemService(DevicePolicyManager::class.java) ?: return false
+        val admin = SmartEmapDeviceAdminReceiver.componentName(context)
         return try {
+            clearAllOwnerRestrictions(dpm, admin)
+            configurePersistentHome(context, dpm, admin, enabled = false)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    dpm.setStatusBarDisabled(admin, false)
+                    dpm.setKeyguardDisabled(admin, false)
+                } catch (_: SecurityException) {
+                    // ignore
+                }
+            }
+            @Suppress("DEPRECATION")
             dpm.clearDeviceOwnerApp(context.packageName)
+            Log.i(TAG, "clearDeviceOwnerApp succeeded")
             true
         } catch (e: Exception) {
             Log.e(TAG, "clearDeviceOwnerApp failed", e)
@@ -165,10 +193,30 @@ object DeviceOwnerController {
         val owner = isDeviceOwner(context)
         val admin = isAdminActive(context)
         val kiosk = KioskSettingsStore(context).isKioskEnabled
+        val um = context.getSystemService(UserManager::class.java)
+        val factoryBlocked = um?.hasUserRestriction(UserManager.DISALLOW_FACTORY_RESET) == true
         return buildString {
             append("Device Owner: "); append(if (owner) "YES" else "NO"); append('\n')
             append("Device Admin: "); append(if (admin) "YES" else "NO"); append('\n')
-            append("Kiosk enabled: "); append(if (kiosk) "YES" else "NO")
+            append("Kiosk enabled: "); append(if (kiosk) "YES" else "NO"); append('\n')
+            append("Factory reset blocked: "); append(if (factoryBlocked) "YES" else "NO")
+        }
+    }
+
+    private fun clearAllOwnerRestrictions(dpm: DevicePolicyManager, admin: ComponentName) {
+        val keys = mutableListOf(
+            UserManager.DISALLOW_FACTORY_RESET,
+            UserManager.DISALLOW_ADD_USER,
+            UserManager.DISALLOW_SAFE_BOOT,
+            UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES,
+            UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA,
+            UserManager.DISALLOW_USB_FILE_TRANSFER,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            keys.add(UserManager.DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY)
+        }
+        for (key in keys) {
+            setRestriction(dpm, admin, key, false)
         }
     }
 

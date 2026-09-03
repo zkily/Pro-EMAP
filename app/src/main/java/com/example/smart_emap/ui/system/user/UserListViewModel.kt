@@ -7,8 +7,10 @@ import com.example.smart_emap.data.model.OrganizationDto
 import com.example.smart_emap.data.model.RoleListItemDto
 import com.example.smart_emap.data.model.UserCreateBodyDto
 import com.example.smart_emap.data.model.UserListItemDto
+import com.example.smart_emap.data.model.UserLoginQrItemDto
 import com.example.smart_emap.data.model.UserUpdateBodyDto
 import com.example.smart_emap.data.repository.SystemUserRepository
+import com.example.smart_emap.core.system.PrintPageLayout
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +25,7 @@ data class UserFormState(
     val fullName: String = "",
     val email: String = "",
     val departmentId: Int? = null,
+    val sectionId: Int? = null,
     val roleId: Int? = null,
     val twoFactorEnabled: Boolean = false,
     val password: String = "",
@@ -44,15 +47,20 @@ data class UserListUiState(
     val pages: Int = 1,
     val keyword: String = "",
     val departmentId: Int? = null,
+    val sectionId: Int? = null,
     val statusFilter: String = "",
     val roles: List<RoleListItemDto> = emptyList(),
     val departments: List<OrganizationDto> = emptyList(),
+    val sections: List<OrganizationDto> = emptyList(),
     val showFormDialog: Boolean = false,
     val isEditMode: Boolean = false,
     val form: UserFormState = UserFormState(),
     val showResetPasswordDialog: Boolean = false,
     val resetPasswordForm: ResetPasswordFormState = ResetPasswordFormState(),
     val pendingPrintHtml: String? = null,
+    val pendingPrintSubject: String = "ユーザー一覧",
+    val pendingPrintLayout: PrintPageLayout = PrintPageLayout.A4_LANDSCAPE_SINGLE,
+    val isPrintingLoginQr: Boolean = false,
     val snackbarMessage: String? = null,
     val errorMessage: String? = null,
 )
@@ -64,6 +72,10 @@ class UserListViewModel(
     val uiState: StateFlow<UserListUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+
+    companion object {
+        private const val LOGIN_QR_FETCH_SIZE = 500
+    }
 
     init {
         loadOptions()
@@ -77,6 +89,7 @@ class UserListViewModel(
             repository.getUsers(
                 keyword = state.keyword,
                 departmentId = state.departmentId,
+                sectionId = state.sectionId,
                 status = state.statusFilter.takeIf { it.isNotBlank() },
                 page = state.page,
                 pageSize = state.pageSize,
@@ -106,8 +119,9 @@ class UserListViewModel(
         viewModelScope.launch {
             val roles = repository.getRoles().getOrElse { emptyList() }
             val orgs = repository.getOrganizations().getOrElse { emptyList() }
-                .filter { it.type in setOf("company", "site", "department") }
-            _uiState.update { it.copy(roles = roles, departments = orgs) }
+            val departments = orgs.filter { it.type in setOf("company", "site", "department") }
+            val sections = orgs.filter { it.type == "section" }
+            _uiState.update { it.copy(roles = roles, departments = departments, sections = sections) }
         }
     }
 
@@ -117,7 +131,21 @@ class UserListViewModel(
     }
 
     fun setDepartmentFilter(departmentId: Int?) {
-        _uiState.update { it.copy(departmentId = departmentId, page = 1) }
+        val currentSection = _uiState.value.sectionId
+        val stillValid = currentSection != null &&
+            _uiState.value.sections.any { it.id == currentSection && it.parentId == departmentId }
+        _uiState.update {
+            it.copy(
+                departmentId = departmentId,
+                sectionId = if (stillValid) currentSection else null,
+                page = 1,
+            )
+        }
+        refreshUsers()
+    }
+
+    fun setSectionFilter(sectionId: Int?) {
+        _uiState.update { it.copy(sectionId = sectionId, page = 1) }
         refreshUsers()
     }
 
@@ -160,6 +188,8 @@ class UserListViewModel(
         val matchedRole = _uiState.value.roles.find { it.name == roleName }
             ?: _uiState.value.roles.find { roleCodeFromJapaneseName(it.name) == user.role?.lowercase() }
         val dept = _uiState.value.departments.find { it.name == user.department }
+        val section = _uiState.value.sections.find { it.name == user.section && (dept == null || it.parentId == dept.id) }
+            ?: _uiState.value.sections.find { it.name == user.section }
         _uiState.update {
             it.copy(
                 showFormDialog = true,
@@ -170,6 +200,7 @@ class UserListViewModel(
                     fullName = user.fullName.orEmpty(),
                     email = user.email.orEmpty(),
                     departmentId = dept?.id,
+                    sectionId = section?.id,
                     roleId = matchedRole?.id,
                     twoFactorEnabled = user.twoFactor == true,
                 ),
@@ -209,6 +240,7 @@ class UserListViewModel(
                         email = form.email,
                         fullName = form.fullName,
                         departmentId = form.departmentId,
+                        sectionId = form.sectionId,
                         roleId = form.roleId,
                         twoFactorEnabled = form.twoFactorEnabled,
                     ),
@@ -220,6 +252,7 @@ class UserListViewModel(
                         email = form.email,
                         fullName = form.fullName,
                         departmentId = form.departmentId,
+                        sectionId = form.sectionId,
                         roleId = form.roleId!!,
                         twoFactorEnabled = form.twoFactorEnabled,
                         password = form.password,
@@ -333,11 +366,110 @@ class UserListViewModel(
             _uiState.update { it.copy(snackbarMessage = "印刷するデータがありません") }
             return
         }
-        _uiState.update { it.copy(pendingPrintHtml = buildUserListPrintHtml(users)) }
+        _uiState.update {
+            it.copy(
+                pendingPrintHtml = buildUserListPrintHtml(users),
+                pendingPrintSubject = "ユーザー一覧",
+                pendingPrintLayout = PrintPageLayout.A4_LANDSCAPE_SINGLE,
+            )
+        }
+    }
+
+    fun printLoginQr(user: UserListItemDto? = null) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isPrintingLoginQr = true) }
+            val targets = if (user != null) {
+                Result.success(listOf(user))
+            } else {
+                fetchAllMatchingUsers()
+            }
+            val targetUsers = targets.getOrElse { e ->
+                _uiState.update {
+                    it.copy(isPrintingLoginQr = false, snackbarMessage = e.message ?: "ユーザー一覧の取得に失敗しました")
+                }
+                return@launch
+            }
+            val ids = targetUsers.mapNotNull { it.id }
+            if (ids.isEmpty()) {
+                _uiState.update { it.copy(isPrintingLoginQr = false, snackbarMessage = "印刷するユーザーがありません") }
+                return@launch
+            }
+            fetchLoginQrPayloads(ids).fold(
+                onSuccess = { items ->
+                    val printItems = buildUserLoginQrPrintItems(items, targetUsers)
+                    if (printItems.isEmpty()) {
+                        _uiState.update {
+                            it.copy(isPrintingLoginQr = false, snackbarMessage = "ログインQRの生成に失敗しました")
+                        }
+                        return@fold
+                    }
+                    _uiState.update {
+                        it.copy(
+                            isPrintingLoginQr = false,
+                            pendingPrintHtml = buildUserLoginQrPrintHtml(printItems),
+                            pendingPrintSubject = "ログインQR",
+                            pendingPrintLayout = PrintPageLayout.A4_PORTRAIT_SINGLE,
+                            snackbarMessage = "${printItems.size}件のログインQRを印刷します",
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _uiState.update {
+                        it.copy(
+                            isPrintingLoginQr = false,
+                            snackbarMessage = e.message ?: "ログインQRの取得に失敗しました",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    private suspend fun fetchAllMatchingUsers(): Result<List<UserListItemDto>> {
+        val state = _uiState.value
+        val pageSize = LOGIN_QR_FETCH_SIZE
+        val first = repository.getUsers(
+            keyword = state.keyword,
+            departmentId = state.departmentId,
+            sectionId = state.sectionId,
+            status = state.statusFilter.takeIf { it.isNotBlank() },
+            page = 1,
+            pageSize = pageSize,
+        ).getOrElse { return Result.failure(it) }
+        val all = first.items.orEmpty().toMutableList()
+        val total = first.total ?: all.size
+        val pages = ((total + pageSize - 1) / pageSize).coerceAtLeast(1)
+        for (page in 2..pages) {
+            val res = repository.getUsers(
+                keyword = state.keyword,
+                departmentId = state.departmentId,
+                sectionId = state.sectionId,
+                status = state.statusFilter.takeIf { it.isNotBlank() },
+                page = page,
+                pageSize = pageSize,
+            ).getOrElse { return Result.failure(it) }
+            all += res.items.orEmpty()
+        }
+        return Result.success(all)
+    }
+
+    private suspend fun fetchLoginQrPayloads(userIds: List<Int>): Result<List<UserLoginQrItemDto>> {
+        val items = mutableListOf<UserLoginQrItemDto>()
+        for (chunk in userIds.chunked(LOGIN_QR_FETCH_SIZE)) {
+            val part = repository.getLoginQrPayloads(chunk).getOrElse { return Result.failure(it) }
+            items += part
+        }
+        return Result.success(items)
     }
 
     fun clearPendingPrintHtml() {
-        _uiState.update { it.copy(pendingPrintHtml = null) }
+        _uiState.update {
+            it.copy(
+                pendingPrintHtml = null,
+                pendingPrintSubject = "ユーザー一覧",
+                pendingPrintLayout = PrintPageLayout.A4_LANDSCAPE_SINGLE,
+            )
+        }
     }
 
     fun clearSnackbar() {

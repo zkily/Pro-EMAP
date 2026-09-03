@@ -7,6 +7,7 @@ data class UserCreateBodyDto(
     val email: String,
     @Json(name = "full_name") val fullName: String? = null,
     @Json(name = "department_id") val departmentId: Int? = null,
+    @Json(name = "section_id") val sectionId: Int? = null,
     @Json(name = "role_id") val roleId: Int,
     @Json(name = "two_factor_enabled") val twoFactorEnabled: Boolean = false,
     val password: String,
@@ -16,6 +17,7 @@ data class UserUpdateBodyDto(
     val email: String? = null,
     @Json(name = "full_name") val fullName: String? = null,
     @Json(name = "department_id") val departmentId: Int? = null,
+    @Json(name = "section_id") val sectionId: Int? = null,
     @Json(name = "role_id") val roleId: Int? = null,
     @Json(name = "two_factor_enabled") val twoFactorEnabled: Boolean? = null,
 )
@@ -130,4 +132,22 @@ data class OrganizationUpdateBodyDto(
     val phone: String? = null,
     val email: String? = null,
     val description: String? = null,
+)
+
+data class UserLoginQrRequestDto(
+    @Json(name = "user_ids") val userIds: List<Int>,
+)
+
+data class UserLoginQrItemDto(
+    @Json(name = "user_id") val userId: Int,
+    val username: String,
+    @Json(name = "full_name") val fullName: String? = null,
+    val email: String? = null,
+    val department: String? = null,
+    val section: String? = null,
+    val payload: String,
+)
+
+data class UserLoginQrResponseDto(
+    val items: List<UserLoginQrItemDto> = emptyList(),
 )

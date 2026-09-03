@@ -23,6 +23,13 @@ class SmartEmapDeviceAdminReceiver : DeviceAdminReceiver() {
         DeviceOwnerController.applyPoliciesIfOwner(context)
     }
 
+    override fun onProfileProvisioningComplete(context: Context, intent: Intent) {
+        super.onProfileProvisioningComplete(context, intent)
+        Log.i(TAG, "Profile/device provisioning complete")
+        DeviceOwnerController.applyPoliciesIfOwner(context)
+        launchMain(context)
+    }
+
     override fun onDisabled(context: Context, intent: Intent) {
         super.onDisabled(context, intent)
         Log.i(TAG, "Device admin disabled")

@@ -12,4 +12,10 @@
 /captures
 .externalNativeBuild
 .cxx
+.kotlin/
 local.properties
+
+# QR 开通用本地 APK 与生成物（勿提交正式包）
+/apk-dist/*.apk
+/apk-dist/provisioning-qr.json
+/apk-dist/*.log

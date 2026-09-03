@@ -249,7 +249,9 @@ interface CuttingInstructionApiService {
 
     @GET("/api/material/usage/reflected-management-codes")
     suspend fun getReflectedManagementCodes(
-        @Query("date") date: String,
+        @Query("date") date: String? = null,
+        @Query("exclude_date") excludeDate: String? = null,
+        @Query("source") source: String = "cutting_management",
     ): MaterialUsageReflectedCodesResponse
 
     @GET("/api/material/stock")

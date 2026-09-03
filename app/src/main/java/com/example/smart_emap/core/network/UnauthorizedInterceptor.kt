@@ -11,7 +11,12 @@ class UnauthorizedInterceptor(
         val request = chain.request()
         val response = chain.proceed(request)
         val path = request.url.encodedPath
-        if (response.code == 401 && !path.endsWith("/api/auth/login")) {
+        if (
+            response.code == 401 &&
+            !path.endsWith("/api/auth/login") &&
+            !path.endsWith("/api/auth/qr-login") &&
+            !path.endsWith("/api/auth/logout")
+        ) {
             sessionEvents.notifyUnauthorized()
         }
         return response

@@ -15,8 +15,8 @@ class AuthInterceptor(
         val request = chain.request()
         val path = request.url.encodedPath
         
-        // 不需要 Token 的路径白名单
-        if (path.endsWith("/api/auth/login") || path.endsWith("/api/auth/logout")) {
+        // login / qr-login は未認証のため Token を付けない；logout は Bearer が必要
+        if (path.endsWith("/api/auth/login") || path.endsWith("/api/auth/qr-login")) {
             return chain.proceed(request)
         }
 

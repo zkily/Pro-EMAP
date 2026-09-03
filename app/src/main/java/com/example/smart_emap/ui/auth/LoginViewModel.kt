@@ -36,7 +36,7 @@ class LoginViewModel(
             val remembered = authRepository.getRememberedCredentials()
             _uiState.update {
                 it.copy(
-                    apiBaseUrl = savedUrl.trim().trimEnd('/'),
+                    apiBaseUrl = ApiDefaults.resolvePresetSelection(savedUrl),
                     rememberMe = remembered.rememberMe,
                     username = remembered.username,
                 )
@@ -53,7 +53,8 @@ class LoginViewModel(
     }
 
     fun onApiBaseUrlChange(value: String) {
-        _uiState.update { it.copy(apiBaseUrl = value, apiBaseUrlError = null, errorMessage = null) }
+        val selected = ApiDefaults.matchPreset(value) ?: ApiDefaults.ensureTrailingSlash(value)
+        _uiState.update { it.copy(apiBaseUrl = selected, apiBaseUrlError = null, errorMessage = null) }
     }
 
     fun onRememberMeChange(checked: Boolean) {
@@ -85,12 +86,7 @@ class LoginViewModel(
             state.password.length < 6 -> "パスワードは6文字以上である必要があります"
             else -> null
         }
-        val apiBaseUrlError = when {
-            state.apiBaseUrl.isBlank() -> "API サーバーアドレスを入力してください"
-            !state.apiBaseUrl.trim().matches(Regex("^https?://\\S+$", RegexOption.IGNORE_CASE)) ->
-                "http:// または https:// で始まる URL を入力してください"
-            else -> null
-        }
+        val apiBaseUrlError = validateApiBaseUrl(state.apiBaseUrl)
         if (usernameError != null || passwordError != null || apiBaseUrlError != null) {
             valid = false
             _uiState.update {
@@ -124,6 +120,84 @@ class LoginViewModel(
                 },
             )
         }
+    }
+
+    fun canAttemptQrLogin(): Boolean {
+        val apiBaseUrlError = validateApiBaseUrl(_uiState.value.apiBaseUrl)
+        if (apiBaseUrlError != null) {
+            _uiState.update { it.copy(apiBaseUrlError = apiBaseUrlError, errorMessage = apiBaseUrlError) }
+            return false
+        }
+        return true
+    }
+
+    fun loginWithScannedQr(code: String, onSuccess: () -> Unit) {
+        if (!canAttemptQrLogin()) return
+        when (val parsed = LoginQrPayload.parse(code)) {
+            is LoginQrPayload.Parsed.TokenLogin -> {
+                _uiState.update {
+                    it.copy(username = parsed.username, usernameError = null, errorMessage = null)
+                }
+                performQrLogin(code, onSuccess)
+            }
+            is LoginQrPayload.Parsed.PasswordLogin -> {
+                _uiState.update {
+                    it.copy(
+                        username = parsed.username,
+                        password = parsed.password,
+                        usernameError = null,
+                        passwordError = null,
+                        errorMessage = null,
+                    )
+                }
+                login(onSuccess)
+            }
+            is LoginQrPayload.Parsed.UsernameOnly -> {
+                _uiState.update {
+                    it.copy(
+                        username = parsed.username,
+                        usernameError = null,
+                        errorMessage = "ユーザー名を読み取りました。パスワードを入力してください",
+                    )
+                }
+            }
+            LoginQrPayload.Parsed.Invalid -> {
+                _uiState.update {
+                    it.copy(errorMessage = "ログイン用のQRコードではありません")
+                }
+            }
+        }
+    }
+
+    private fun performQrLogin(code: String, onSuccess: () -> Unit) {
+        val state = _uiState.value
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            val apiBaseUrl = ApiDefaults.ensureTrailingSlash(
+                ApiDefaults.migrateDevApiUrl(state.apiBaseUrl.trim().trimEnd('/')),
+            )
+            val result = authRepository.qrLogin(
+                code = code,
+                apiBaseUrl = apiBaseUrl,
+                rememberMe = state.rememberMe,
+            )
+            _uiState.update { it.copy(isLoading = false) }
+            result.fold(
+                onSuccess = { onSuccess() },
+                onFailure = { e ->
+                    _uiState.update {
+                        it.copy(errorMessage = e.message ?: "QRログインに失敗しました")
+                    }
+                },
+            )
+        }
+    }
+
+    private fun validateApiBaseUrl(url: String): String? = when {
+        url.isBlank() -> "API サーバーアドレスを入力してください"
+        !url.trim().matches(Regex("^https?://\\S+$", RegexOption.IGNORE_CASE)) ->
+            "http:// または https:// で始まる URL を入力してください"
+        else -> null
     }
 
     class Factory(

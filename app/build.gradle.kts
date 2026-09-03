@@ -41,6 +41,9 @@ android {
 
     buildTypes {
         release {
+            // 厂内 QR 开通需要已签名且非 testOnly 的包；暂用 debug 密钥便于 assembleRelease。
+            // 正式对外分发时请改为独立 release keystore。
+            signingConfig = signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

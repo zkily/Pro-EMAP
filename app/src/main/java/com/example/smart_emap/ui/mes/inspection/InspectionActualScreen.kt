@@ -1,8 +1,20 @@
 package com.example.smart_emap.ui.mes.inspection
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +45,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +59,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
@@ -53,7 +68,10 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudUpload
@@ -66,11 +84,14 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
+import android.view.WindowManager
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -94,6 +115,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -116,8 +138,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.example.smart_emap.core.mes.InspectionSessionLogic
 import com.example.smart_emap.core.mes.TimerPhase
+import com.example.smart_emap.data.model.ErpProductDto
 import com.example.smart_emap.data.model.InspectionManagementRowDto
 import java.text.NumberFormat
 import java.util.Locale
@@ -252,12 +276,45 @@ fun InspectionActualScreen(
         )
     }
 
+    if (uiState.cancelProductionConfirmVisible) {
+        val cancelSubmitting = uiState.cancelProductionSubmitting
+        AlertDialog(
+            onDismissRequest = {
+                if (!cancelSubmitting) viewModel.dismissCancelProductionConfirm()
+            },
+            title = { Text(s.cancelProductionConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(s.cancelProductionConfirm, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(
+                    onClick = viewModel::confirmCancelProduction,
+                    enabled = !cancelSubmitting,
+                ) {
+                    if (cancelSubmitting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(s.btnCancelProduction)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = viewModel::dismissCancelProductionConfirm,
+                    enabled = !cancelSubmitting,
+                ) {
+                    Text(s.cancel)
+                }
+            },
+        )
+    }
+
     if (uiState.confirmedEditVisible) {
         ConfirmedHistoryEditDialog(
             uiState = uiState,
             s = s,
             defectGroups = uiState.defectGroups,
-            defectCount = viewModel::confirmedEditDefectCount,
             onQtyChange = viewModel::onConfirmedEditQtyChange,
             onWallStartChange = viewModel::onConfirmedEditWallStartChange,
             onWallEndChange = viewModel::onConfirmedEditWallEndChange,
@@ -312,6 +369,7 @@ fun InspectionActualScreen(
                     onToday = viewModel::setProductionDayToday,
                     onProductSelected = viewModel::onProductSelected,
                     onScan = viewModel::openScanDialog,
+                    onOpenQrHistory = viewModel::openQrScanHistoryPanel,
                 )
                 if (uiState.showActiveProductionSwitchBanner) {
                     ActiveProductionSwitchBanner(
@@ -348,7 +406,6 @@ fun InspectionActualScreen(
                                     productTitle = uiState.nextAssignmentProductTitle,
                                     canApply = uiState.canApplyNextAssignmentProduct,
                                     onApply = viewModel::applyNextAssignmentProductSelection,
-                                    height = 44.dp,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .widthIn(max = 448.dp),
@@ -376,7 +433,6 @@ fun InspectionActualScreen(
                         PlanProductionCard(
                             uiState = uiState,
                             s = s,
-                            defectCount = viewModel::defectCount,
                             onApplyNextAssignment = viewModel::applyNextAssignmentProductSelection,
                             onStart = viewModel::onStartProduction,
                             onPause = viewModel::onPauseProduction,
@@ -384,6 +440,7 @@ fun InspectionActualScreen(
                             onBreak = viewModel::onBreakProduction,
                             onResumeBreak = viewModel::onResumeBreakProduction,
                             onEnd = viewModel::openEndDialog,
+                            onCancelProduction = viewModel::requestCancelProduction,
                             onBumpDefect = viewModel::bumpDefect,
                         )
                     }
@@ -392,6 +449,7 @@ fun InspectionActualScreen(
                     CompletedHistorySection(
                         rows = uiState.completedRows,
                         totalQty = uiState.completedQtyTotal,
+                        products = uiState.products,
                         s = s,
                         inspectorLabelForRow = viewModel::inspectorLabelForHistoryRow,
                         canEditRow = viewModel::canEditConfirmedHistoryRow,
@@ -406,6 +464,171 @@ fun InspectionActualScreen(
                     .fillMaxHeight()
                     .padding(vertical = 4.dp),
             )
+            InspectionQrScanNoticeBanner(
+                info = uiState.qrScanNoticeBanner?.takeIf { it.kind != QrScanNoticeKind.Cooldown },
+                onDismiss = viewModel::dismissQrScanNoticeBanner,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 4.dp),
+            )
+            InspectionPersistentScannerOverlay(
+                visible = uiState.persistentScannerVisible,
+                lastCode = uiState.persistentScannerLastCode,
+                lastAtDisplay = uiState.persistentScannerLastAtDisplay,
+                onScanned = viewModel::onPersistentScannerCodeScanned,
+                cameraPermissionRequired = s.cameraPermissionRequired,
+                cameraPermissionWaiting = s.cameraPermissionWaiting,
+                cameraStartFailed = s.cameraStartFailed,
+                persistentScannerWaiting = s.persistentScannerWaiting,
+                persistentScannerLatest = s.persistentScannerLatest,
+                persistentScannerTime = s.persistentScannerTime,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(
+                        end = if (uiState.qrScanHistoryVisible) 336.dp else 20.dp,
+                    ),
+            )
+            QrScanHistorySidePanel(
+                visible = uiState.qrScanHistoryVisible,
+                uiState = uiState,
+                s = s,
+                onClose = viewModel::closeQrScanHistoryPanel,
+                onRefresh = { viewModel.openQrScanHistoryPanel() },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(vertical = 8.dp, horizontal = 8.dp),
+            )
+            InspectionAwayBanner(
+                visible = uiState.showAwayBanner,
+                phase = uiState.timerPhase,
+                s = s,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 20.dp),
+            )
+            InspectionQrScanCooldownBanner(
+                info = uiState.qrScanNoticeBanner?.takeIf { it.kind == QrScanNoticeKind.Cooldown },
+                onDismiss = viewModel::dismissQrScanNoticeBanner,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .zIndex(12f),
+            )
+            InspectionQrScanSuccessBanner(
+                info = uiState.qrScanSuccessBanner,
+                successTitle = s.qrScanSuccessTitle,
+                onDismiss = viewModel::dismissQrScanSuccessBanner,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .zIndex(12f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InspectionAwayBanner(
+    visible: Boolean,
+    phase: TimerPhase,
+    s: InspStrings,
+    modifier: Modifier = Modifier,
+) {
+    val isBreak = phase == TimerPhase.Break
+    val accent = if (isBreak) Color(0xFF0D9488) else Color(0xFFD97706)
+    val accentSoft = if (isBreak) Color(0xFFECFDF5) else Color(0xFFFFFBEB)
+    val accentBorder = if (isBreak) Color(0xFF5EEAD4) else Color(0xFFFCD34D)
+    val icon = if (isBreak) Icons.Filled.FreeBreakfast else Icons.Filled.Pause
+
+    val infinite = rememberInfiniteTransition(label = "awayBanner")
+    val pulseAlpha by infinite.animateFloat(
+        initialValue = 0.55f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "awayPulse",
+    )
+    val glowScale by infinite.animateFloat(
+        initialValue = 0.92f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "awayGlow",
+    )
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(280)) + slideInVertically(tween(320)) { it / 3 } + expandVertically(tween(280)),
+        exit = fadeOut(tween(220)) + slideOutVertically(tween(260)) { it / 4 } + shrinkVertically(tween(220)),
+        modifier = modifier,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer {
+                        scaleX = glowScale
+                        scaleY = glowScale
+                        alpha = pulseAlpha * 0.35f
+                    }
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(accent.copy(alpha = 0.35f), Color.Transparent),
+                        ),
+                        shape = RoundedCornerShape(28.dp),
+                    ),
+            )
+            Row(
+                modifier = Modifier
+                    .shadow(10.dp, RoundedCornerShape(24.dp), clip = false)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                accentSoft,
+                                Color.White.copy(alpha = 0.96f),
+                                accentSoft,
+                            ),
+                        ),
+                    )
+                    .border(2.dp, accentBorder.copy(alpha = 0.85f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 28.dp, vertical = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .graphicsLayer { alpha = pulseAlpha }
+                        .background(accent.copy(alpha = 0.14f), CircleShape)
+                        .border(1.5.dp, accent.copy(alpha = 0.45f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(
+                        text = s.awayBannerTitle,
+                        color = accent.copy(alpha = 0.55f + pulseAlpha * 0.45f),
+                        fontSize = 68.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 6.sp,
+                        maxLines = 1,
+                    )
+                }
+            }
         }
     }
 }
@@ -782,7 +1005,7 @@ private fun timerPanelMinHeight(uiState: InspectionUiState): androidx.compose.ui
         else -> PlanOpsMetrics.BlockHeight
     }
 
-private enum class PlanActionVariant { Start, Pause, Resume, Break, BreakResume, End, Disabled }
+private enum class PlanActionVariant { Start, Pause, Resume, Break, BreakResume, End, Cancel, Disabled }
 
 private data class TimerPhaseStyle(
     val background: Brush,
@@ -915,6 +1138,13 @@ private fun planActionStyle(variant: PlanActionVariant, enabled: Boolean): PlanA
             content = Color.White,
             shadow = Color(0x40EF4444),
         )
+        PlanActionVariant.Cancel -> PlanActionStyle(
+            top = Color(0xFF94A3B8),
+            bottom = Color(0xFF64748B),
+            border = Color(0xFF475569),
+            content = Color.White,
+            shadow = Color(0x4064748B),
+        )
         PlanActionVariant.Disabled -> PlanActionStyle(
             top = Color(0xFFF8FAFC),
             bottom = Color(0xFFE2E8F0),
@@ -941,6 +1171,7 @@ private fun ToolbarCard(
     onToday: () -> Unit,
     onProductSelected: (String?) -> Unit,
     onScan: () -> Unit,
+    onOpenQrHistory: () -> Unit,
 ) {
     var productExpanded by remember { mutableStateOf(false) }
     val products = uiState.products
@@ -986,76 +1217,88 @@ private fun ToolbarCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            ToolbarFieldGroup(icon = Icons.Default.CalendarMonth, label = s.productionDay) {
-                GlassValueChip(text = uiState.productionDay)
-                GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, s.dayPrev, onPrevDay)
-                GlassPillButton(text = s.dayToday, onClick = onToday)
-                GlassCircleButton(Icons.AutoMirrored.Filled.ArrowForward, s.dayNext, onNextDay)
-            }
-
-            ToolbarFieldGroup(icon = Icons.Default.Person, label = s.inspector) {
-                GlassValueChip(
-                    text = uiState.inspectorLabel.ifBlank { "—" },
-                    modifier = Modifier.widthIn(min = 88.dp, max = 120.dp),
-                    muted = true,
-                )
-            }
-
-            ToolbarFieldGroup(
-                icon = Icons.Default.Inventory2,
-                label = s.selectProduct,
-                labelMinWidth = 56.dp,
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val productEnabled = !uiState.productSelectionLocked && !uiState.isLoadingProducts
-                ExposedDropdownMenuBox(
-                    expanded = productExpanded,
-                    onExpandedChange = { if (productEnabled) productExpanded = it },
-                ) {
-                    GlassProductSelect(
-                        text = selectedLabel.ifBlank { s.productPlaceholder },
-                        isPlaceholder = selectedLabel.isBlank(),
-                        expanded = productExpanded,
-                        enabled = productEnabled,
-                        modifier = Modifier
-                            .menuAnchor(
-                                type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
-                                enabled = productEnabled,
-                            )
-                            .widthIn(
-                                min = ToolbarMetrics.ProductSelectMinWidth,
-                                max = ToolbarMetrics.ProductSelectMaxWidth,
-                            ),
+                ToolbarFieldGroup(icon = Icons.Default.CalendarMonth, label = s.productionDay) {
+                    GlassValueChip(text = uiState.productionDay)
+                    GlassCircleButton(Icons.AutoMirrored.Filled.ArrowBack, s.dayPrev, onPrevDay)
+                    GlassPillButton(text = s.dayToday, onClick = onToday)
+                    GlassCircleButton(Icons.AutoMirrored.Filled.ArrowForward, s.dayNext, onNextDay)
+                }
+
+                ToolbarFieldGroup(icon = Icons.Default.Person, label = s.inspector) {
+                    GlassValueChip(
+                        text = uiState.inspectorLabel.ifBlank { "—" },
+                        modifier = Modifier.widthIn(min = 88.dp, max = 120.dp),
+                        muted = true,
                     )
-                    ExposedDropdownMenu(expanded = productExpanded, onDismissRequest = { productExpanded = false }) {
-                        products.forEach { p ->
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        p.productName.trim().ifEmpty { p.productCode },
-                                        style = ToolbarTextStyle,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                },
-                                onClick = {
-                                    productExpanded = false
-                                    onProductSelected(p.productCode)
-                                },
-                            )
+                }
+
+                ToolbarFieldGroup(
+                    icon = Icons.Default.Inventory2,
+                    label = s.selectProduct,
+                    labelMinWidth = 56.dp,
+                ) {
+                    val productEnabled = !uiState.productSelectionLocked && !uiState.isLoadingProducts
+                    ExposedDropdownMenuBox(
+                        expanded = productExpanded,
+                        onExpandedChange = { if (productEnabled) productExpanded = it },
+                    ) {
+                        GlassProductSelect(
+                            text = selectedLabel.ifBlank { s.productPlaceholder },
+                            isPlaceholder = selectedLabel.isBlank(),
+                            expanded = productExpanded,
+                            enabled = productEnabled,
+                            modifier = Modifier
+                                .menuAnchor(
+                                    type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                                    enabled = productEnabled,
+                                )
+                                .widthIn(
+                                    min = ToolbarMetrics.ProductSelectMinWidth,
+                                    max = ToolbarMetrics.ProductSelectMaxWidth,
+                                ),
+                        )
+                        ExposedDropdownMenu(expanded = productExpanded, onDismissRequest = { productExpanded = false }) {
+                            products.forEach { p ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            p.productName.trim().ifEmpty { p.productCode },
+                                            style = ToolbarTextStyle,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    onClick = {
+                                        productExpanded = false
+                                        onProductSelected(p.productCode)
+                                    },
+                                )
+                            }
                         }
                     }
+                    GlassScanButton(
+                        label = s.btnScanCode,
+                        enabled = productEnabled,
+                        onClick = onScan,
+                    )
                 }
-                GlassScanButton(
-                    label = s.btnScanCode,
-                    enabled = productEnabled,
-                    onClick = onScan,
-                )
             }
+            GlassHistoryButton(
+                label = s.btnQrScanHistory,
+                highlighted = uiState.qrScanHistoryVisible,
+                onClick = onOpenQrHistory,
+            )
         }
     }
 }
@@ -1296,6 +1539,248 @@ private fun GlassScanButton(label: String, enabled: Boolean, onClick: () -> Unit
 }
 
 @Composable
+private fun GlassHistoryButton(
+    label: String,
+    highlighted: Boolean,
+    onClick: () -> Unit,
+) {
+    val bg = if (highlighted) {
+        Brush.linearGradient(listOf(Color(0xFFCCFBF1), Color(0xFF99F6E4)))
+    } else {
+        Brush.linearGradient(
+            listOf(
+                Color(0xFFECFEFF).copy(alpha = 0.95f),
+                Color(0xFFCFFAFE).copy(alpha = 0.88f),
+            ),
+        )
+    }
+    Box(
+        modifier = Modifier
+            .height(ToolbarMetrics.ControlHeight)
+            .shadow(3.dp, RoundedCornerShape(ToolbarMetrics.CornerRadius), spotColor = Color(0x330E7490))
+            .clip(RoundedCornerShape(ToolbarMetrics.CornerRadius))
+            .background(bg)
+            .border(
+                1.dp,
+                if (highlighted) Color(0xFF2DD4BF) else Color(0xFF67E8F9).copy(alpha = 0.8f),
+                RoundedCornerShape(ToolbarMetrics.CornerRadius),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Icon(
+                Icons.AutoMirrored.Filled.List,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = Color(0xFF0F766E),
+            )
+            Text(
+                label,
+                style = ToolbarTextStyle.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F766E),
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun QrScanHistorySidePanel(
+    visible: Boolean,
+    uiState: InspectionUiState,
+    s: InspStrings,
+    onClose: () -> Unit,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+        modifier = modifier,
+    ) {
+        Column(
+            modifier = Modifier
+                .width(320.dp)
+                .fillMaxHeight()
+                .shadow(12.dp, RoundedCornerShape(14.dp), spotColor = Color(0x400F766E))
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFFF0FDFA))
+                .border(1.dp, Color(0xFF99F6E4), RoundedCornerShape(14.dp))
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = s.qrScanHistoryTitle,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF115E59),
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                IconButton(onClick = onRefresh, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = Color(0xFF0F766E),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color(0xFF0F766E),
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
+            Text(
+                text = uiState.selectedProductCode?.let { cd ->
+                    val name = uiState.products.find { it.productCode == cd }?.productName?.trim().orEmpty()
+                    if (name.isNotEmpty()) "$cd · $name" else cd
+                } ?: "—",
+                fontSize = 11.sp,
+                color = Color(0xFF134E4A),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFCCFBF1))
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(s.qrScanHistoryTotalBoxes, fontSize = 10.sp, color = Color(0xFF0F766E))
+                    Text(
+                        uiState.qrScanHistoryBoxTotal.toString(),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF115E59),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(s.qrScanHistoryTotalPieces, fontSize = 10.sp, color = Color(0xFF0F766E))
+                    Text(
+                        uiState.qrScanHistoryPieceTotal.toString(),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF115E59),
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("×${uiState.qrScanHistoryScanCount}", fontSize = 11.sp, color = Color(0xFF0F766E))
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(s.qrScanHistoryColTime, modifier = Modifier.weight(1.4f), fontSize = 10.sp, color = Color(0xFF64748B))
+                Text(s.qrScanHistoryColCode, modifier = Modifier.weight(0.8f), fontSize = 10.sp, color = Color(0xFF64748B))
+                Text(s.qrScanHistoryColBoxes, modifier = Modifier.weight(0.5f), fontSize = 10.sp, color = Color(0xFF64748B))
+                Text(s.qrScanHistoryColPieces, modifier = Modifier.weight(0.5f), fontSize = 10.sp, color = Color(0xFF64748B))
+            }
+            when {
+                uiState.qrScanHistoryLoading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            color = InspectionActualColors.Teal,
+                            modifier = Modifier.size(28.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+                uiState.qrScanHistoryItems.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(s.qrScanHistoryEmpty, fontSize = 12.sp, color = Color(0xFF64748B))
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        items(
+                            items = uiState.qrScanHistoryItems,
+                            key = { it.id ?: "${it.registeredAt}-${it.scannedCode}-${it.hashCode()}" },
+                        ) { row ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.White.copy(alpha = 0.85f))
+                                    .border(1.dp, Color(0xFF99F6E4).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 6.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    formatQrHistoryTime(row.registeredAt),
+                                    modifier = Modifier.weight(1.4f),
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF134E4A),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Text(
+                                    row.scannedCode?.trim().orEmpty().ifBlank { "—" },
+                                    modifier = Modifier.weight(0.8f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF0F766E),
+                                    maxLines = 1,
+                                )
+                                Text(
+                                    (row.boxQty ?: 0).toString(),
+                                    modifier = Modifier.weight(0.5f),
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF134E4A),
+                                )
+                                Text(
+                                    (row.pieceQty ?: 0).toString(),
+                                    modifier = Modifier.weight(0.5f),
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF134E4A),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun formatQrHistoryTime(raw: String?): String {
+    val value = raw?.trim().orEmpty()
+    if (value.isEmpty()) return "—"
+    return when {
+        value.length >= 19 -> value.substring(5, 19).replace('T', ' ')
+        value.length >= 16 -> value.substring(5, 16).replace('T', ' ')
+        else -> value
+    }
+}
+
+@Composable
 private fun ActiveProductionSwitchBanner(
     productLabel: String,
     s: InspStrings,
@@ -1436,7 +1921,6 @@ private fun PlanProductionMetaRow(
     s: InspStrings,
     onApplyNextAssignment: () -> Unit,
 ) {
-    val blockHeight = 44.dp
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -1477,32 +1961,29 @@ private fun PlanProductionMetaRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 7.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             PlanMetaGlassChip(
                 label = s.productCd,
                 value = uiState.displayProductCd,
                 variant = PlanMetaChipVariant.ProductCd,
-                height = blockHeight,
-                modifier = Modifier.widthIn(min = 84.dp, max = 108.dp),
+                modifier = Modifier.widthIn(min = 88.dp, max = 116.dp),
             )
             PlanMetaGlassChip(
                 label = s.productName,
                 value = uiState.displayProductName,
                 variant = PlanMetaChipVariant.ProductName,
-                height = blockHeight,
                 compactWidth = true,
                 modifier = Modifier
-                    .widthIn(max = 136.dp)
+                    .widthIn(min = 96.dp, max = 148.dp)
                     .wrapContentWidth(),
             )
             PlanMetaGlassChip(
                 label = s.defectTotal,
                 value = uiState.defectTotal.toString(),
                 variant = PlanMetaChipVariant.DefectTotal,
-                height = blockHeight,
                 valueColorOverride = if (uiState.defectTotal > 0) Color(0xFFDC2626) else null,
                 modifier = Modifier.widthIn(min = 88.dp, max = 112.dp),
             )
@@ -1510,9 +1991,8 @@ private fun PlanProductionMetaRow(
                 label = s.inspector,
                 value = uiState.inspectorLabel.ifBlank { "—" },
                 variant = PlanMetaChipVariant.Inspector,
-                height = blockHeight,
                 leadingIcon = Icons.Default.Person,
-                modifier = Modifier.widthIn(min = 100.dp, max = 148.dp),
+                modifier = Modifier.widthIn(min = 108.dp, max = 160.dp),
             )
             if (uiState.showNextAssignmentStrip) {
                 PlanMetaNextAssignmentChip(
@@ -1521,8 +2001,7 @@ private fun PlanProductionMetaRow(
                     productTitle = uiState.nextAssignmentProductTitle,
                     canApply = uiState.canApplyNextAssignmentProduct,
                     onApply = onApplyNextAssignment,
-                    height = blockHeight,
-                    modifier = Modifier.widthIn(min = 132.dp, max = 220.dp),
+                    modifier = Modifier.widthIn(min = 168.dp, max = 260.dp),
                 )
             }
         }
@@ -1586,7 +2065,6 @@ private fun PlanMetaGlassChip(
     value: String,
     variant: PlanMetaChipVariant,
     modifier: Modifier = Modifier,
-    height: Dp = 44.dp,
     valueColorOverride: Color? = null,
     leadingIcon: ImageVector? = null,
     compactWidth: Boolean = false,
@@ -1601,8 +2079,7 @@ private fun PlanMetaGlassChip(
 
     Box(
         modifier = modifier
-            .defaultMinSize(minHeight = height)
-            .height(height)
+            .heightIn(min = 52.dp)
             .shadow(
                 elevation = 5.dp,
                 shape = RoundedCornerShape(10.dp),
@@ -1613,7 +2090,7 @@ private fun PlanMetaGlassChip(
             .background(Brush.verticalGradient(listOf(style.gradientTop, style.gradientBottom)))
             .border(1.dp, style.border.copy(alpha = 0.92f), RoundedCornerShape(10.dp))
             .border(0.5.dp, Color.White.copy(alpha = 0.65f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Box(
@@ -1642,10 +2119,11 @@ private fun PlanMetaGlassChip(
             }
             Column(
                 modifier = if (compactWidth) {
-                    Modifier.widthIn(max = 116.dp)
+                    Modifier.widthIn(max = 128.dp)
                 } else {
                     Modifier.weight(1f, fill = false)
                 },
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Text(
                     text = label,
@@ -1655,6 +2133,7 @@ private fun PlanMetaGlassChip(
                     letterSpacing = 0.4.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = 11.sp,
                 )
                 Text(
                     text = value,
@@ -1662,8 +2141,10 @@ private fun PlanMetaGlassChip(
                     fontWeight = FontWeight.Bold,
                     color = valueColor,
                     fontFamily = valueFont,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    lineHeight = 16.sp,
+                    softWrap = true,
                 )
             }
         }
@@ -1675,7 +2156,6 @@ private fun PlanMetaGlassChip(
 private fun PlanProductionCard(
     uiState: InspectionUiState,
     s: InspStrings,
-    defectCount: (String) -> Int,
     onApplyNextAssignment: () -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
@@ -1683,6 +2163,7 @@ private fun PlanProductionCard(
     onBreak: () -> Unit,
     onResumeBreak: () -> Unit,
     onEnd: () -> Unit,
+    onCancelProduction: () -> Unit,
     onBumpDefect: (String, Int) -> Unit,
 ) {
     val phaseLabel = phaseLabel(uiState.timerPhase, s)
@@ -1765,6 +2246,13 @@ private fun PlanProductionCard(
                         onClick = {},
                     )
                 }
+                GlassPlanActionButton(
+                    label = s.btnCancelProduction,
+                    icon = Icons.Default.Cancel,
+                    variant = PlanActionVariant.Cancel,
+                    enabled = uiState.canCancelProduction,
+                    onClick = onCancelProduction,
+                )
             }
 
             HorizontalDivider(color = InspectionActualColors.Border)
@@ -1783,36 +2271,15 @@ private fun PlanProductionCard(
             } else if (uiState.defectGroups.isEmpty()) {
                 Text(s.defectItemsEmpty, fontSize = 12.sp, color = InspectionActualColors.TextMuted)
             } else {
-                uiState.defectGroups.forEach { group ->
-                    Column(verticalArrangement = Arrangement.spacedBy(DefectCardMetrics.gridVerticalGap)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                s.attributableProcess,
-                                fontSize = 10.sp,
-                                color = InspectionActualColors.TextMuted,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(Color(0xFFF1F5F9))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(group.processName, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(DefectCardMetrics.gridVerticalGap),
-                        ) {
-                            group.items.forEach { item ->
-                                DefectCell(
-                                    label = item.label,
-                                    count = defectCount(item.id),
-                                    active = defectCount(item.id) > 0,
-                                    enabled = uiState.canEditDefects,
-                                    onMinus = { onBumpDefect(item.id, -1) },
-                                    onPlus = { onBumpDefect(item.id, 1) },
-                                )
-                            }
-                        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    uiState.defectGroups.forEach { group ->
+                        DefectProcessGroupBlock(
+                            s = s,
+                            group = group,
+                            counts = uiState.defectCounts,
+                            canEdit = uiState.canEditDefects,
+                            onBumpDefect = onBumpDefect,
+                        )
                     }
                 }
             }
@@ -2072,6 +2539,86 @@ private object DefectCardMetrics {
 }
 
 @Composable
+private fun DefectProcessGroupBlock(
+    s: InspStrings,
+    group: DefectGroupUi,
+    counts: Map<String, Int>,
+    canEdit: Boolean,
+    onBumpDefect: (String, Int) -> Unit,
+    compact: Boolean = false,
+) {
+    val tone = defectProcessTone(group.processCd)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(tone.background)
+            .border(1.dp, tone.border.copy(alpha = 0.85f), RoundedCornerShape(10.dp))
+            .padding(
+                horizontal = if (compact) 8.dp else 10.dp,
+                vertical = if (compact) 8.dp else 10.dp,
+            ),
+        verticalArrangement = Arrangement.spacedBy(
+            if (compact) 6.dp else DefectCardMetrics.gridVerticalGap,
+        ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                s.attributableProcess,
+                fontSize = if (compact) 9.sp else 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = tone.accent.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(tone.labelBg)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+            Text(
+                group.processName,
+                fontSize = if (compact) 11.sp else 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = tone.accent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(
+                if (compact) 6.dp else DefectCardMetrics.gridVerticalGap,
+            ),
+        ) {
+            group.items.forEach { item ->
+                val count = counts[item.id] ?: 0
+                if (compact) {
+                    ConfirmedEditDefectChip(
+                        label = item.label,
+                        count = count,
+                        active = count > 0,
+                        enabled = canEdit,
+                        onMinus = { onBumpDefect(item.id, -1) },
+                        onPlus = { onBumpDefect(item.id, 1) },
+                    )
+                } else {
+                    DefectCell(
+                        label = item.label,
+                        count = count,
+                        active = count > 0,
+                        enabled = canEdit,
+                        onMinus = { onBumpDefect(item.id, -1) },
+                        onPlus = { onBumpDefect(item.id, 1) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun DefectCell(
     label: String,
     count: Int,
@@ -2160,6 +2707,7 @@ private val HistoryTableColumns: (InspStrings) -> List<HistoryColumnSpec> = { s 
     listOf(
         HistoryColumnSpec(s.productCd, 0.9f, 52.dp, group = HistoryColumnGroup.Product),
         HistoryColumnSpec(s.productName, 2.4f, 88.dp, group = HistoryColumnGroup.Product),
+        HistoryColumnSpec(s.boxQty, 0.55f, 40.dp, TextAlign.End, HistoryColumnGroup.Metrics),
         HistoryColumnSpec(s.productionQty, 0.65f, 44.dp, TextAlign.End, HistoryColumnGroup.Metrics),
         HistoryColumnSpec(s.defectQty, 0.58f, 40.dp, TextAlign.End, HistoryColumnGroup.Metrics),
         HistoryColumnSpec(s.defectRate, 0.68f, 44.dp, TextAlign.End, HistoryColumnGroup.Metrics),
@@ -2183,6 +2731,7 @@ private fun RowScope.historyTableColumn(col: HistoryColumnSpec): Modifier =
 private fun CompletedHistorySection(
     rows: List<InspectionManagementRowDto>,
     totalQty: Int,
+    products: List<ErpProductDto>,
     s: InspStrings,
     inspectorLabelForRow: (InspectionManagementRowDto) -> String,
     canEditRow: (InspectionManagementRowDto) -> Boolean,
@@ -2190,6 +2739,11 @@ private fun CompletedHistorySection(
 ) {
     val nf = remember { NumberFormat.getNumberInstance(Locale.JAPAN) }
     val columns = remember(s) { HistoryTableColumns(s) }
+    val unitPerBoxByCd = remember(products) {
+        products.associate { p ->
+            p.normalizedCode() to (p.unitPerBox ?: 0).coerceAtLeast(0)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -2237,7 +2791,9 @@ private fun CompletedHistorySection(
                             row = row,
                             index = index,
                             columns = columns,
+                            s = s,
                             nf = nf,
+                            unitPerBox = unitPerBoxByCd[row.productCd?.trim().orEmpty()] ?: 0,
                             inspectorLabel = inspectorLabelForRow(row),
                             canEdit = canEditRow(row),
                             onEdit = { onEditRow(row) },
@@ -2395,7 +2951,9 @@ private fun HistoryTableDataRow(
     row: InspectionManagementRowDto,
     index: Int,
     columns: List<HistoryColumnSpec>,
+    s: InspStrings,
     nf: NumberFormat,
+    unitPerBox: Int,
     inspectorLabel: String,
     canEdit: Boolean,
     onEdit: () -> Unit,
@@ -2406,6 +2964,11 @@ private fun HistoryTableDataRow(
     val wallSec = HistoryRowFormat.rowWallElapsedSec(row)
     val pauseSec = HistoryRowFormat.rowPausedAccumSec(row)
     val efficiencyStr = InspectionManagementRowExt.formatEfficiencyRate(row)
+    val boxQtyStr = if (unitPerBox > 0) {
+        nf.format(kotlin.math.round(prod.toDouble() / unitPerBox).toInt())
+    } else {
+        "—"
+    }
     val striped = index % 2 == 1
     val rowBg = if (striped) {
         Brush.horizontalGradient(listOf(Color(0xFFF8FAFC), Color(0xFFF1F5F9).copy(alpha = 0.55f)))
@@ -2428,34 +2991,38 @@ private fun HistoryTableDataRow(
             if (colIndex > 0 && columns[colIndex - 1].group != col.group) {
                 HistoryGroupDivider()
             }
-            when (colIndex) {
-                0 -> HistoryCodeCell(row.productCd ?: "—", historyTableColumn(col))
-                1 -> HistoryProductNameCell(row.productName ?: "—", historyTableColumn(col))
-                2 -> HistoryQtyCell(nf.format(prod), historyTableColumn(col), positive = true)
-                3 -> HistoryQtyCell(
+            when (col.header) {
+                s.productCd -> HistoryCodeCell(row.productCd ?: "—", historyTableColumn(col))
+                s.productName -> HistoryProductNameCell(row.productName ?: "—", historyTableColumn(col))
+                s.boxQty -> HistoryQtyCell(boxQtyStr, historyTableColumn(col), positive = unitPerBox > 0 && prod > 0)
+                s.productionQty -> HistoryQtyCell(nf.format(prod), historyTableColumn(col), positive = true)
+                s.defectQty -> HistoryQtyCell(
                     if (defects > 0) nf.format(defects) else "—",
                     historyTableColumn(col),
                     positive = defects > 0,
                     warn = true,
                 )
-                4 -> HistoryRateCell(defectRateStr, historyTableColumn(col), warn = defects > 0 && prod > 0)
-                5 -> HistoryRateCell(efficiencyStr, historyTableColumn(col), efficiency = true)
-                6 -> HistoryTimeCell(HistoryRowFormat.formatProductionStart(row), historyTableColumn(col))
-                7 -> HistoryTimeCell(HistoryRowFormat.formatProductionEnd(row), historyTableColumn(col))
-                8 -> HistoryDurationCell(
+                s.defectRate -> HistoryRateCell(defectRateStr, historyTableColumn(col), warn = defects > 0 && prod > 0)
+                s.efficiencyRate -> HistoryRateCell(efficiencyStr, historyTableColumn(col), efficiency = true)
+                s.productionStart -> HistoryTimeCell(HistoryRowFormat.formatProductionStart(row), historyTableColumn(col))
+                s.productionEnd -> HistoryTimeCell(HistoryRowFormat.formatProductionEnd(row), historyTableColumn(col))
+                s.elapsedMinutes -> HistoryDurationCell(
                     HistoryRowFormat.formatSecondsAsMinutes(wallSec),
                     historyTableColumn(col),
                     active = wallSec > 0,
                 )
-                9 -> HistoryDurationCell(
+                s.pausedAccumMinutes -> HistoryDurationCell(
                     HistoryRowFormat.formatSecondsAsMinutes(pauseSec),
                     historyTableColumn(col),
                     active = pauseSec > 0,
                     muted = pauseSec <= 0,
                 )
-                10 -> HistoryDayCell(InspectionManagementRowExt.formatHistoryProductionDay(row), historyTableColumn(col))
-                11 -> HistoryNameCell(inspectorLabel, historyTableColumn(col))
-                12 -> HistoryActionCell(historyTableColumn(col), canEdit, col.header, onEdit)
+                s.productionDay -> HistoryDayCell(
+                    InspectionManagementRowExt.formatHistoryProductionDay(row),
+                    historyTableColumn(col),
+                )
+                s.inspector -> HistoryNameCell(inspectorLabel, historyTableColumn(col))
+                s.historyActions -> HistoryActionCell(historyTableColumn(col), canEdit, col.header, onEdit)
             }
         }
     }
@@ -2738,7 +3305,6 @@ private fun ConfirmedHistoryEditDialog(
     uiState: InspectionUiState,
     s: InspStrings,
     defectGroups: List<DefectGroupUi>,
-    defectCount: (String) -> Int,
     onQtyChange: (String) -> Unit,
     onWallStartChange: (Long) -> Unit,
     onWallEndChange: (Long) -> Unit,
@@ -2990,29 +3556,16 @@ private fun ConfirmedHistoryEditDialog(
                     if (defectGroups.isEmpty()) {
                         Text(s.defectItemsEmpty, fontSize = 10.sp, color = InspectionActualColors.TextMuted)
                     } else {
-                        defectGroups.forEach { group ->
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    group.processName,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color(0xFF64748B),
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            defectGroups.forEach { group ->
+                                DefectProcessGroupBlock(
+                                    s = s,
+                                    group = group,
+                                    counts = uiState.confirmedEditDefects,
+                                    canEdit = !submitting,
+                                    onBumpDefect = onBumpDefect,
+                                    compact = true,
                                 )
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                                ) {
-                                    group.items.forEach { item ->
-                                        ConfirmedEditDefectChip(
-                                            label = item.label,
-                                            count = defectCount(item.id),
-                                            active = defectCount(item.id) > 0,
-                                            enabled = !submitting,
-                                            onMinus = { onBumpDefect(item.id, -1) },
-                                            onPlus = { onBumpDefect(item.id, 1) },
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
@@ -3147,12 +3700,13 @@ private fun EndDialogQtyInput(
     onValueChange: (String) -> Unit,
     enabled: Boolean,
     placeholder: String,
-    focusRequester: FocusRequester,
     derived: Boolean,
 ) {
     val qtyRed = Color(0xFFF56C6C)
     val qtyRedLight = Color(0xFFF89898)
     val bgColor = if (derived) Color(0xFFF8FAFC) else Color(0xFFF56C6C).copy(alpha = 0.06f)
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -3172,6 +3726,9 @@ private fun EndDialogQtyInput(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Done,
         ),
+        keyboardActions = KeyboardActions(
+            onDone = { keyboardController?.hide() },
+        ),
         shape = RoundedCornerShape(7.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = qtyRed,
@@ -3186,8 +3743,7 @@ private fun EndDialogQtyInput(
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 38.dp)
-            .focusRequester(focusRequester),
+            .defaultMinSize(minHeight = 38.dp),
     )
 }
 
@@ -3305,19 +3861,25 @@ private fun EndProductionDialog(
     onConfirm: () -> Unit,
 ) {
     val boxMode = uiState.endDialogUnitPerBox > 0
-    val boxFocusRequester = remember { FocusRequester() }
-    val pieceFocusRequester = remember { FocusRequester() }
     val qtyRed = Color(0xFFF56C6C)
     val submitting = uiState.endDialogSubmitting
     val boxDerived = boxMode && uiState.endDialogQtyInputSource == EndDialogQtyInputSource.Piece
     val pieceDerived = boxMode && uiState.endDialogQtyInputSource == EndDialogQtyInputSource.Box
     val bodyScroll = rememberScrollState()
-
-    LaunchedEffect(boxMode) {
-        if (boxMode) boxFocusRequester.requestFocus() else pieceFocusRequester.requestFocus()
-    }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Dialog(onDismissRequest = { if (!submitting) onDismiss() }) {
+        val dialogView = LocalView.current
+        SideEffect {
+            (dialogView.parent as? DialogWindowProvider)?.window?.setSoftInputMode(
+                WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN,
+            )
+        }
+        LaunchedEffect(Unit) {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -3477,6 +4039,33 @@ private fun EndProductionDialog(
                                 accent = true,
                             )
                         }
+                        if (uiState.endDialogScanCount > 0 || uiState.endDialogScanBoxTotal > 0) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFECFDF5))
+                                    .border(1.dp, Color(0xFF6EE7B7), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(
+                                    s.endDialogScanSummaryTitle,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF065F46),
+                                )
+                                Text(
+                                    s.endDialogScanSummaryDetail
+                                        .replace("{count}", uiState.endDialogScanCount.toString())
+                                        .replace("{boxes}", uiState.endDialogScanBoxTotal.toString())
+                                        .replace("{pieces}", uiState.endDialogScanPieceTotal.toString()),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color(0xFF134E4A),
+                                )
+                            }
+                        }
                     }
 
                     Column(
@@ -3529,7 +4118,6 @@ private fun EndProductionDialog(
                                         onValueChange = onBoxesChange,
                                         enabled = !submitting,
                                         placeholder = s.boxQtyPlaceholder,
-                                        focusRequester = boxFocusRequester,
                                         derived = boxDerived,
                                     )
                                 }
@@ -3544,7 +4132,6 @@ private fun EndProductionDialog(
                                         onValueChange = onPieceQtyChange,
                                         enabled = !submitting,
                                         placeholder = s.productionQtyPlaceholder,
-                                        focusRequester = pieceFocusRequester,
                                         derived = pieceDerived,
                                     )
                                 }
@@ -3580,7 +4167,6 @@ private fun EndProductionDialog(
                                     onValueChange = onPieceQtyChange,
                                     enabled = !submitting,
                                     placeholder = s.productionQtyPlaceholder,
-                                    focusRequester = pieceFocusRequester,
                                     derived = false,
                                 )
                             }
@@ -3671,12 +4257,12 @@ private fun PlanMetaNextAssignmentChip(
     productTitle: String,
     canApply: Boolean,
     onApply: () -> Unit,
-    height: Dp,
     modifier: Modifier = Modifier,
 ) {
+    val displayName = productLabel.ifBlank { productTitle }.ifBlank { "—" }
     Box(
         modifier = modifier
-            .height(height)
+            .heightIn(min = 52.dp)
             .shadow(
                 elevation = 6.dp,
                 shape = RoundedCornerShape(10.dp),
@@ -3689,8 +4275,9 @@ private fun PlanMetaNextAssignmentChip(
                     colors = listOf(Color(0xFFECFEFF), Color(0xFFCFFAFE)),
                 ),
             )
-            .border(1.dp, Color(0xFF67E8F9).copy(alpha = 0.55f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .border(1.dp, Color(0xFF67E8F9).copy(alpha = 0.75f), RoundedCornerShape(10.dp))
+            .border(0.5.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(
@@ -3698,31 +4285,37 @@ private fun PlanMetaNextAssignmentChip(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    s.nextAssignmentStripTitle,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF0E7490),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    productLabel,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = InspectionActualColors.TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Text(
+                text = s.nextAssignmentStripTitle,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF0E7490),
+                letterSpacing = 0.2.sp,
+                maxLines = 1,
+                softWrap = false,
+            )
+            Text(
+                text = displayName,
+                modifier = Modifier.weight(1f),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF155E75),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
             OutlinedButton(
                 onClick = onApply,
                 enabled = canApply,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                modifier = Modifier.height(24.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                modifier = Modifier
+                    .height(26.dp)
+                    .defaultMinSize(minWidth = 48.dp),
                 border = BorderStroke(1.dp, Color(0xFF38BDF8)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF0284C7)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF0284C7),
+                    disabledContentColor = Color(0xFF94A3B8),
+                ),
             ) {
                 Text(s.nextAssignmentApplySelectShort, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
